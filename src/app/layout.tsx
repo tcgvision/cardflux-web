@@ -2,6 +2,7 @@ import "~/styles/globals.css";
 
 import { type Metadata } from "next";
 import { Geist } from "next/font/google";
+import Link from "next/link";
 
 import { TRPCReactProvider } from "~/trpc/react";
 import { ClerkProvider, SignedIn, SignedOut, SignInButton, SignUpButton, UserButton } from "@clerk/nextjs";
@@ -36,16 +37,25 @@ const NavBar = () => {
   return (
     <header className="flex justify-between items-center p-4 gap-4 h-16">
       <h1 className="text-2xl font-bold">
-        TCG Vision
+        <Link href="/" className="hover:opacity-80 transition-opacity">
+          TCG Vision
+        </Link>
       </h1>
-      <div>
-        <SignedOut>
-          <SignInButton />
-          <SignUpButton />
-        </SignedOut>
-        <SignedIn>
-          <UserButton />
-        </SignedIn>
+      <div className="flex items-center gap-8">
+        <div>
+          <Link href="/posts/create" className="hover:opacity-80 transition-opacity">
+            Create Post
+          </Link>
+        </div>
+        <div className="flex items-center gap-4">
+          <SignedOut>
+            <SignInButton />
+            <SignUpButton />
+          </SignedOut>
+          <SignedIn>
+            <UserButton />
+          </SignedIn>
+        </div>
       </div>
     </header>
   );
