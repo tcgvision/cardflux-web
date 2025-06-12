@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 
 export default function Post() {
   const params = useParams();
-  const id = params.id as string;
+  const id = Number(params.id);
 
   // Use the `getPost` query from the TRPC client
   const { data: post, isLoading, error } = api.post.getPost.useQuery({ id });

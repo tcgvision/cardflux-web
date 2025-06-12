@@ -21,27 +21,32 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${geist.variable}`}>
-      <body>
-        <ClerkProvider>
-          <NavBar />
-          <TRPCReactProvider>{children}</TRPCReactProvider>
-        </ClerkProvider>
-      </body>
-    </html>
+    <ClerkProvider>
+      <html lang="en" className={`${geist.variable}`}>
+        <body>
+            <NavBar />
+            <TRPCReactProvider>{children}</TRPCReactProvider>
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }
 
 const NavBar = () => {
   return (
-    <header className="flex justify-end items-center p-4 gap-4 h-16">
-      <SignedOut>
-        <SignInButton />
-        <SignUpButton />
-      </SignedOut>
-      <SignedIn>
-        <UserButton />
-      </SignedIn>
+    <header className="flex justify-between items-center p-4 gap-4 h-16">
+      <h1 className="text-2xl font-bold">
+        TCG Vision
+      </h1>
+      <div>
+        <SignedOut>
+          <SignInButton />
+          <SignUpButton />
+        </SignedOut>
+        <SignedIn>
+          <UserButton />
+        </SignedIn>
+      </div>
     </header>
   );
 };

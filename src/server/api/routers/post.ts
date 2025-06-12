@@ -1,6 +1,7 @@
 import { protectedProcedure, publicProcedure, createTRPCRouter } from "~/server/api/trpc";
 import { db } from "~/server/db";
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 
 /**
  * Post Router Documentation
@@ -31,14 +32,8 @@ const postSchema = z.object({
   content: z.string().optional(),
 });
 
-const userSchema = z.object({
-  id: z.string(),
-  name: z.string().optional(),
-  email: z.string().email(),
-});
-
 const postIdSchema = z.object({
-  id: z.string().transform((val) => parseInt(val)),
+  id: z.number(),
 });
 
 export const postRouter = createTRPCRouter({
@@ -49,12 +44,21 @@ export const postRouter = createTRPCRouter({
   getPost: publicProcedure
     .input(postIdSchema)
     .query(async ({ input }) => {
-      return await db.post.findUnique({
+      const post = await db.post.findUnique({
         where: { id: input.id },
         include: {
           author: true,
         },
       });
+
+      if (!post) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Post not found",
+        });
+      }
+
+      return post;
     }),
 
   /**
@@ -75,29 +79,35 @@ export const postRouter = createTRPCRouter({
   /**
    * Create a new post
    * Protected endpoint - only authenticated users can access
-   * Automatically uses the authenticated user's ID
    */
   createPost: protectedProcedure
     .input(postSchema)
     .mutation(async ({ ctx, input }) => {
+      console.log(ctx)
       if (!ctx.auth.userId) {
-        throw new Error("Not authorized");
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "You must be logged in to create a post",
+        });
       }
 
-      // Ensure user exists
+      // Find the user by their Clerk ID
       const user = await db.user.findUnique({
-        where: { id: ctx.auth.userId },
+        where: { clerkId: ctx.auth.userId },
       });
 
       if (!user) {
-        throw new Error("User not found in database");
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "User not found in database",
+        });
       }
 
       return await db.post.create({
         data: {
           title: input.title,
           content: input.content,
-          authorId: ctx.auth.userId,
+          authorId: user.id, // Use the numeric ID from the database
         },
         include: {
           author: true,
@@ -108,24 +118,48 @@ export const postRouter = createTRPCRouter({
   /**
    * Update an existing post
    * Protected endpoint - only authenticated users can access
-   * Only allows updating own posts
    */
   updatePost: protectedProcedure
     .input(z.object({
-      id: z.string().transform((val) => parseInt(val)),
+      id: z.number(),
       data: postSchema,
     }))
     .mutation(async ({ ctx, input }) => {
+      if (!ctx.auth.userId) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "You must be logged in to update a post",
+        });
+      }
+
+      // Find the user by their Clerk ID
+      const user = await db.user.findUnique({
+        where: { clerkId: ctx.auth.userId },
+      });
+
+      if (!user) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "User not found in database",
+        });
+      }
+
       const post = await db.post.findUnique({
         where: { id: input.id },
       });
 
       if (!post) {
-        throw new Error("Post not found");
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Post not found",
+        });
       }
 
-      if (post.authorId !== ctx.auth.userId) {
-        throw new Error("Not authorized to update this post");
+      if (post.authorId !== user.id) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You are not authorized to update this post",
+        });
       }
 
       return await db.post.update({
@@ -140,21 +174,45 @@ export const postRouter = createTRPCRouter({
   /**
    * Delete a post
    * Protected endpoint - only authenticated users can access
-   * Only allows deleting own posts
    */
   deletePost: protectedProcedure
     .input(postIdSchema)
     .mutation(async ({ ctx, input }) => {
+      if (!ctx.auth.userId) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "You must be logged in to delete a post",
+        });
+      }
+
+      // Find the user by their Clerk ID
+      const user = await db.user.findUnique({
+        where: { clerkId: ctx.auth.userId },
+      });
+
+      if (!user) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "User not found in database",
+        });
+      }
+
       const post = await db.post.findUnique({
         where: { id: input.id },
       });
 
       if (!post) {
-        throw new Error("Post not found");
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Post not found",
+        });
       }
 
-      if (post.authorId !== ctx.auth.userId) {
-        throw new Error("Not authorized to delete this post");
+      if (post.authorId !== user.id) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You are not authorized to delete this post",
+        });
       }
 
       return await db.post.delete({
