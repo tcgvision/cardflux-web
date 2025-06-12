@@ -31,8 +31,14 @@ const postSchema = z.object({
   content: z.string().optional(),
 });
 
-const postIdSchema = z.object({
+const userSchema = z.object({
   id: z.string(),
+  name: z.string().optional(),
+  email: z.string().email(),
+});
+
+const postIdSchema = z.object({
+  id: z.string().transform((val) => parseInt(val)),
 });
 
 export const postRouter = createTRPCRouter({
@@ -46,7 +52,7 @@ export const postRouter = createTRPCRouter({
       return await db.post.findUnique({
         where: { id: input.id },
         include: {
-          author: true, // Include author details
+          author: true,
         },
       });
     }),
@@ -74,12 +80,24 @@ export const postRouter = createTRPCRouter({
   createPost: protectedProcedure
     .input(postSchema)
     .mutation(async ({ ctx, input }) => {
-      // ctx.auth.userId is guaranteed to exist in protected procedures
+      if (!ctx.auth.userId) {
+        throw new Error("Not authorized");
+      }
+
+      // Ensure user exists
+      const user = await db.user.findUnique({
+        where: { id: ctx.auth.userId },
+      });
+
+      if (!user) {
+        throw new Error("User not found in database");
+      }
+
       return await db.post.create({
         data: {
           title: input.title,
           content: input.content,
-          authorId: ctx.auth.userId, // Use the authenticated user's ID
+          authorId: ctx.auth.userId,
         },
         include: {
           author: true,
@@ -94,11 +112,10 @@ export const postRouter = createTRPCRouter({
    */
   updatePost: protectedProcedure
     .input(z.object({
-      id: z.string(),
+      id: z.string().transform((val) => parseInt(val)),
       data: postSchema,
     }))
     .mutation(async ({ ctx, input }) => {
-      // First verify the post belongs to the user
       const post = await db.post.findUnique({
         where: { id: input.id },
       });
@@ -128,7 +145,6 @@ export const postRouter = createTRPCRouter({
   deletePost: protectedProcedure
     .input(postIdSchema)
     .mutation(async ({ ctx, input }) => {
-      // First verify the post belongs to the user
       const post = await db.post.findUnique({
         where: { id: input.id },
       });

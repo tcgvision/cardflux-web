@@ -99,10 +99,10 @@ export default function NewPost() {
         </div>
         <button
           type="submit"
-          disabled={createPostMutation.isLoading}
+          disabled={createPostMutation.isPending}
           className="inline-block w-full rounded-lg border-2 border-current px-4 py-2 text-current transition-all hover:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {createPostMutation.isLoading ? 'Creating...' : 'Create Post'}
+          {createPostMutation.isPending ? 'Creating...' : 'Create Post'}
         </button>
       </form>
     </div>
