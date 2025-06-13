@@ -191,6 +191,7 @@ export const postRouter = createTRPCRouter({
         where: { clerkId: ctx.auth.userId },
       });
 
+
       if (!user) {
         throw new TRPCError({
           code: "NOT_FOUND",

@@ -11,12 +11,23 @@ datasource db {
     directUrl = env("DIRECT_URL")   
 }
 
+model Shop {
+  id        String   @id             // Clerk Org ID
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  users     User[]   @relation("ShopUsers")
+}
+
 model User {
-  id      Int     @id @default(autoincrement())
-  clerkId String  @unique
-  email   String  @unique
-  name    String?
-  posts   Post[]
+  id       Int     @id @default(autoincrement())
+  clerkId  String  @unique
+  email    String  @unique
+  name     String?
+  shopId   String?               // FK to Shop (nullable for now)
+  shop     Shop?   @relation("ShopUsers", fields: [shopId], references: [id])
+  posts    Post[]
 }
 
 model Post {
