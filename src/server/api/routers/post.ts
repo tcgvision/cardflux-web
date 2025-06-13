@@ -2,6 +2,7 @@ import { protectedProcedure, publicProcedure, createTRPCRouter } from "~/server/
 import { db } from "~/server/db";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
+import type { User } from "@prisma/client";
 
 /**
  * Post Router Documentation
@@ -94,7 +95,7 @@ export const postRouter = createTRPCRouter({
       // Find the user by their Clerk ID
       const user = await db.user.findUnique({
         where: { clerkId: ctx.auth.userId },
-      });
+      }) as User | null
 
       if (!user) {
         throw new TRPCError({
