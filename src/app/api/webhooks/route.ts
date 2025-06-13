@@ -74,5 +74,42 @@ export async function POST(req: Request) {
     }
   }
 
+  if (evt.type === 'organization.created') {
+    const { id, name, slug } = evt.data as { id: string; name: string; slug: string };
+    try {
+      const newShop = await db.shop.upsert({
+        where: { id },
+        update: {},
+        create: {
+          id, name, slug,
+        },
+      });
+      console.log("Created Shop (Org):", newShop);
+    } catch (error) {
+      console.error("Error creating shop:", error);
+    }
+  }
+  
+  if (evt.type === 'organizationMembership.created') {
+    const { organization, public_user_data } = evt.data as { organization: { id: string }; public_user_data: { identifier: string; first_name: string } };
+  
+    const email = public_user_data?.identifier;
+    const name = public_user_data?.first_name;
+  
+    try {
+      await db.user.update({
+        where: { email },
+        data: {
+          shopId: organization.id,
+          name: name ?? undefined,
+        },
+      });
+      console.log(`Linked user to shop: ${organization.id}`);
+    } catch (error) {
+      console.error("Error linking user to shop:", error);
+    }
+  }
+  
+
   return new Response('Webhook received', { status: 200 })
 }
