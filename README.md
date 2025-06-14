@@ -85,6 +85,26 @@ pnpm dev
 ```
 The app will be live at http://localhost:3000
 
+### 6. Ngrok Setup (for external access)
+To expose your local development server to the internet (useful for testing webhooks or mobile devices):
+
+1. Install ngrok:
+```bash
+# Using Homebrew (macOS)
+brew install ngrok
+
+# Or download from https://ngrok.com/download
+```
+
+2. Start ngrok (in a separate terminal):
+```bash
+ngrok http 3000
+```
+
+3. Use the provided ngrok URL (e.g., `https://xxxx-xx-xx-xxx-xx.ngrok.io`) to access your local development server from anywhere.
+
+Note: The ngrok URL will change each time you restart ngrok unless you have a paid account.
+
 ## 🧼 Code Quality
 
 We use:
