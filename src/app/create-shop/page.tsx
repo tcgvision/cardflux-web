@@ -35,7 +35,15 @@ export default function CreateShopPage() {
         slug: formData.shopName.toLowerCase().replace(/\s+/g, '-'),
       });
       
-      router.push("/");
+      // Redirect to enterprise dashboard
+      const isLocalhost = window.location.hostname === "localhost";
+      if (isLocalhost) {
+        router.push("/enterprise");
+      } else {
+        const enterpriseUrl = new URL("/", window.location.href);
+        enterpriseUrl.hostname = "enterprise.tcgvision.com";
+        window.location.href = enterpriseUrl.toString();
+      }
     } catch (err) {
       console.error("Error creating shop:", err);
       setError("Failed to create shop. Please try again.");

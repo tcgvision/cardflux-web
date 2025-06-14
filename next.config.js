@@ -4,7 +4,22 @@
  */
 import "./src/env.js";
 
-/** @type {import("next").NextConfig} */
-const config = {};
+/** @type {import('next').NextConfig} */
+const config = {
+  async rewrites() {
+    return [
+      {
+        source: '/:path*',
+        has: [
+          {
+            type: 'host',
+            value: 'enterprise.tcgvision.com',
+          },
+        ],
+        destination: '/enterprise/:path*',
+      },
+    ];
+  },
+};
 
 export default config;
