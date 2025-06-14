@@ -4,6 +4,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useClerk } from "@clerk/nextjs";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import { Button } from "~/components/ui/button";
+import { Input } from "~/components/ui/input";
+import { Textarea } from "~/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
+import { Label } from "~/components/ui/label";
 
 export default function CreateShopPage() {
   const router = useRouter();
@@ -29,7 +35,6 @@ export default function CreateShopPage() {
         slug: formData.shopName.toLowerCase().replace(/\s+/g, '-'),
       });
       
-      // Redirect to dashboard after successful creation
       router.push("/");
     } catch (err) {
       console.error("Error creating shop:", err);
@@ -40,119 +45,99 @@ export default function CreateShopPage() {
   };
 
   const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const handleSelectChange = (value: string) => {
+    setFormData(prev => ({ ...prev, shopType: value as "local" | "online" | "both" }));
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Create Your TCG Shop
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
+    <div className="container flex h-[calc(100vh-4rem)] items-center justify-center py-6">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle>Create Your TCG Shop</CardTitle>
+          <CardDescription>
             Set up your trading card game shop to start managing inventory and sales
-          </p>
-        </div>
-        
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="space-y-4">
-            {/* Shop Name */}
-            <div>
-              <label htmlFor="shopName" className="block text-sm font-medium text-gray-700">
-                Shop Name *
-              </label>
-              <input
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="shopName">Shop Name *</Label>
+              <Input
                 id="shopName"
                 name="shopName"
-                type="text"
-                autoComplete="organization"
-                required
                 value={formData.shopName}
                 onChange={handleInputChange}
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
                 placeholder="e.g., Dragon's Den Cards"
+                required
               />
             </div>
 
-            {/* Description */}
-            <div>
-              <label htmlFor="description" className="block text-sm font-medium text-gray-700">
-                Description
-              </label>
-              <textarea
+            <div className="space-y-2">
+              <Label htmlFor="description">Description</Label>
+              <Textarea
                 id="description"
                 name="description"
-                rows={3}
                 value={formData.description}
                 onChange={handleInputChange}
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
                 placeholder="Brief description of your shop and specialties"
+                rows={3}
               />
             </div>
 
-            {/* Location */}
-            <div>
-              <label htmlFor="location" className="block text-sm font-medium text-gray-700">
-                Location
-              </label>
-              <input
+            <div className="space-y-2">
+              <Label htmlFor="location">Location</Label>
+              <Input
                 id="location"
                 name="location"
-                type="text"
                 value={formData.location}
                 onChange={handleInputChange}
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
                 placeholder="e.g., Los Angeles, CA"
               />
             </div>
 
-            {/* Shop Type */}
-            <div>
-              <label htmlFor="shopType" className="block text-sm font-medium text-gray-700">
-                Shop Type *
-              </label>
-              <select
-                id="shopType"
-                name="shopType"
-                required
+            <div className="space-y-2">
+              <Label htmlFor="shopType">Shop Type *</Label>
+              <Select
                 value={formData.shopType}
-                onChange={handleInputChange}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                onValueChange={handleSelectChange}
               >
-                <option value="local">Local Store Only</option>
-                <option value="online">Online Only</option>
-                <option value="both">Both Local & Online</option>
-              </select>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select shop type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="local">Local Store Only</SelectItem>
+                  <SelectItem value="online">Online Only</SelectItem>
+                  <SelectItem value="both">Both Local & Online</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-          </div>
 
-          {error && (
-            <div className="text-red-600 text-sm text-center">
-              {error}
-            </div>
-          )}
+            {error && (
+              <div className="text-sm text-red-500 text-center">
+                {error}
+              </div>
+            )}
 
-          <div>
-            <button
+            <Button
               type="submit"
+              className="w-full"
               disabled={isCreating || !formData.shopName.trim()}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isCreating ? "Creating Shop..." : "Create Shop"}
-            </button>
-          </div>
+            </Button>
 
-          <div className="text-center">
-            <p className="text-xs text-gray-600">
+            <p className="text-xs text-muted-foreground text-center">
               By creating a shop, you agree to our terms of service and privacy policy
             </p>
-          </div>
-        </form>
-      </div>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }
