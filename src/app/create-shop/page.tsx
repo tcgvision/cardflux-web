@@ -3,17 +3,19 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useClerk } from "@clerk/nextjs";
+import { useClerk, useOrganization } from "@clerk/nextjs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Textarea } from "~/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import { Label } from "~/components/ui/label";
+import { api } from "~/trpc/react";
 
 export default function CreateShopPage() {
   const router = useRouter();
   const { createOrganization } = useClerk();
+  const { organization } = useOrganization();
   const [formData, setFormData] = useState({
     shopName: "",
     description: "",
@@ -23,6 +25,21 @@ export default function CreateShopPage() {
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState("");
 
+  // If user already has an organization, redirect to enterprise
+  if (organization) {
+    const isLocalhost = window.location.hostname === "localhost";
+    if (isLocalhost) {
+      router.push("/enterprise");
+    } else {
+      const enterpriseUrl = new URL("/", window.location.href);
+      enterpriseUrl.hostname = "enterprise.tcgvision.com";
+      window.location.href = enterpriseUrl.toString();
+    }
+    return null;
+  }
+
+  const createShopMutation = api.shop.create.useMutation();
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -30,9 +47,19 @@ export default function CreateShopPage() {
     setError("");
 
     try {
-      await createOrganization({
+      // Create the organization in Clerk
+      const org = await createOrganization({
         name: formData.shopName,
         slug: formData.shopName.toLowerCase().replace(/\s+/g, '-'),
+      });
+
+      // Create the shop in our database
+      createShopMutation.mutate({
+        name: formData.shopName,
+        description: formData.description,
+        location: formData.location,
+        type: formData.shopType,
+        clerkOrgId: org.id,
       });
       
       // Redirect to enterprise dashboard

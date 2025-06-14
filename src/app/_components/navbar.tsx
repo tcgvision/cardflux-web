@@ -55,7 +55,7 @@ export function Navbar() {
             <>
               {isSignedIn ? (
                 <div className="flex items-center space-x-4">
-                  <Link href="/dashboard">
+                  <Link href="/enterprise">
                     <Button variant="ghost" size="sm" className="hidden sm:inline-flex">
                       Dashboard
                     </Button>

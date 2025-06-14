@@ -1,6 +1,5 @@
-import { clerkMiddleware } from "@clerk/nextjs/server";
+import { clerkMiddleware, getAuth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
 
 // This example protects all routes including api/trpc routes
 // Please edit this to allow other routes to be public as needed.
@@ -14,7 +13,7 @@ export default clerkMiddleware((auth, req) => {
     ? hostname.split(":")[0] 
     : hostname.split(".")[0];
   
-  // If we're on the enterprise subdomain
+  // If we're on the enterprise subdomain or enterprise path
   if (subdomain === "enterprise" || (isLocalhost && url.pathname.startsWith("/enterprise"))) {
     // If user is not signed in, redirect to main site
     if (!auth.userId) {
@@ -25,13 +24,22 @@ export default clerkMiddleware((auth, req) => {
       return NextResponse.redirect(signInUrl);
     }
     
-    // If user is signed in but doesn't have a shop, redirect to create shop
+    // If user is signed in but doesn't have an organization, redirect to create shop
     if (auth.userId && !auth.orgId) {
       const createShopUrl = new URL("/create-shop", req.url);
       if (!isLocalhost) {
         createShopUrl.hostname = "tcgvision.com";
       }
       return NextResponse.redirect(createShopUrl);
+    }
+
+    // If user is signed in and has an organization but is not a member of the current org
+    if (auth.userId && auth.orgId && auth.orgId !== auth.org?.id) {
+      const mainSiteUrl = new URL("/", req.url);
+      if (!isLocalhost) {
+        mainSiteUrl.hostname = "tcgvision.com";
+      }
+      return NextResponse.redirect(mainSiteUrl);
     }
   }
   
