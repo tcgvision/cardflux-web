@@ -56,8 +56,8 @@ export default function CreateShopPage() {
   };
 
   return (
-    <div className="container flex h-[calc(100vh-4rem)] items-center justify-center py-6">
-      <Card className="w-full max-w-md">
+    <div className="container mx-auto flex h-[calc(100vh-4rem)] items-center justify-center px-4">
+      <Card className="w-full max-w-md mx-auto">
         <CardHeader>
           <CardTitle>Create Your TCG Shop</CardTitle>
           <CardDescription>
