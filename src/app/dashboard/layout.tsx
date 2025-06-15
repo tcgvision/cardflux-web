@@ -2,7 +2,7 @@ import { type Metadata } from "next";
 import { Geist } from "next/font/google";
 import { TRPCReactProvider } from "~/trpc/react";
 import { ClerkProvider } from "@clerk/nextjs";
-import { EnterpriseNavbar } from "./_components/enterprise-navbar";
+import { DashboardNavbar } from "./_components/enterprise-navbar";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "~/server/db";
 import type { PrismaClient } from "@prisma/client";
@@ -15,8 +15,8 @@ export async function generateMetadata(): Promise<Metadata> {
   
   if (!orgId) {
     return {
-      title: "TCG Vision Enterprise",
-      description: "Manage your TCG business with TCG Vision Enterprise",
+      title: "TCG Vision Dashboard",
+      description: "Manage your TCG business with TCG Vision",
     };
   }
 
@@ -29,20 +29,20 @@ export async function generateMetadata(): Promise<Metadata> {
 
     if (!shop) {
       return {
-        title: "TCG Vision Enterprise",
-        description: "Manage your TCG business with TCG Vision Enterprise",
+        title: "TCG Vision Dashboard",
+        description: "Manage your TCG business with TCG Vision",
       };
     }
 
     return {
       title: `${shop.name} | TCG Vision`,
-      description: `Manage ${shop.name} with TCG Vision Enterprise`,
+      description: `Manage ${shop.name} with TCG Vision`,
     };
   } catch (error) {
     console.error("Error fetching shop details:", error);
     return {
-      title: "TCG Vision Enterprise",
-      description: "Manage your TCG business with TCG Vision Enterprise",
+      title: "TCG Vision Dashboard",
+      description: "Manage your TCG business with TCG Vision",
     };
   }
 }
@@ -50,7 +50,16 @@ export async function generateMetadata(): Promise<Metadata> {
 // This tells Next.js not to inherit the root layout
 export const dynamic = "force-dynamic";
 
-export default function EnterpriseLayout({
+// Prevent inheriting from root layout
+// export const metadata: Metadata = {
+//   title: "TCG Vision Enterprise",
+//   description: "Manage your TCG business with TCG Vision Enterprise",
+// };
+
+// This tells Next.js not to inherit the root layout
+export const layout = false;
+
+export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -59,7 +68,7 @@ export default function EnterpriseLayout({
     <ClerkProvider>
       <TRPCReactProvider>
         <div className="min-h-screen bg-background font-sans antialiased">
-          <EnterpriseNavbar />
+          <DashboardNavbar />
           <main className="container mx-auto px-4 py-6">{children}</main>
         </div>
       </TRPCReactProvider>

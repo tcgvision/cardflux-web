@@ -25,15 +25,15 @@ export default function CreateShopPage() {
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState("");
 
-  // If user already has an organization, redirect to enterprise
+  // If user already has an organization, redirect to dashboard
   if (organization) {
     const isLocalhost = window.location.hostname === "localhost";
     if (isLocalhost) {
-      router.push("/enterprise");
+      router.push("/dashboard");
     } else {
-      const enterpriseUrl = new URL("/", window.location.href);
-      enterpriseUrl.hostname = "enterprise.tcgvision.com";
-      window.location.href = enterpriseUrl.toString();
+      const dashboardUrl = new URL("/", window.location.href);
+      dashboardUrl.hostname = "dashboard.tcgvision.com";
+      window.location.href = dashboardUrl.toString();
     }
     return null;
   }
@@ -50,7 +50,12 @@ export default function CreateShopPage() {
       // Create the organization in Clerk
       const org = await createOrganization({
         name: formData.shopName,
-        slug: formData.shopName.toLowerCase().replace(/\s+/g, '-'),
+        slug: formData.shopName
+          .toLowerCase()
+          .replace(/['']/g, '') // Remove apostrophes and smart quotes
+          .replace(/[^a-z0-9-]/g, '-') // Replace any non-alphanumeric chars with '-'
+          .replace(/-+/g, '-') // Replace multiple consecutive '-' with single '-'
+          .replace(/^-|-$/g, ''), // Remove leading and trailing '-'
       });
 
       // Create the shop in our database
@@ -62,14 +67,13 @@ export default function CreateShopPage() {
         clerkOrgId: org.id,
       });
       
-      // Redirect to enterprise dashboard
-      const isLocalhost = window.location.hostname === "localhost";
-      if (isLocalhost) {
-        router.push("/enterprise");
+      // Redirect to dashboard
+      if (process.env.NEXT_PUBLIC_VERCEL_ENV === "production") {
+        router.push("/dashboard");
       } else {
-        const enterpriseUrl = new URL("/", window.location.href);
-        enterpriseUrl.hostname = "enterprise.tcgvision.com";
-        window.location.href = enterpriseUrl.toString();
+        const dashboardUrl = new URL("/", window.location.href);
+        dashboardUrl.hostname = "dashboard.tcgvision.com";
+        window.location.href = dashboardUrl.toString();
       }
     } catch (err) {
       console.error("Error creating shop:", err);

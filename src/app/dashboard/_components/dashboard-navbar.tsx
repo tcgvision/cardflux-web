@@ -13,13 +13,13 @@ import {
 import { Menu, Settings, Store, BarChart3, Users } from "lucide-react";
 
 const navigation = [
-  { name: "Dashboard", href: "/enterprise", icon: BarChart3 },
-  { name: "Inventory", href: "/enterprise/inventory", icon: Store },
-  { name: "Team", href: "/enterprise/team", icon: Users },
-  { name: "Settings", href: "/enterprise/settings", icon: Settings },
+  { name: "Dashboard", href: "/dashboard", icon: BarChart3 },
+  { name: "Inventory", href: "/dashboard/inventory", icon: Store },
+  { name: "Team", href: "/dashboard/team", icon: Users },
+  { name: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
 
-export function EnterpriseNavbar() {
+export function DashboardNavbar() {
   const pathname = usePathname();
   const { organization } = useOrganization();
 
@@ -28,7 +28,7 @@ export function EnterpriseNavbar() {
       <nav className="container mx-auto flex h-16 items-center justify-between px-4">
         {/* Logo and Organization Name */}
         <div className="flex items-center gap-4">
-          <Link href="/enterprise" className="flex items-center space-x-2">
+          <Link href="/dashboard" className="flex items-center space-x-2">
             <span className="text-xl font-bold tracking-tight">TCG Vision</span>
           </Link>
           {organization && (

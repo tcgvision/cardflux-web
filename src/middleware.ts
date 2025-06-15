@@ -1,4 +1,4 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { clerkMiddleware } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
 
@@ -21,7 +21,7 @@ export default clerkMiddleware(async (auth, req) => {
     : hostname.split(".")[0];
   
   // If we're on the enterprise subdomain or enterprise path
-  if (subdomain === "enterprise" || (isLocalhost && url.pathname.startsWith("/enterprise"))) {
+  if (subdomain === "dashboard" || (isLocalhost && url.pathname.startsWith("/dashboard"))) {
     // If user is not signed in, redirect to main site
     if (!userId) {
       const signInUrl = new URL("/", req.url);
@@ -48,9 +48,9 @@ export default clerkMiddleware(async (auth, req) => {
   if ((subdomain === "tcgvision" || isLocalhost) && userId && orgId) {
     const enterpriseUrl = new URL(url.pathname, req.url);
     if (!isLocalhost) {
-      enterpriseUrl.hostname = "enterprise.tcgvision.com";
+      enterpriseUrl.hostname = "dashboard.tcgvision.com";
     } else {
-      enterpriseUrl.pathname = `/enterprise${url.pathname}`;
+      enterpriseUrl.pathname = `/dashboard${url.pathname}`;
     }
     return NextResponse.redirect(enterpriseUrl);
   }
