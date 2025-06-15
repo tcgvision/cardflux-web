@@ -2,7 +2,7 @@ import { type Metadata } from "next";
 import { Geist } from "next/font/google";
 import { TRPCReactProvider } from "~/trpc/react";
 import { ClerkProvider } from "@clerk/nextjs";
-import { DashboardNavbar } from "./_components/enterprise-navbar";
+import { DashboardNavbar } from "./_components/dashboard-navbar";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "~/server/db";
 import type { PrismaClient } from "@prisma/client";

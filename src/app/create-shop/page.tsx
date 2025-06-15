@@ -27,14 +27,7 @@ export default function CreateShopPage() {
 
   // If user already has an organization, redirect to dashboard
   if (organization) {
-    const isLocalhost = window.location.hostname === "localhost";
-    if (isLocalhost) {
-      router.push("/dashboard");
-    } else {
-      const dashboardUrl = new URL("/", window.location.href);
-      dashboardUrl.hostname = "dashboard.tcgvision.com";
-      window.location.href = dashboardUrl.toString();
-    }
+    router.push("/dashboard");
     return null;
   }
 
@@ -68,13 +61,7 @@ export default function CreateShopPage() {
       });
       
       // Redirect to dashboard
-      if (process.env.NEXT_PUBLIC_VERCEL_ENV === "production") {
-        router.push("/dashboard");
-      } else {
-        const dashboardUrl = new URL("/", window.location.href);
-        dashboardUrl.hostname = "dashboard.tcgvision.com";
-        window.location.href = dashboardUrl.toString();
-      }
+      router.push("/dashboard");
     } catch (err) {
       console.error("Error creating shop:", err);
       setError("Failed to create shop. Please try again.");
