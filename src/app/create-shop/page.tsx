@@ -11,6 +11,9 @@ import { Textarea } from "~/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import { Label } from "~/components/ui/label";
 import { api } from "~/trpc/react";
+import { toast } from "sonner";
+import type { TRPCClientErrorLike } from "@trpc/client";
+import type { AppRouter } from "~/server/api/root";
 
 export default function CreateShopPage() {
   const router = useRouter();
@@ -25,13 +28,26 @@ export default function CreateShopPage() {
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState("");
 
-  // If user already has an organization, redirect to dashboard
+  // If user already has an organization, show toast and redirect to dashboard
   if (organization) {
+    toast.error("Shop Already Exists", {
+      description: "You already have a shop. You can manage your shop from the dashboard.",
+      action: {
+        label: "Go to Dashboard",
+        onClick: () => router.push("/dashboard"),
+      },
+    });
     router.push("/dashboard");
     return null;
   }
 
-  const createShopMutation = api.shop.create.useMutation();
+  const createShopMutation = api.shop.create.useMutation({
+    onError: (error: TRPCClientErrorLike<AppRouter>) => {
+      toast.error("Error Creating Shop", {
+        description: error.message || "Failed to create shop. Please try again.",
+      });
+    },
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,7 +68,7 @@ export default function CreateShopPage() {
       });
 
       // Create the shop in our database
-      createShopMutation.mutate({
+      await createShopMutation.mutateAsync({
         name: formData.shopName,
         description: formData.description,
         location: formData.location,
@@ -60,11 +76,19 @@ export default function CreateShopPage() {
         clerkOrgId: org.id,
       });
       
+      toast.success("Shop Created Successfully", {
+        description: "Redirecting to your dashboard...",
+      });
+      
       // Redirect to dashboard
       router.push("/dashboard");
     } catch (err) {
       console.error("Error creating shop:", err);
-      setError("Failed to create shop. Please try again.");
+      const errorMessage = err instanceof Error ? err.message : "Failed to create shop. Please try again.";
+      setError(errorMessage);
+      toast.error("Error Creating Shop", {
+        description: errorMessage,
+      });
     } finally {
       setIsCreating(false);
     }
