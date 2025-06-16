@@ -1,7 +1,10 @@
 import { clerkMiddleware } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
-
+// Constants for environment-specific configuration
+const DEV_HOST = "localhost:3000";
+const PROD_HOST = "tcgvision.com";
+const DASHBOARD_SUBDOMAIN = "dashboard";
 
 // This example protects all routes including api/trpc routes
 // Please edit this to allow other routes to be public as needed.
@@ -11,48 +14,51 @@ import { NextResponse } from "next/server";
 
 export default clerkMiddleware(async (auth, req) => {
   const { userId, redirectToSignIn, orgId } = await auth();
-
-  // Handle subdomain routing
   const url = req.nextUrl;
   const hostname = req.headers.get("host") ?? "";
-  const isLocalhost = hostname.includes("localhost");
-  const subdomain = isLocalhost 
-    ? hostname.split(":")[0] 
-    : hostname.split(".")[0];
   
-  // If we're on the enterprise subdomain or enterprise path
-  if (subdomain === "dashboard" || (isLocalhost && url.pathname.startsWith("/dashboard"))) {
+  // Determine if we're in development or production
+  const isDev = hostname.includes("localhost");
+  
+  // Handle dashboard routes
+  const isDashboardRoute = isDev 
+    ? url.pathname.startsWith("/dashboard")
+    : hostname.startsWith(`${DASHBOARD_SUBDOMAIN}.`);
+
+  if (isDashboardRoute) {
     // If user is not signed in, redirect to main site
     if (!userId) {
       const signInUrl = new URL("/", req.url);
-      if (!isLocalhost) {
-        signInUrl.hostname = "tcgvision.com";
+      if (!isDev) {
+        signInUrl.hostname = PROD_HOST;
       }
-      return redirectToSignIn()
+      return redirectToSignIn();
     }
 
-  
-    
     // If user is signed in but doesn't have an organization, redirect to create shop
     if (userId && !orgId) {
       const createShopUrl = new URL("/create-shop", req.url);
-      if (!isLocalhost) {
-        createShopUrl.hostname = "tcgvision.com";
+      if (!isDev) {
+        createShopUrl.hostname = PROD_HOST;
       }
       return NextResponse.redirect(createShopUrl);
     }
   }
   
   // If we're on the main domain and user is signed in with a shop,
-  // redirect to enterprise subdomain
-  if ((subdomain === "tcgvision" || isLocalhost) && userId && orgId) {
-    const enterpriseUrl = new URL(url.pathname, req.url);
-    if (!isLocalhost) {
-      enterpriseUrl.hostname = "dashboard.tcgvision.com";
+  // redirect to dashboard
+  const isMainDomain = isDev 
+    ? !url.pathname.startsWith("/dashboard")
+    : !hostname.startsWith(`${DASHBOARD_SUBDOMAIN}.`);
+
+  if (isMainDomain && userId && orgId) {
+    const dashboardUrl = new URL(url.pathname, req.url);
+    if (!isDev) {
+      dashboardUrl.hostname = `${DASHBOARD_SUBDOMAIN}.${PROD_HOST}`;
     } else {
-      enterpriseUrl.pathname = `/dashboard${url.pathname}`;
+      dashboardUrl.pathname = `/dashboard${url.pathname}`;
     }
-    return NextResponse.redirect(enterpriseUrl);
+    return NextResponse.redirect(dashboardUrl);
   }
 });
 
