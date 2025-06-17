@@ -2,106 +2,63 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-// Constants for environment-specific configuration
-const DEV_HOST = "localhost:3000";
-const PROD_HOST = "tcgvision.com";
-const DASHBOARD_SUBDOMAIN = "dashboard";
-
 // Define route matchers
 const isPublicRoute = createRouteMatcher([
   "/",
-  "/features",
-  "/pricing",
-  "/about",
-  "/api/webhook/clerk",
-  "/api/webhook/stripe",
+  "/learn-more",
+  "/api/trpc/(.*)",
+  "/api/webhooks/(.*)",
 ]);
 
-const isDashboardRoute = createRouteMatcher(["/dashboard(.*)"]);
-const isAuthRoute = createRouteMatcher(["/dashboard/sign-in(.*)", "/dashboard/sign-up(.*)"]);
-const isCreateShopRoute = createRouteMatcher(["/create-shop"]);
+const isDashboardRoute = createRouteMatcher([
+  "/dashboard(.*)",
+]);
 
-// Helper function to create URLs with proper hostname
-const createUrl = (path: string, req: NextRequest, isDev: boolean) => {
-  const url = new URL(path, req.url);
-  if (!isDev) {
-    url.hostname = PROD_HOST;
-  } else {
-    url.hostname = DEV_HOST;
-  }
-  return url;
-};
+const isCreateShopRoute = createRouteMatcher([
+  "/dashboard/create-shop",
+]);
 
-// Helper function to create dashboard URLs
-const createDashboardUrl = (path: string, req: NextRequest, isDev: boolean) => {
-  const url = new URL(path, req.url);
-  if (!isDev) {
-    url.hostname = `${DASHBOARD_SUBDOMAIN}.${PROD_HOST}`;
-  } else {
-    url.hostname = DEV_HOST;
-    url.pathname = `/dashboard${path}`;
-  }
-  return url;
-};
-
+// Export the middleware
 export default clerkMiddleware(async (auth, req: NextRequest) => {
   const { userId, orgId } = await auth();
-  const hostname = req.headers.get("host") ?? "";
-  const isDev = hostname.includes("localhost");
-  
-  // Handle dashboard routes
-  const isDashboardSubdomain = isDev 
-    ? req.nextUrl.pathname.startsWith("/dashboard")
-    : hostname.startsWith(`${DASHBOARD_SUBDOMAIN}.`);
+  const url = new URL(req.url);
 
-  // Skip auth check for public routes and auth routes
-  if (isPublicRoute(req) || isAuthRoute(req)) {
+  // Allow public routes
+  if (isPublicRoute(req)) {
     return NextResponse.next();
   }
 
-  // Protect dashboard routes
-  if (isDashboardRoute(req)) {
-    await auth.protect();
+  // Handle unauthenticated users
+  if (!userId) {
+    const signInUrl = new URL("/dashboard/sign-in", req.url);
+    signInUrl.searchParams.set("redirect_url", url.pathname);
+    return NextResponse.redirect(signInUrl);
   }
 
   // Handle create-shop route
   if (isCreateShopRoute(req)) {
-    // If user is not signed in, redirect to sign in
-    if (!userId) {
-      return NextResponse.redirect(createUrl("/dashboard/sign-in", req, isDev));
-    }
-
     // If user already has an organization, redirect to dashboard
     if (orgId) {
-      return NextResponse.redirect(createDashboardUrl("/", req, isDev));
+      return NextResponse.redirect(new URL("/dashboard", req.url));
     }
+    // Allow access to create-shop if user has no organization
+    return NextResponse.next();
   }
 
-  if (isDashboardSubdomain) {
-    // If user is signed in but doesn't have an organization, redirect to create shop
-    if (userId && !orgId) {
-      return NextResponse.redirect(createUrl("/create-shop", req, isDev));
+  // Handle dashboard routes
+  if (isDashboardRoute(req)) {
+    // If user has no organization and isn't on create-shop, redirect to create-shop
+    if (!orgId && !isCreateShopRoute(req)) {
+      return NextResponse.redirect(new URL("/dashboard/create-shop", req.url));
     }
-  }
-  
-  // If we're on the main domain and user is signed in with a shop,
-  // redirect to dashboard
-  const isMainDomain = isDev 
-    ? !req.nextUrl.pathname.startsWith("/dashboard")
-    : !hostname.startsWith(`${DASHBOARD_SUBDOMAIN}.`);
-
-  if (isMainDomain && userId && orgId) {
-    return NextResponse.redirect(createDashboardUrl(req.nextUrl.pathname, req, isDev));
+    // Allow access to dashboard if user has an organization
+    return NextResponse.next();
   }
 
+  // Default: allow the request
   return NextResponse.next();
 });
 
 export const config = {
-  matcher: [
-    // Skip Next.js internals and all static files
-    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
-    // Always run for API routes
-    "/(api|trpc)(.*)",
-  ],
+  matcher: ["/((?!.+\\.[\\w]+$|_next).*)", "/", "/(api|trpc)(.*)"],
 };

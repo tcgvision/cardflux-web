@@ -20,16 +20,29 @@ import {
 import { Input } from "~/components/ui/input";
 import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import { Combobox } from "~/components/ui/combobox";
 
 // Form validation schema
 const formSchema = z.object({
   name: z.string().min(2, "Shop name must be at least 2 characters"),
   description: z.string().min(10, "Description must be at least 10 characters"),
-  location: z.string().min(5, "Location must be at least 5 characters"),
+  location: z.object({
+    value: z.string().min(1, "Location is required"),
+    label: z.string().min(1, "Location is required"),
+  }),
   type: z.enum(["local", "online", "both"]),
 });
 
 type FormData = z.infer<typeof formSchema>;
+
+// Mock locations for now - replace with Google Places API
+const locations = [
+  { value: "new-york", label: "New York, NY" },
+  { value: "los-angeles", label: "Los Angeles, CA" },
+  { value: "chicago", label: "Chicago, IL" },
+  { value: "houston", label: "Houston, TX" },
+  { value: "phoenix", label: "Phoenix, AZ" },
+];
 
 export default function CreateShopPage() {
   const router = useRouter();
@@ -42,7 +55,7 @@ export default function CreateShopPage() {
     defaultValues: {
       name: "",
       description: "",
-      location: "",
+      location: { value: "", label: "" },
       type: "local",
     },
   });
@@ -79,7 +92,7 @@ export default function CreateShopPage() {
       await createShopMutation.mutateAsync({
         name: data.name,
         description: data.description,
-        location: data.location,
+        location: data.location.label,
         type: data.type,
         clerkOrgId: org.id,
       });
@@ -93,8 +106,8 @@ export default function CreateShopPage() {
   };
 
   return (
-    <div className="container mx-auto max-w-2xl py-8">
-      <Card>
+    <div className="container mx-auto flex h-[calc(100vh-4rem)] items-center justify-center px-4">
+      <Card className="w-full max-w-2xl">
         <CardHeader>
           <CardTitle>Create Your Shop</CardTitle>
           <CardDescription>
@@ -139,7 +152,13 @@ export default function CreateShopPage() {
                   <FormItem>
                     <FormLabel>Location</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter your shop location" {...field} />
+                      <Combobox
+                        options={locations}
+                        value={field.value}
+                        onChange={field.onChange}
+                        placeholder="Select a location"
+                        emptyText="No locations found."
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
