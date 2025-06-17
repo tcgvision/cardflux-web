@@ -3,189 +3,179 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useClerk, useOrganization } from "@clerk/nextjs";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
-import { Button } from "~/components/ui/button";
-import { Input } from "~/components/ui/input";
-import { Textarea } from "~/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
-import { Label } from "~/components/ui/label";
+import { useClerk, useUser } from "@clerk/nextjs";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 import { api } from "~/trpc/react";
+import { Button } from "~/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "~/components/ui/form";
+import { Input } from "~/components/ui/input";
 import { toast } from "sonner";
-import type { TRPCClientErrorLike } from "@trpc/client";
-import type { AppRouter } from "~/server/api/root";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+
+// Form validation schema
+const formSchema = z.object({
+  name: z.string().min(2, "Shop name must be at least 2 characters"),
+  description: z.string().min(10, "Description must be at least 10 characters"),
+  location: z.string().min(5, "Location must be at least 5 characters"),
+  type: z.enum(["local", "online", "both"]),
+});
+
+type FormData = z.infer<typeof formSchema>;
 
 export default function CreateShopPage() {
   const router = useRouter();
+  const { user } = useUser();
   const { createOrganization } = useClerk();
-  const { organization } = useOrganization();
-  const [formData, setFormData] = useState({
-    shopName: "",
-    description: "",
-    location: "",
-    shopType: "local" as "local" | "online" | "both",
+
+  // Form setup
+  const form = useForm<FormData>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      name: "",
+      description: "",
+      location: "",
+      type: "local",
+    },
   });
-  const [isCreating, setIsCreating] = useState(false);
-  const [error, setError] = useState("");
 
-  // If user already has an organization, show toast and redirect to dashboard
-  if (organization) {
-    toast.error("Shop Already Exists", {
-      description: "You already have a shop. You can manage your shop from the dashboard.",
-      action: {
-        label: "Go to Dashboard",
-        onClick: () => router.push("/dashboard"),
-      },
-    });
-    router.push("/dashboard");
-    return null;
-  }
-
+  // Create shop mutation
   const createShopMutation = api.shop.create.useMutation({
-    onError: (error: TRPCClientErrorLike<AppRouter>) => {
-      toast.error("Error Creating Shop", {
+    onSuccess: () => {
+      toast.success("Success!", {
+        description: "Your shop has been created successfully.",
+      });
+      router.push("/dashboard");
+    },
+    onError: (error) => {
+      toast.error("Error", {
         description: error.message || "Failed to create shop. Please try again.",
       });
     },
   });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    setIsCreating(true);
-    setError("");
-
+  // Form submission handler
+  const onSubmit = async (data: FormData) => {
     try {
-      // Create the organization in Clerk
+      // Create organization in Clerk
       const org = await createOrganization({
-        name: formData.shopName,
-        slug: formData.shopName
-          .toLowerCase()
-          .replace(/['']/g, '') // Remove apostrophes and smart quotes
-          .replace(/[^a-z0-9-]/g, '-') // Replace any non-alphanumeric chars with '-'
-          .replace(/-+/g, '-') // Replace multiple consecutive '-' with single '-'
-          .replace(/^-|-$/g, ''), // Remove leading and trailing '-'
+        name: data.name,
+        slug: data.name.toLowerCase().replace(/\s+/g, "-"),
       });
 
-      // Create the shop in our database
+      if (!org) {
+        throw new Error("Failed to create organization");
+      }
+
+      // Create shop in database
       await createShopMutation.mutateAsync({
-        name: formData.shopName,
-        description: formData.description,
-        location: formData.location,
-        type: formData.shopType,
+        name: data.name,
+        description: data.description,
+        location: data.location,
+        type: data.type,
         clerkOrgId: org.id,
       });
-      
-      toast.success("Shop Created Successfully", {
-        description: "Redirecting to your dashboard...",
-      });
-      
-      // Redirect to dashboard
-      router.push("/dashboard");
-    } catch (err) {
-      console.error("Error creating shop:", err);
-      const errorMessage = err instanceof Error ? err.message : "Failed to create shop. Please try again.";
-      setError(errorMessage);
-      toast.error("Error Creating Shop", {
+    } catch (error) {
+      console.error("Error creating shop:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to create shop. Please try again.";
+      toast.error("Error", {
         description: errorMessage,
       });
-    } finally {
-      setIsCreating(false);
     }
   };
 
-  const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleSelectChange = (value: string) => {
-    setFormData(prev => ({ ...prev, shopType: value as "local" | "online" | "both" }));
-  };
-
   return (
-    <div className="container mx-auto flex h-[calc(100vh-4rem)] items-center justify-center px-4">
-      <Card className="w-full max-w-md mx-auto">
+    <div className="container mx-auto max-w-2xl py-8">
+      <Card>
         <CardHeader>
-          <CardTitle>Create Your TCG Shop</CardTitle>
+          <CardTitle>Create Your Shop</CardTitle>
           <CardDescription>
-            Set up your trading card game shop to start managing inventory and sales
+            Set up your shop profile to start managing your inventory
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="shopName">Shop Name *</Label>
-              <Input
-                id="shopName"
-                name="shopName"
-                value={formData.shopName}
-                onChange={handleInputChange}
-                placeholder="e.g., Dragon's Den Cards"
-                required
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Shop Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Enter your shop name" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
+              <FormField
+                control={form.control}
                 name="description"
-                value={formData.description}
-                onChange={handleInputChange}
-                placeholder="Brief description of your shop and specialties"
-                rows={3}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Describe your shop" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="location">Location</Label>
-              <Input
-                id="location"
+              <FormField
+                control={form.control}
                 name="location"
-                value={formData.location}
-                onChange={handleInputChange}
-                placeholder="e.g., Los Angeles, CA"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Location</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Enter your shop location" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="shopType">Shop Type *</Label>
-              <Select
-                value={formData.shopType}
-                onValueChange={handleSelectChange}
+              <FormField
+                control={form.control}
+                name="type"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Shop Type</FormLabel>
+                    <FormControl>
+                      <select
+                        className="w-full rounded-md border border-input bg-background px-3 py-2"
+                        {...field}
+                      >
+                        <option value="local">Local Store</option>
+                        <option value="online">Online Store</option>
+                        <option value="both">Both Local & Online</option>
+                      </select>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <Button 
+                type="submit" 
+                className="w-full"
+                disabled={createShopMutation.isPending}
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select shop type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="local">Local Store Only</SelectItem>
-                  <SelectItem value="online">Online Only</SelectItem>
-                  <SelectItem value="both">Both Local & Online</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {error && (
-              <div className="text-sm text-red-500 text-center">
-                {error}
-              </div>
-            )}
-
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={isCreating || !formData.shopName.trim()}
-            >
-              {isCreating ? "Creating Shop..." : "Create Shop"}
-            </Button>
-
-            <p className="text-xs text-muted-foreground text-center">
-              By creating a shop, you agree to our terms of service and privacy policy
-            </p>
-          </form>
+                {createShopMutation.isPending ? "Creating..." : "Create Shop"}
+              </Button>
+            </form>
+          </Form>
         </CardContent>
       </Card>
     </div>

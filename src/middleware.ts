@@ -19,18 +19,39 @@ const isPublicRoute = createRouteMatcher([
 
 const isDashboardRoute = createRouteMatcher(["/dashboard(.*)"]);
 const isAuthRoute = createRouteMatcher(["/dashboard/sign-in(.*)", "/dashboard/sign-up(.*)"]);
+const isCreateShopRoute = createRouteMatcher(["/create-shop"]);
+
+// Helper function to create URLs with proper hostname
+const createUrl = (path: string, req: NextRequest, isDev: boolean) => {
+  const url = new URL(path, req.url);
+  if (!isDev) {
+    url.hostname = PROD_HOST;
+  } else {
+    url.hostname = DEV_HOST;
+  }
+  return url;
+};
+
+// Helper function to create dashboard URLs
+const createDashboardUrl = (path: string, req: NextRequest, isDev: boolean) => {
+  const url = new URL(path, req.url);
+  if (!isDev) {
+    url.hostname = `${DASHBOARD_SUBDOMAIN}.${PROD_HOST}`;
+  } else {
+    url.hostname = DEV_HOST;
+    url.pathname = `/dashboard${path}`;
+  }
+  return url;
+};
 
 export default clerkMiddleware(async (auth, req: NextRequest) => {
   const { userId, orgId } = await auth();
-  const url = req.nextUrl;
   const hostname = req.headers.get("host") ?? "";
-  
-  // Determine if we're in development or production
   const isDev = hostname.includes("localhost");
   
   // Handle dashboard routes
   const isDashboardSubdomain = isDev 
-    ? url.pathname.startsWith("/dashboard")
+    ? req.nextUrl.pathname.startsWith("/dashboard")
     : hostname.startsWith(`${DASHBOARD_SUBDOMAIN}.`);
 
   // Skip auth check for public routes and auth routes
@@ -43,35 +64,37 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
     await auth.protect();
   }
 
+  // Handle create-shop route
+  if (isCreateShopRoute(req)) {
+    // If user is not signed in, redirect to sign in
+    if (!userId) {
+      return NextResponse.redirect(createUrl("/dashboard/sign-in", req, isDev));
+    }
+
+    // If user already has an organization, redirect to dashboard
+    if (orgId) {
+      return NextResponse.redirect(createDashboardUrl("/", req, isDev));
+    }
+  }
+
   if (isDashboardSubdomain) {
     // If user is signed in but doesn't have an organization, redirect to create shop
     if (userId && !orgId) {
-      const createShopUrl = new URL("/create-shop", req.url);
-      if (!isDev) {
-        createShopUrl.hostname = PROD_HOST;
-      } else {
-        createShopUrl.hostname = DEV_HOST;
-      }
-      return NextResponse.redirect(createShopUrl);
+      return NextResponse.redirect(createUrl("/create-shop", req, isDev));
     }
   }
   
   // If we're on the main domain and user is signed in with a shop,
   // redirect to dashboard
   const isMainDomain = isDev 
-    ? !url.pathname.startsWith("/dashboard")
+    ? !req.nextUrl.pathname.startsWith("/dashboard")
     : !hostname.startsWith(`${DASHBOARD_SUBDOMAIN}.`);
 
   if (isMainDomain && userId && orgId) {
-    const dashboardUrl = new URL(url.pathname, req.url);
-    if (!isDev) {
-      dashboardUrl.hostname = `${DASHBOARD_SUBDOMAIN}.${PROD_HOST}`;
-    } else {
-      dashboardUrl.hostname = DEV_HOST;
-      dashboardUrl.pathname = `/dashboard${url.pathname}`;
-    }
-    return NextResponse.redirect(dashboardUrl);
+    return NextResponse.redirect(createDashboardUrl(req.nextUrl.pathname, req, isDev));
   }
+
+  return NextResponse.next();
 });
 
 export const config = {
