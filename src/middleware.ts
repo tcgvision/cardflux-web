@@ -10,6 +10,11 @@ const isPublicRoute = createRouteMatcher([
   "/api/webhooks/(.*)",
 ]);
 
+const isAuthRoute = createRouteMatcher([
+  "/dashboard/sign-in(.*)",
+  "/dashboard/sign-up(.*)",
+]);
+
 const isDashboardRoute = createRouteMatcher([
   "/dashboard(.*)",
 ]);
@@ -25,6 +30,15 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
 
   // Allow public routes
   if (isPublicRoute(req)) {
+    return NextResponse.next();
+  }
+
+  // Allow auth routes (sign-in and sign-up)
+  if (isAuthRoute(req)) {
+    // If user is already signed in, redirect to dashboard
+    if (userId) {
+      return NextResponse.redirect(new URL("/dashboard", req.url));
+    }
     return NextResponse.next();
   }
 
