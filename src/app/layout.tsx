@@ -1,6 +1,5 @@
 import { ClerkProvider } from "@clerk/nextjs";
 import { Inter } from "next/font/google";
-import { Navbar } from "~/app/_components/navbar";
 import "~/styles/globals.css";
 import { type Metadata } from "next";
 import { Geist } from "next/font/google";
@@ -27,15 +26,22 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <ClerkProvider>
-      <html lang="en" className={`${geist.variable} ${inter.className}`}>
-        <body>
+    <html lang="en" className={`${geist.variable} ${inter.className}`}>
+      <body>
+        <ClerkProvider
+          appearance={{
+            elements: {
+              formButtonPrimary: "bg-primary hover:bg-primary/90",
+              footerActionLink: "text-primary hover:text-primary/90",
+            },
+          }}
+        >
           <NavbarWrapper />
           <TRPCReactProvider>{children}</TRPCReactProvider>
           <Toaster />
-        </body>
-      </html>
-    </ClerkProvider>
+        </ClerkProvider>
+      </body>
+    </html>
   );
 }
 

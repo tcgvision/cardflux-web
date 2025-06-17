@@ -1,19 +1,27 @@
-import { clerkMiddleware } from "@clerk/nextjs/server";
+import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
 // Constants for environment-specific configuration
 const DEV_HOST = "localhost:3000";
 const PROD_HOST = "tcgvision.com";
 const DASHBOARD_SUBDOMAIN = "dashboard";
 
-// This example protects all routes including api/trpc routes
-// Please edit this to allow other routes to be public as needed.
-// See https://clerk.com/docs/references/nextjs/auth-middleware for more information about configuring your middleware
+// Define route matchers
+const isPublicRoute = createRouteMatcher([
+  "/",
+  "/features",
+  "/pricing",
+  "/about",
+  "/api/webhook/clerk",
+  "/api/webhook/stripe",
+]);
 
-// const isProtectedRoute = createRouteMatcher(["/enterprise(.*)"]);
+const isDashboardRoute = createRouteMatcher(["/dashboard(.*)"]);
+const isAuthRoute = createRouteMatcher(["/dashboard/sign-in(.*)", "/dashboard/sign-up(.*)"]);
 
-export default clerkMiddleware(async (auth, req) => {
-  const { userId, redirectToSignIn, orgId } = await auth();
+export default clerkMiddleware(async (auth, req: NextRequest) => {
+  const { userId, orgId } = await auth();
   const url = req.nextUrl;
   const hostname = req.headers.get("host") ?? "";
   
@@ -21,22 +29,21 @@ export default clerkMiddleware(async (auth, req) => {
   const isDev = hostname.includes("localhost");
   
   // Handle dashboard routes
-  const isDashboardRoute = isDev 
+  const isDashboardSubdomain = isDev 
     ? url.pathname.startsWith("/dashboard")
     : hostname.startsWith(`${DASHBOARD_SUBDOMAIN}.`);
 
-  if (isDashboardRoute) {
-    // If user is not signed in, redirect to main site
-    if (!userId) {
-      const signInUrl = new URL("/", req.url);
-      if (!isDev) {
-        signInUrl.hostname = PROD_HOST;
-      } else {
-        signInUrl.hostname = DEV_HOST;
-      }
-      return redirectToSignIn();
-    }
+  // Skip auth check for public routes
+  if (isPublicRoute(req)) {
+    return NextResponse.next();
+  }
 
+  // Protect dashboard routes
+  if (isDashboardRoute(req) && !isAuthRoute(req)) {
+    await auth.protect();
+  }
+
+  if (isDashboardSubdomain) {
     // If user is signed in but doesn't have an organization, redirect to create shop
     if (userId && !orgId) {
       const createShopUrl = new URL("/create-shop", req.url);
@@ -68,5 +75,10 @@ export default clerkMiddleware(async (auth, req) => {
 });
 
 export const config = {
-  matcher: ["/((?!.+\\.[\\w]+$|_next).*)", "/", "/(api|trpc)(.*)"],
+  matcher: [
+    // Skip Next.js internals and all static files
+    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
+    // Always run for API routes
+    "/(api|trpc)(.*)",
+  ],
 };
