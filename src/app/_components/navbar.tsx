@@ -25,33 +25,35 @@ export function Navbar() {
 
   return (
     <header className="bg-background/95 supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50 w-full border-b backdrop-blur">
-      <nav className="container mx-auto flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
+      <nav className="container mx-auto flex h-16 items-center px-4 sm:px-6 lg:px-8">
         {/* Logo */}
-        <div className="flex items-center">
+        <div className="flex w-1/3 items-center">
           <Link href="/" className="flex items-center space-x-2">
             <span className="text-xl font-bold tracking-tight">TCG Vision</span>
           </Link>
         </div>
 
         {/* Desktop Navigation */}
-        <div className="hidden md:flex md:items-center md:space-x-8">
-          {navigation.map((item) => (
-            <Link
-              key={item.name}
-              href={item.href}
-              className={`hover:text-primary text-sm font-medium transition-colors ${
-                pathname === item.href
-                  ? "text-foreground"
-                  : "text-foreground/60"
-              }`}
-            >
-              {item.name}
-            </Link>
-          ))}
+        <div className="hidden w-1/3 md:flex md:items-center md:justify-center">
+          <div className="flex items-center space-x-8">
+            {navigation.map((item) => (
+              <Link
+                key={item.name}
+                href={item.href}
+                className={`hover:text-primary text-sm font-medium transition-colors ${
+                  pathname === item.href
+                    ? "text-foreground"
+                    : "text-foreground/60"
+                }`}
+              >
+                {item.name}
+              </Link>
+            ))}
+          </div>
         </div>
 
         {/* Auth Buttons & Mobile Menu */}
-        <div className="flex items-center space-x-4">
+        <div className="flex w-1/3 items-center justify-end space-x-4">
           <ThemeToggle />
           {isLoaded && (
             <>
