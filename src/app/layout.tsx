@@ -6,6 +6,7 @@ import { Geist } from "next/font/google";
 import { TRPCReactProvider } from "~/trpc/react";
 import { Toaster } from "sonner";
 import { NavbarWrapper } from "./_components/navbar-wrapper";
+import { ThemeProvider } from "~/components/themeprovider";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -26,26 +27,36 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${geist.variable} ${inter.className}`}>
+    <html
+      lang="en"
+      className={`${geist.variable} ${inter.className}`}
+      suppressHydrationWarning
+    >
       <body>
-        <ClerkProvider
-          appearance={{
-            elements: {
-              formButtonPrimary: "bg-primary hover:bg-primary/90",
-              footerActionLink: "text-primary hover:text-primary/90",
-            },
-          }}
-          signInUrl="/dashboard/sign-in"
-          signUpUrl="/dashboard/sign-up"
-          afterSignInUrl="/dashboard"
-          afterSignUpUrl="/dashboard"
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
         >
-          <NavbarWrapper />
-          <TRPCReactProvider>{children}</TRPCReactProvider>
-          <Toaster />
-        </ClerkProvider>
+          <ClerkProvider
+            appearance={{
+              elements: {
+                formButtonPrimary: "bg-primary hover:bg-primary/90",
+                footerActionLink: "text-primary hover:text-primary/90",
+              },
+            }}
+            signInUrl="/dashboard/sign-in"
+            signUpUrl="/dashboard/sign-up"
+            afterSignInUrl="/dashboard"
+            afterSignUpUrl="/dashboard"
+          >
+            <NavbarWrapper />
+            <TRPCReactProvider>{children}</TRPCReactProvider>
+            <Toaster />
+          </ClerkProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
 }
-
