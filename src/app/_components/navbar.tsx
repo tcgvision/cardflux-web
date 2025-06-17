@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { SignInButton, SignUpButton, UserButton, useAuth } from "@clerk/nextjs";
+import { UserButton, useAuth } from "@clerk/nextjs";
 import { Button } from "~/components/ui/button";
 import {
   DropdownMenu,
@@ -71,14 +71,14 @@ export function Navbar() {
                 </div>
               ) : (
                 <div className="flex items-center space-x-4">
-                  <SignInButton mode="modal">
+                  <Link href="/get-started?tab=sign-in">
                     <Button variant="ghost" size="sm" className="hidden sm:inline-flex">
                       Sign in
                     </Button>
-                  </SignInButton>
-                  <SignUpButton mode="modal">
+                  </Link>
+                  <Link href="/get-started?tab=sign-up">
                     <Button size="sm">Get Started</Button>
-                  </SignUpButton>
+                  </Link>
                 </div>
               )}
             </>
@@ -107,10 +107,19 @@ export function Navbar() {
                   </Link>
                 </DropdownMenuItem>
               ))}
-              {isSignedIn && (
+              {isSignedIn ? (
                 <DropdownMenuItem asChild>
                   <Link href="/dashboard" className="w-full">Dashboard</Link>
                 </DropdownMenuItem>
+              ) : (
+                <>
+                  <DropdownMenuItem asChild>
+                    <Link href="/get-started?tab=sign-in" className="w-full">Sign in</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/get-started?tab=sign-up" className="w-full">Get Started</Link>
+                  </DropdownMenuItem>
+                </>
               )}
             </DropdownMenuContent>
           </DropdownMenu>
