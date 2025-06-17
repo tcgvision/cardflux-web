@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 import { Menu } from "lucide-react";
+import { ThemeToggle } from "./theme-toggle";
 
 const navigation = [
   { name: "Features", href: "/features" },
@@ -23,7 +24,7 @@ export function Navbar() {
   const { isSignedIn, isLoaded } = useAuth();
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="bg-background/95 supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50 w-full border-b backdrop-blur">
       <nav className="container mx-auto flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Logo */}
         <div className="flex items-center">
@@ -38,7 +39,7 @@ export function Navbar() {
             <Link
               key={item.name}
               href={item.href}
-              className={`text-sm font-medium transition-colors hover:text-primary ${
+              className={`hover:text-primary text-sm font-medium transition-colors ${
                 pathname === item.href
                   ? "text-foreground"
                   : "text-foreground/60"
@@ -51,12 +52,17 @@ export function Navbar() {
 
         {/* Auth Buttons & Mobile Menu */}
         <div className="flex items-center space-x-4">
+          <ThemeToggle />
           {isLoaded && (
             <>
               {isSignedIn ? (
                 <div className="flex items-center space-x-4">
                   <Link href="/dashboard">
-                    <Button variant="ghost" size="sm" className="hidden sm:inline-flex">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="hidden sm:inline-flex"
+                    >
                       Dashboard
                     </Button>
                   </Link>
@@ -72,7 +78,11 @@ export function Navbar() {
               ) : (
                 <div className="flex items-center space-x-4">
                   <Link href="/dashboard/sign-in">
-                    <Button variant="ghost" size="sm" className="hidden sm:inline-flex">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="hidden sm:inline-flex"
+                    >
                       Sign in
                     </Button>
                   </Link>
@@ -95,7 +105,7 @@ export function Navbar() {
             <DropdownMenuContent align="end" className="w-56">
               {navigation.map((item) => (
                 <DropdownMenuItem key={item.name} asChild>
-                  <Link 
+                  <Link
                     href={item.href}
                     className={`w-full ${
                       pathname === item.href
@@ -109,15 +119,21 @@ export function Navbar() {
               ))}
               {isSignedIn ? (
                 <DropdownMenuItem asChild>
-                  <Link href="/dashboard" className="w-full">Dashboard</Link>
+                  <Link href="/dashboard" className="w-full">
+                    Dashboard
+                  </Link>
                 </DropdownMenuItem>
               ) : (
                 <>
                   <DropdownMenuItem asChild>
-                    <Link href="/dashboard/sign-in" className="w-full">Sign in</Link>
+                    <Link href="/dashboard/sign-in" className="w-full">
+                      Sign in
+                    </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
-                    <Link href="/dashboard/sign-up" className="w-full">Get Started</Link>
+                    <Link href="/dashboard/sign-up" className="w-full">
+                      Get Started
+                    </Link>
                   </DropdownMenuItem>
                 </>
               )}
@@ -127,4 +143,4 @@ export function Navbar() {
       </nav>
     </header>
   );
-} 
+}
