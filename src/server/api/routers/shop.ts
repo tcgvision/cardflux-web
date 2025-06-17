@@ -117,4 +117,23 @@ export const shopRouter = createTRPCRouter({
         },
       });
     }),
+
+  hasShop: protectedProcedure
+    .input(z.void())
+    .query(async ({ ctx }) => {
+      if (!ctx.auth.userId) {
+        return false;
+      }
+      
+      const user = await ctx.db.user.findUnique({
+        where: {
+          clerkId: ctx.auth.userId,
+        },
+        include: {
+          shop: true,
+        },
+      });
+      
+      return !!user?.shop;
+    }),
 }); 

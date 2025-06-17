@@ -1,10 +1,17 @@
+"use client";
+
+import { useRouter } from "next/navigation";
 import { Button } from "~/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
-import { Separator } from "~/components/ui/separator";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "~/components/ui/accordion";
 import { Check, ArrowRight, Sparkles } from "lucide-react";
 
 export default function Home() {
+  const router = useRouter();
+
+  const handleGetStarted = () => {
+    router.push("/create-shop");
+  };
+
   return (
     <div className="flex min-h-screen flex-col">
       {/* Hero Section */}
@@ -33,12 +40,12 @@ export default function Home() {
 
             {/* CTA Buttons */}
             <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
-              <Button size="lg" className="group">
+              <Button size="lg" className="group" onClick={handleGetStarted}>
                 Get Started
                 <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
               </Button>
-              <Button variant="outline" size="lg">
-                Watch Demo
+              <Button variant="outline" size="lg" onClick={() => router.push("/learn-more")}>
+                Learn More
               </Button>
             </div>
 
@@ -68,6 +75,42 @@ export default function Home() {
         <div className="absolute inset-0 -z-10">
           <div className="absolute left-1/2 top-0 -translate-x-1/2">
             <div className="h-[500px] w-[500px] rounded-full bg-primary/10 blur-3xl" />
+          </div>
+        </div>
+      </section>
+
+      {/* Features Section */}
+      <section className="container mx-auto px-4 py-20">
+        <div className="text-center">
+          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Why Choose TCG Vision?</h2>
+          <p className="mt-4 text-lg text-muted-foreground">
+            Everything you need to run your TCG business efficiently
+          </p>
+        </div>
+
+        <div className="mt-12 grid gap-8 md:grid-cols-3">
+          {/* Feature 1 */}
+          <div className="rounded-lg border bg-card p-6">
+            <h3 className="text-xl font-bold">AI-Powered Scanning</h3>
+            <p className="mt-2 text-muted-foreground">
+              Instantly identify cards and update inventory with our advanced AI technology
+            </p>
+          </div>
+
+          {/* Feature 2 */}
+          <div className="rounded-lg border bg-card p-6">
+            <h3 className="text-xl font-bold">Real-Time Pricing</h3>
+            <p className="mt-2 text-muted-foreground">
+              Stay competitive with automatic price updates from major marketplaces
+            </p>
+          </div>
+
+          {/* Feature 3 */}
+          <div className="rounded-lg border bg-card p-6">
+            <h3 className="text-xl font-bold">Powerful Analytics</h3>
+            <p className="mt-2 text-muted-foreground">
+              Make data-driven decisions with comprehensive sales and inventory insights
+            </p>
           </div>
         </div>
       </section>
@@ -119,7 +162,9 @@ export default function Home() {
                     <span>Email support</span>
                   </li>
                 </ul>
-                <Button className="mt-8 w-full">Get Started</Button>
+                <Button className="mt-8 w-full" onClick={handleGetStarted}>
+                  Get Started
+                </Button>
               </div>
 
               {/* Growth Plan */}
@@ -137,15 +182,7 @@ export default function Home() {
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-primary" />
-                    <span>Unlimited inventory</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="h-4 w-4 text-primary" />
-                    <span>Up to 5 team members</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="h-4 w-4 text-primary" />
-                    <span>Discord bot integration</span>
+                    <span>Unlimited inventory items</span>
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-primary" />
@@ -153,34 +190,30 @@ export default function Home() {
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-primary" />
-                    <span>Role-based access control</span>
+                    <span>API access</span>
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-primary" />
                     <span>Priority support</span>
                   </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="h-4 w-4 text-primary" />
-                    <span>50% off website development</span>
-                  </li>
                 </ul>
-                <Button className="mt-8 w-full">Get Started</Button>
+                <Button className="mt-8 w-full" onClick={handleGetStarted}>
+                  Get Started
+                </Button>
               </div>
             </div>
           </TabsContent>
 
           <TabsContent value="annual" className="mt-8">
             <div className="grid gap-8 md:grid-cols-2">
-              {/* Starter Plan Annual */}
+              {/* Starter Plan - Annual */}
               <div className="rounded-lg border bg-card p-8">
                 <h3 className="text-2xl font-bold">Starter</h3>
                 <p className="mt-2 text-muted-foreground">For hobby shops and solo sellers</p>
                 <div className="mt-4">
-                  <span className="text-4xl font-bold">$490</span>
-                  <span className="text-muted-foreground">/year</span>
+                  <span className="text-4xl font-bold">$39</span>
+                  <span className="text-muted-foreground">/month</span>
                 </div>
-                <p className="mt-2 text-sm text-muted-foreground">Save 2 months</p>
-                {/* Same features as monthly */}
                 <ul className="mt-8 space-y-4">
                   <li className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-primary" />
@@ -203,19 +236,19 @@ export default function Home() {
                     <span>Email support</span>
                   </li>
                 </ul>
-                <Button className="mt-8 w-full">Get Started</Button>
+                <Button className="mt-8 w-full" onClick={handleGetStarted}>
+                  Get Started
+                </Button>
               </div>
 
-              {/* Growth Plan Annual */}
+              {/* Growth Plan - Annual */}
               <div className="rounded-lg border bg-card p-8">
                 <h3 className="text-2xl font-bold">Growth</h3>
                 <p className="mt-2 text-muted-foreground">For scaling TCG businesses</p>
                 <div className="mt-4">
-                  <span className="text-4xl font-bold">$1,490</span>
-                  <span className="text-muted-foreground">/year</span>
+                  <span className="text-4xl font-bold">$119</span>
+                  <span className="text-muted-foreground">/month</span>
                 </div>
-                <p className="mt-2 text-sm text-muted-foreground">Save 2 months</p>
-                {/* Same features as monthly */}
                 <ul className="mt-8 space-y-4">
                   <li className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-primary" />
@@ -223,15 +256,7 @@ export default function Home() {
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-primary" />
-                    <span>Unlimited inventory</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="h-4 w-4 text-primary" />
-                    <span>Up to 5 team members</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="h-4 w-4 text-primary" />
-                    <span>Discord bot integration</span>
+                    <span>Unlimited inventory items</span>
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-primary" />
@@ -239,73 +264,20 @@ export default function Home() {
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-primary" />
-                    <span>Role-based access control</span>
+                    <span>API access</span>
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-primary" />
                     <span>Priority support</span>
                   </li>
-                  <li className="flex items-center gap-2">
-                    <Check className="h-4 w-4 text-primary" />
-                    <span>50% off website development</span>
-                  </li>
                 </ul>
-                <Button className="mt-8 w-full">Get Started</Button>
+                <Button className="mt-8 w-full" onClick={handleGetStarted}>
+                  Get Started
+                </Button>
               </div>
             </div>
           </TabsContent>
         </Tabs>
-      </section>
-
-      <Separator className="my-8" />
-
-      {/* FAQ Section */}
-      <section className="container mx-auto px-4 py-20">
-        <div className="text-center">
-          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">Frequently Asked Questions</h2>
-          <p className="mt-4 text-lg text-muted-foreground">
-            Everything you need to know about TCG Vision
-          </p>
-        </div>
-
-        <div className="mx-auto mt-12 max-w-3xl">
-          <Accordion type="single" collapsible className="w-full">
-            <AccordionItem value="item-1">
-              <AccordionTrigger>What is TCG Vision?</AccordionTrigger>
-              <AccordionContent>
-                TCG Vision is a modern inventory management system designed specifically for trading card game shops. It combines AI-powered scanning, real-time pricing, and powerful analytics to help you manage your inventory efficiently.
-              </AccordionContent>
-            </AccordionItem>
-
-            <AccordionItem value="item-2">
-              <AccordionTrigger>How does the AI scanning work?</AccordionTrigger>
-              <AccordionContent>
-                Our AI scanning technology uses advanced computer vision to quickly identify and catalog your cards. Simply take a photo of your cards, and our system will automatically identify them and add them to your inventory.
-              </AccordionContent>
-            </AccordionItem>
-
-            <AccordionItem value="item-3">
-              <AccordionTrigger>Can I upgrade my plan later?</AccordionTrigger>
-              <AccordionContent>
-                Yes, you can upgrade your plan at any time. When you upgrade, you&apos;ll only be charged the prorated difference for the remaining time in your billing cycle.
-              </AccordionContent>
-            </AccordionItem>
-
-            <AccordionItem value="item-4">
-              <AccordionTrigger>What kind of support do you offer?</AccordionTrigger>
-              <AccordionContent>
-                Starter plan users receive email support, while Growth plan users get priority support with dedicated Slack/Zoom access. Our support team is available to help you with any questions or issues you may have.
-              </AccordionContent>
-            </AccordionItem>
-
-            <AccordionItem value="item-5">
-              <AccordionTrigger>How does the Discord bot integration work?</AccordionTrigger>
-              <AccordionContent>
-                The Discord bot allows you to manage your inventory directly from your Discord server. You can check prices, update inventory, and even process sales without leaving Discord. This feature is available exclusively on the Growth plan.
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
-        </div>
       </section>
     </div>
   );

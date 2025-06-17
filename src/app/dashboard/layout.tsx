@@ -50,11 +50,6 @@ export async function generateMetadata(): Promise<Metadata> {
 // This tells Next.js not to inherit the root layout
 export const dynamic = "force-dynamic";
 
-// Prevent inheriting from root layout
-// export const metadata: Metadata = {
-//   title: "TCG Vision Enterprise",
-//   description: "Manage your TCG business with TCG Vision Enterprise",
-// };
 
 // This tells Next.js not to inherit the root layout
 export const layout = false;

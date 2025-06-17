@@ -6,6 +6,7 @@ import { type Metadata } from "next";
 import { Geist } from "next/font/google";
 import { TRPCReactProvider } from "~/trpc/react";
 import { Toaster } from "sonner";
+import { NavbarWrapper } from "./_components/navbar-wrapper";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -29,7 +30,7 @@ export default function RootLayout({
     <ClerkProvider>
       <html lang="en" className={`${geist.variable} ${inter.className}`}>
         <body>
-          <Navbar />
+          <NavbarWrapper />
           <TRPCReactProvider>{children}</TRPCReactProvider>
           <Toaster />
         </body>

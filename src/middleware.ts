@@ -31,6 +31,8 @@ export default clerkMiddleware(async (auth, req) => {
       const signInUrl = new URL("/", req.url);
       if (!isDev) {
         signInUrl.hostname = PROD_HOST;
+      } else {
+        signInUrl.hostname = DEV_HOST;
       }
       return redirectToSignIn();
     }
@@ -40,6 +42,8 @@ export default clerkMiddleware(async (auth, req) => {
       const createShopUrl = new URL("/create-shop", req.url);
       if (!isDev) {
         createShopUrl.hostname = PROD_HOST;
+      } else {
+        createShopUrl.hostname = DEV_HOST;
       }
       return NextResponse.redirect(createShopUrl);
     }
@@ -56,6 +60,7 @@ export default clerkMiddleware(async (auth, req) => {
     if (!isDev) {
       dashboardUrl.hostname = `${DASHBOARD_SUBDOMAIN}.${PROD_HOST}`;
     } else {
+      dashboardUrl.hostname = DEV_HOST;
       dashboardUrl.pathname = `/dashboard${url.pathname}`;
     }
     return NextResponse.redirect(dashboardUrl);
