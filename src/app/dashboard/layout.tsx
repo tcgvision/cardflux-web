@@ -60,7 +60,12 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <ClerkProvider>
+    <ClerkProvider
+      signInUrl="/dashboard/sign-in"
+      signUpUrl="/dashboard/sign-up"
+      afterSignInUrl="/dashboard"
+      afterSignUpUrl="/dashboard"
+    >
       <TRPCReactProvider>
         <div className="min-h-screen bg-background font-sans antialiased">
           <DashboardNavbar />

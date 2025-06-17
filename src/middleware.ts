@@ -33,13 +33,13 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
     ? url.pathname.startsWith("/dashboard")
     : hostname.startsWith(`${DASHBOARD_SUBDOMAIN}.`);
 
-  // Skip auth check for public routes
-  if (isPublicRoute(req)) {
+  // Skip auth check for public routes and auth routes
+  if (isPublicRoute(req) || isAuthRoute(req)) {
     return NextResponse.next();
   }
 
   // Protect dashboard routes
-  if (isDashboardRoute(req) && !isAuthRoute(req)) {
+  if (isDashboardRoute(req)) {
     await auth.protect();
   }
 

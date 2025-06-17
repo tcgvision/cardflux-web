@@ -1,7 +1,6 @@
 "use client";
 
 import { useAuth } from "@clerk/nextjs";
-import { useRouter } from "next/navigation";
 import * as Clerk from "@clerk/elements/common";
 import * as SignUp from "@clerk/elements/sign-up";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "~/components/ui/card";
@@ -25,13 +24,6 @@ import { Icons } from "~/components/icons";
  */
 export default function SignUpPage() {
   const { isSignedIn } = useAuth();
-  const router = useRouter();
-
-  // Redirect to dashboard if user is already signed in
-  if (isSignedIn) {
-    router.push("/dashboard");
-    return null;
-  }
 
   return (
     <main className="flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center">
