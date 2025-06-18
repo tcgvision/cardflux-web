@@ -25,7 +25,7 @@ const isCreateShopRoute = createRouteMatcher([
 
 // Export the middleware
 export default clerkMiddleware(async (auth, req: NextRequest) => {
-  const { userId, orgId } = await auth();
+  const { userId, orgId, orgRole } = await auth();
   const url = new URL(req.url);
 
   // Allow public routes
@@ -35,9 +35,13 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
 
   // Allow auth routes (sign-in and sign-up)
   if (isAuthRoute(req)) {
-    // If user is already signed in, redirect to dashboard
-    if (userId) {
+    // If user is already signed in and has an organization, redirect to dashboard
+    if (userId && orgId) {
       return NextResponse.redirect(new URL("/dashboard", req.url));
+    }
+    // If user is signed in but has no organization, redirect to create-shop
+    if (userId && !orgId) {
+      return NextResponse.redirect(new URL("/dashboard/create-shop", req.url));
     }
     return NextResponse.next();
   }
@@ -52,7 +56,7 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
   // Handle create-shop route
   if (isCreateShopRoute(req)) {
     // If user already has an organization, redirect to dashboard
-    if (orgId) {
+    if (orgId && orgRole) {
       return NextResponse.redirect(new URL("/dashboard", req.url));
     }
     // Allow access to create-shop if user has no organization

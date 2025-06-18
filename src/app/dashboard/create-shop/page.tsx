@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useClerk, useUser, useOrganization } from "@clerk/nextjs";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Combobox } from "~/components/ui/combobox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
+import { Loader2, Store } from "lucide-react";
 
 // Form validation schema
 const formSchema = z.object({
@@ -47,9 +48,16 @@ const locations = [
 export default function CreateShopPage() {
   const router = useRouter();
   const { user } = useUser();
-  const { createOrganization } = useClerk();
-  const { organization } = useOrganization();
+  const { createOrganization, setActive } = useClerk();
+  const { organization, isLoaded: orgLoaded } = useOrganization();
   const [activeTab, setActiveTab] = useState<"create" | "join">("create");
+
+  // Handle organization changes - redirect to dashboard when organization is available
+  useEffect(() => {
+    if (orgLoaded && organization) {
+      router.push("/dashboard");
+    }
+  }, [orgLoaded, organization, router]);
 
   // Form setup
   const form = useForm<FormData>({
@@ -68,7 +76,7 @@ export default function CreateShopPage() {
       toast.success("Success!", {
         description: "Your shop has been created successfully.",
       });
-      router.push("/dashboard");
+      // Don't navigate here - let the onSubmit handler handle it
     },
     onError: (error) => {
       toast.error("Error", {
@@ -90,6 +98,9 @@ export default function CreateShopPage() {
         throw new Error("Failed to create organization");
       }
 
+      // Set the newly created organization as active
+      await setActive({ organization: org.id });
+
       // Create shop in database
       await createShopMutation.mutateAsync({
         name: data.name,
@@ -98,6 +109,19 @@ export default function CreateShopPage() {
         type: data.type,
         clerkOrgId: org.id,
       });
+
+      // Small delay to ensure Clerk processes the organization change
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Navigate to dashboard - the middleware should now recognize the organization
+      router.push("/dashboard");
+      
+      // Fallback: if router.push doesn't work due to middleware timing, force refresh
+      setTimeout(() => {
+        if (window.location.pathname !== "/dashboard") {
+          window.location.href = "/dashboard";
+        }
+      }, 2000);
     } catch (error) {
       console.error("Error creating shop:", error);
       const errorMessage = error instanceof Error ? error.message : "Failed to create shop. Please try again.";
@@ -108,13 +132,25 @@ export default function CreateShopPage() {
   };
 
   // If user already has an organization, redirect to dashboard
-  if (organization) {
+  if (orgLoaded && organization) {
     router.push("/dashboard");
     return null;
   }
 
+  // Show loading while organization context is loading
+  if (!orgLoaded) {
+    return (
+      <div className="container mx-auto flex min-h-[calc(100vh-7rem)] items-center justify-center px-4">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="container mx-auto flex h-[calc(100vh-4rem)] items-center justify-center px-4">
+    <div className="container mx-auto flex min-h-[calc(100vh-7rem)] items-center justify-center px-4">
       <Card className="w-full max-w-2xl">
         <CardHeader>
           <CardTitle>Set Up Your Shop</CardTitle>
@@ -130,17 +166,22 @@ export default function CreateShopPage() {
             </TabsList>
             <TabsContent value="create">
               <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                <form onSubmit={form.handleSubmit(onSubmit)} className={`space-y-6 ${createShopMutation.isPending ? 'opacity-60 pointer-events-none' : ''}`}>
                   <FormField
                     control={form.control}
                     name="name"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Shop Name</FormLabel>
+                        <FormLabel className="text-foreground">Shop Name</FormLabel>
                         <FormControl>
-                          <Input placeholder="Enter your shop name" {...field} />
+                          <Input 
+                            placeholder="Enter your shop name" 
+                            {...field} 
+                            disabled={createShopMutation.isPending}
+                            className="bg-background border-border text-foreground placeholder:text-muted-foreground"
+                          />
                         </FormControl>
-                        <FormMessage />
+                        <FormMessage className="text-destructive" />
                       </FormItem>
                     )}
                   />
@@ -150,11 +191,16 @@ export default function CreateShopPage() {
                     name="description"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Description</FormLabel>
+                        <FormLabel className="text-foreground">Description</FormLabel>
                         <FormControl>
-                          <Input placeholder="Describe your shop" {...field} />
+                          <Input 
+                            placeholder="Describe your shop" 
+                            {...field} 
+                            disabled={createShopMutation.isPending}
+                            className="bg-background border-border text-foreground placeholder:text-muted-foreground"
+                          />
                         </FormControl>
-                        <FormMessage />
+                        <FormMessage className="text-destructive" />
                       </FormItem>
                     )}
                   />
@@ -164,7 +210,7 @@ export default function CreateShopPage() {
                     name="location"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Location</FormLabel>
+                        <FormLabel className="text-foreground">Location</FormLabel>
                         <FormControl>
                           <Combobox
                             options={locations}
@@ -174,7 +220,7 @@ export default function CreateShopPage() {
                             emptyText="No locations found."
                           />
                         </FormControl>
-                        <FormMessage />
+                        <FormMessage className="text-destructive" />
                       </FormItem>
                     )}
                   />
@@ -184,28 +230,39 @@ export default function CreateShopPage() {
                     name="type"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Shop Type</FormLabel>
+                        <FormLabel className="text-foreground">Shop Type</FormLabel>
                         <FormControl>
                           <select
-                            className="w-full rounded-md border border-input bg-background px-3 py-2"
+                            className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
                             {...field}
+                            disabled={createShopMutation.isPending}
                           >
                             <option value="local">Local Store</option>
                             <option value="online">Online Store</option>
                             <option value="both">Both Local & Online</option>
                           </select>
                         </FormControl>
-                        <FormMessage />
+                        <FormMessage className="text-destructive" />
                       </FormItem>
                     )}
                   />
 
                   <Button 
                     type="submit" 
-                    className="w-full"
+                    className="w-full bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer disabled:cursor-not-allowed"
                     disabled={createShopMutation.isPending}
                   >
-                    {createShopMutation.isPending ? "Creating..." : "Create Shop"}
+                    {createShopMutation.isPending ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Creating Shop...
+                      </>
+                    ) : (
+                      <>
+                        <Store className="mr-2 h-4 w-4" />
+                        Create Shop
+                      </>
+                    )}
                   </Button>
                 </form>
               </Form>
@@ -218,7 +275,7 @@ export default function CreateShopPage() {
                 </p>
                 <Button 
                   variant="outline" 
-                  className="w-full"
+                  className="w-full cursor-pointer hover:bg-accent hover:text-accent-foreground"
                   onClick={() => {
                     // TODO: Implement invitation flow
                     toast.info("Coming soon!", {
