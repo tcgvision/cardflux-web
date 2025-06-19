@@ -4,79 +4,20 @@ import { useRouter } from "next/navigation";
 import { Button } from "~/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { Check, ArrowRight, Sparkles } from "lucide-react";
+import { HeroSection } from "./_components/hero-section";
 
 export default function Home() {
   const router = useRouter();
 
   const handleGetStarted = () => {
-    router.push("/get-started");
+    router.push("/dashboard/sign-up");
   };
 
   return (
     <div className="flex min-h-screen flex-col">
       {/* Hero Section */}
-      <section className="relative flex h-[calc(100vh-4rem)] items-center justify-center overflow-hidden bg-background">
-        {/* Background gradient */}
-        <div className="absolute inset-0 bg-gradient-to-b from-background via-background/80 to-background/40" />
-        
-        {/* Content */}
-        <div className="container relative z-10 mx-auto px-4">
-          <div className="mx-auto max-w-4xl text-center">
-            {/* Badge */}
-            <div className="mb-8 inline-flex items-center rounded-full border bg-background/50 px-3 py-1 text-sm backdrop-blur-sm">
-              <Sparkles className="mr-2 h-4 w-4 text-primary" />
-              <span>AI-Powered TCG Management</span>
-            </div>
-
-            {/* Main heading */}
-            <h1 className="mb-6 bg-gradient-to-b from-foreground to-foreground/70 bg-clip-text text-4xl font-bold tracking-tight sm:text-6xl md:text-7xl">
-              Modern TCG Inventory Management
-            </h1>
-
-            {/* Subheading */}
-            <p className="mx-auto mb-8 max-w-2xl text-lg leading-8 text-muted-foreground">
-              Streamline your card shop operations with AI-powered scanning, real-time pricing, and powerful analytics.
-            </p>
-
-            {/* CTA Buttons */}
-            <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
-              <Button size="lg" className="group" onClick={handleGetStarted}>
-                Get Started
-                <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
-              </Button>
-              <Button variant="outline" size="lg" onClick={() => router.push("/learn-more")}>
-                Learn More
-              </Button>
-            </div>
-
-            {/* Stats */}
-            <div className="mt-16 grid grid-cols-2 gap-8 border-t border-border/40 pt-8 sm:grid-cols-4">
-              <div>
-                <div className="text-3xl font-bold">300+</div>
-                <div className="text-sm text-muted-foreground">Daily Scans</div>
-              </div>
-              <div>
-                <div className="text-3xl font-bold">5k+</div>
-                <div className="text-sm text-muted-foreground">Cards Tracked</div>
-              </div>
-              <div>
-                <div className="text-3xl font-bold">24/7</div>
-                <div className="text-sm text-muted-foreground">Price Updates</div>
-              </div>
-              <div>
-                <div className="text-3xl font-bold">99%</div>
-                <div className="text-sm text-muted-foreground">Accuracy</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Decorative elements */}
-        <div className="absolute inset-0 -z-10">
-          <div className="absolute left-1/2 top-0 -translate-x-1/2">
-            <div className="h-[500px] w-[500px] rounded-full bg-primary/10 blur-3xl" />
-          </div>
-        </div>
+      <section className="relative overflow-hidden bg-background">
+        <HeroSection />
       </section>
 
       {/* Features Section */}
@@ -213,6 +154,7 @@ export default function Home() {
                 <div className="mt-4">
                   <span className="text-4xl font-bold">$39</span>
                   <span className="text-muted-foreground">/month</span>
+                  <div className="text-sm text-primary">Save $120/year</div>
                 </div>
                 <ul className="mt-8 space-y-4">
                   <li className="flex items-center gap-2">
@@ -248,6 +190,7 @@ export default function Home() {
                 <div className="mt-4">
                   <span className="text-4xl font-bold">$119</span>
                   <span className="text-muted-foreground">/month</span>
+                  <div className="text-sm text-primary">Save $360/year</div>
                 </div>
                 <ul className="mt-8 space-y-4">
                   <li className="flex items-center gap-2">
