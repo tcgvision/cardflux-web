@@ -357,16 +357,11 @@ export default function SignUpPage() {
             </form>
           </Form>
 
-          <div className="text-center">
-            <p className="text-sm text-muted-foreground">
-              Already have an account?{" "}
-              <Link
-                href="/dashboard/sign-in"
-                className="font-medium text-primary hover:text-primary/90 underline-offset-4 hover:underline"
-              >
-                Sign in
-              </Link>
-            </p>
+          <div className="text-center text-sm text-muted-foreground">
+            Already have an account?{" "}
+            <Link href="/auth/sign-in" className="text-primary hover:text-primary/90 font-medium">
+              Sign in
+            </Link>
           </div>
         </CardContent>
       </Card>

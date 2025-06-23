@@ -9,7 +9,7 @@ export function HeroSection() {
   const router = useRouter();
 
   const handleGetStarted = () => {
-    router.push("/dashboard/sign-up");
+    router.push("/auth/sign-up");
   };
 
   const handleLearnMore = () => {
