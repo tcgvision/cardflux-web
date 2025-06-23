@@ -31,7 +31,11 @@ export const createTRPCContext = async (opts: { headers: Headers }) => {
   
   return {
     db,
-    auth: { userId: session?.userId },
+    auth: { 
+      userId: session?.userId,
+      orgId: session?.orgId,
+      orgRole: session?.orgRole,
+    },
     ...opts,
   };
 };
@@ -117,6 +121,97 @@ const isAuthed = t.middleware(({ next, ctx }) => {
 });
 
 /**
+ * Shop context middleware
+ * Ensures user has access to a shop and provides shop context
+ */
+const isShopMember = t.middleware(async ({ next, ctx }) => {
+  if (!ctx.auth.userId) {
+    throw new TRPCError({ code: "UNAUTHORIZED" });
+  }
+
+  if (!ctx.auth.orgId) {
+    throw new TRPCError({ 
+      code: "FORBIDDEN", 
+      message: "You must be a member of a shop to access this resource" 
+    });
+  }
+
+  // Get shop details
+  const shop = await ctx.db.shop.findUnique({
+    where: { id: ctx.auth.orgId },
+    include: {
+      settings: true,
+    },
+  });
+
+  if (!shop) {
+    throw new TRPCError({ 
+      code: "NOT_FOUND", 
+      message: "Shop not found" 
+    });
+  }
+
+  // Get user details
+  const user = await ctx.db.user.findUnique({
+    where: { clerkId: ctx.auth.userId },
+  });
+
+  if (!user) {
+    throw new TRPCError({ 
+      code: "NOT_FOUND", 
+      message: "User not found in database" 
+    });
+  }
+
+  return next({
+    ctx: {
+      auth: ctx.auth,
+      shop,
+      user,
+    },
+  });
+});
+
+/**
+ * Staff-only middleware
+ * Ensures user has staff role in the shop
+ */
+const isStaff = t.middleware(async ({ next, ctx }) => {
+  if (!ctx.auth.userId) {
+    throw new TRPCError({ code: "UNAUTHORIZED" });
+  }
+
+  if (!ctx.auth.orgId) {
+    throw new TRPCError({ 
+      code: "FORBIDDEN", 
+      message: "You must be a member of a shop to access this resource" 
+    });
+  }
+
+  // Check if user is staff (has transactions, buylists, or credit transactions)
+  const user = await ctx.db.user.findFirst({
+    where: { 
+      clerkId: ctx.auth.userId,
+      shopId: ctx.auth.orgId,
+    },
+  });
+
+  if (!user) {
+    throw new TRPCError({ 
+      code: "FORBIDDEN", 
+      message: "You must be a staff member to perform this action" 
+    });
+  }
+
+  return next({
+    ctx: {
+      auth: ctx.auth,
+      user,
+    },
+  });
+});
+
+/**
  * Public (unauthenticated) procedure
  *
  * This is the base piece you use to build new queries and mutations on your tRPC API. It does not
@@ -132,3 +227,19 @@ export const publicProcedure = t.procedure.use(timingMiddleware);
  * authentication. It guarantees that a user is signed in before the procedure is executed.
  */
 export const protectedProcedure = t.procedure.use(timingMiddleware).use(isAuthed);
+
+/**
+ * Shop member procedure
+ *
+ * This procedure ensures the user is a member of a shop and provides shop context.
+ * Use this for most shop-related operations.
+ */
+export const shopProcedure = t.procedure.use(timingMiddleware).use(isShopMember);
+
+/**
+ * Staff procedure
+ *
+ * This procedure ensures the user is a staff member of the shop.
+ * Use this for operations that require staff privileges.
+ */
+export const staffProcedure = t.procedure.use(timingMiddleware).use(isStaff);

@@ -11,6 +11,7 @@ datasource db {
     directUrl = env("DIRECT_URL")   
 }
 
+// --- CORE MODELS --- //
 model Shop {
   id          String   @id             // Clerk Org ID
   name        String
@@ -20,7 +21,16 @@ model Shop {
   type        String   // "local", "online", or "both"
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  
+  // Relations
   users       User[]   @relation("ShopUsers")
+  customers   Customer[]
+  products    Product[]
+  inventoryItems InventoryItem[]
+  transactions Transaction[]
+  buylists    Buylist[]
+  storeCreditTransactions StoreCreditTransaction[]
+  settings    ShopSettings?
 }
 
 model User {
@@ -30,15 +40,250 @@ model User {
   name     String?
   shopId   String?               // FK to Shop (nullable for now)
   shop     Shop?   @relation("ShopUsers", fields: [shopId], references: [id])
-  posts    Post[]
+  
+  // Relations for staff actions
+  transactions Transaction[] @relation("StaffTransactions")
+  buylists     Buylist[]     @relation("StaffBuylists")
+  storeCreditTransactions StoreCreditTransaction[] @relation("StaffCreditTransactions")
 }
 
-model Post {
-  id        Int      @id @default(autoincrement())
-  title     String
-  content   String?
-  published Boolean  @default(false)
-  authorId  Int
-  author    User     @relation(fields: [authorId], references: [id])
-  createdAt DateTime @default(now())
+// --- CUSTOMER & STORE CREDIT --- //
+model Customer {
+  id            String   @id @default(cuid())
+  shopId        String
+  name          String
+  phone         String
+  currentCredit Float    @default(0) // Current available store credit
+  totalEarned   Float    @default(0) // Total store credit earned (for reference)
+  lastVisit     DateTime?
+  isActive      Boolean  @default(true)
+  notes         String?  // Staff notes about customer
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Relations
+  shop          Shop     @relation(fields: [shopId], references: [id])
+  transactions  Transaction[]
+  storeCreditTransactions StoreCreditTransaction[]
+  buylists      Buylist[] // Add missing relation
+  
+  @@unique([shopId, phone]) // Phone number as unique identifier
+  @@index([shopId, isActive])
+}
+
+model StoreCreditTransaction {
+  id            String   @id @default(cuid())
+  customerId    String
+  shopId        String
+  type          StoreCreditType
+  amount        Float
+  balanceBefore Float
+  balanceAfter  Float
+  referenceId   String?  // Link to transaction or buylist
+  referenceType ReferenceType?
+  staffId       Int?     // Staff member who processed this - changed to Int
+  notes         String?  // Reason for credit adjustment
+  createdAt     DateTime @default(now())
+  
+  // Relations
+  customer      Customer @relation(fields: [customerId], references: [id])
+  shop          Shop     @relation(fields: [shopId], references: [id])
+  staff         User?    @relation("StaffCreditTransactions", fields: [staffId], references: [id])
+  
+  @@index([customerId, createdAt])
+  @@index([shopId, type, createdAt])
+}
+
+enum StoreCreditType {
+  EARNED        // From buylist
+  SPENT         // Used in transactions
+  ADJUSTED      // Manual adjustment by staff
+  REFUNDED      // Refund from transaction
+}
+
+enum ReferenceType {
+  TRANSACTION   // Linked to a sale/purchase
+  BUYLIST       // Linked to a buylist
+  MANUAL        // Manual adjustment
+  REFUND        // Refund credit
+}
+
+// --- PRODUCTS & INVENTORY --- //
+model Product {
+  id            String   @id @default(cuid())
+  name          String
+  setCode       String?   // e.g., OP06
+  setName       String?   // e.g., "Awakening of the New Era"
+  tcgLine       String    // e.g., "One Piece TCG"
+  rarity        String?
+  cardNumber    String?   // e.g., "OP06-001"
+  imageUrl      String?
+  tcgplayerId   String?   // for sync reference
+  marketPrice   Float?    // Add for price tracking
+  lastPriceUpdate DateTime? // Add for price freshness
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relations
+  shop          Shop     @relation(fields: [shopId], references: [id])
+  shopId        String
+  inventoryItems InventoryItem[]
+  transactionItems TransactionItem[]
+  buylistItems  BuylistItem[]
+  
+  @@unique([shopId, tcgLine, setCode, cardNumber]) // Prevent duplicates
+  @@index([tcgplayerId]) // For price sync performance
+}
+
+model InventoryItem {
+  id            String   @id @default(cuid())
+  shopId        String
+  productId     String
+  quantity      Int
+  price         Float
+  condition     Condition @default(NM) // Add condition tracking
+  notes         String?   // Add for item-specific notes
+  lastUpdated   DateTime  @updatedAt
+  createdAt     DateTime @default(now())
+  
+  // Relations
+  product       Product  @relation(fields: [productId], references: [id])
+  shop          Shop     @relation(fields: [shopId], references: [id])
+  
+  @@unique([shopId, productId, condition]) // Prevent duplicate entries
+}
+
+enum Condition {
+  NM  // Near Mint
+  LP  // Lightly Played
+  MP  // Moderately Played
+  HP  // Heavily Played
+  DMG // Damaged
+}
+
+// --- TRANSACTIONS --- //
+model Transaction {
+  id           String   @id @default(cuid())
+  shopId       String
+  customerId   String?  // Optional - for store credit tracking
+  type         TransactionType
+  staffId      Int?     // Changed to Int to match User.id
+  customerName String?  // Fallback if no customer record
+  customerPhone String? // Fallback if no customer record
+  subtotal     Float
+  tax          Float    @default(0)
+  discount     Float    @default(0)
+  totalAmount  Float
+  amountPaid   Float    // Actual amount paid
+  storeCreditUsed Float @default(0) // Amount of store credit used
+  paymentMethod PaymentMethod @default(CASH)
+  status       TransactionStatus @default(COMPLETED)
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  shop         Shop     @relation(fields: [shopId], references: [id])
+  customer     Customer? @relation(fields: [customerId], references: [id])
+  staff        User?    @relation("StaffTransactions", fields: [staffId], references: [id])
+  items        TransactionItem[]
+
+  @@index([shopId, createdAt])
+  @@index([customerId, createdAt])
+}
+
+model TransactionItem {
+  id             String @id @default(cuid())
+  transactionId  String
+  productId      String
+  quantity       Int
+  pricePerUnit   Float
+  condition      Condition @default(NM)
+  
+  // Relations
+  transaction    Transaction @relation(fields: [transactionId], references: [id])
+  product        Product     @relation(fields: [productId], references: [id])
+}
+
+enum TransactionType {
+  BUYIN    // Customer selling to shop
+  CHECKOUT // Customer buying from shop
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  VOIDED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  CASH
+  CREDIT_CARD
+  DEBIT_CARD
+  STORE_CREDIT
+  MIXED         // Combination of payment methods
+}
+
+// --- BUYLISTS --- //
+model Buylist {
+  id          String   @id @default(cuid())
+  shopId      String
+  customerId  String?  // Optional - for store credit
+  staffId     Int?     // Changed to Int to match User.id
+  customerName String? // Fallback if no customer record
+  customerPhone String? // Fallback if no customer record
+  status      BuylistStatus
+  totalValue  Float
+  storeCreditAmount Float @default(0) // Amount to add to store credit
+  cashAmount  Float @default(0) // Amount to pay in cash
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  shop        Shop     @relation(fields: [shopId], references: [id])
+  customer    Customer? @relation(fields: [customerId], references: [id])
+  staff       User?    @relation("StaffBuylists", fields: [staffId], references: [id])
+  items       BuylistItem[]
+
+  @@index([shopId, status, createdAt])
+}
+
+model BuylistItem {
+  id          String   @id @default(cuid())
+  buylistId   String
+  productId   String
+  quantity    Int
+  offerPrice  Float
+  condition   Condition @default(NM)
+
+  // Relations
+  buylist     Buylist  @relation(fields: [buylistId], references: [id])
+  product     Product  @relation(fields: [productId], references: [id])
+}
+
+enum BuylistStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CREDITED
+}
+
+// --- SHOP SETTINGS --- //
+model ShopSettings {
+  id                    String @id @default(cuid())
+  shopId                String @unique
+  defaultCurrency       String @default("USD")
+  enableNotifications   Boolean @default(true)
+  autoPriceSync         Boolean @default(true)
+  lowStockThreshold     Int @default(5)
+  
+  // Store Credit Settings
+  enableStoreCredit     Boolean @default(true)
+  minCreditAmount       Float   @default(0)
+  maxCreditAmount       Float?  // null = unlimited
+  
+  // Relations
+  shop                  Shop @relation(fields: [shopId], references: [id])
 }
