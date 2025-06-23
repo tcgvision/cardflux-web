@@ -46,8 +46,8 @@ export default function RootLayout({
                 footerActionLink: "text-primary hover:text-primary/90",
               },
             }}
-            signInUrl="/dashboard/sign-in"
-            signUpUrl="/dashboard/sign-up"
+            signInUrl="/auth/sign-in"
+            signUpUrl="/auth/sign-up"
             afterSignInUrl="/dashboard"
             afterSignUpUrl="/dashboard"
           >
