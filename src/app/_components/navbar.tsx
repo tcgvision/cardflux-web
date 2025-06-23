@@ -77,7 +77,7 @@ export function Navbar() {
                 </div>
               ) : (
                 <div className="flex items-center space-x-4">
-                  <Link href="/dashboard/sign-in">
+                  <Link href="/auth/sign-in">
                     <Button
                       variant="ghost"
                       size="sm"
@@ -86,7 +86,7 @@ export function Navbar() {
                       Sign in
                     </Button>
                   </Link>
-                  <Link href="/dashboard/sign-up">
+                  <Link href="/auth/sign-up">
                     <Button size="sm">Get Started</Button>
                   </Link>
                 </div>
@@ -126,12 +126,12 @@ export function Navbar() {
               ) : (
                 <>
                   <DropdownMenuItem asChild>
-                    <Link href="/dashboard/sign-in" className="w-full">
+                    <Link href="/auth/sign-in" className="w-full">
                       Sign in
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
-                    <Link href="/dashboard/sign-up" className="w-full">
+                    <Link href="/auth/sign-up" className="w-full">
                       Get Started
                     </Link>
                   </DropdownMenuItem>

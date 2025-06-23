@@ -61,8 +61,8 @@ export default function DashboardLayout({
 }) {
   return (
     <ClerkProvider
-      signInUrl="/dashboard/sign-in"
-      signUpUrl="/dashboard/sign-up"
+      signInUrl="/auth/sign-in"
+      signUpUrl="/auth/sign-up"
       afterSignInUrl="/dashboard"
       afterSignUpUrl="/dashboard"
     >
