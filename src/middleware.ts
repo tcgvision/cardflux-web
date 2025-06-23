@@ -6,13 +6,18 @@ import type { NextRequest } from "next/server";
 const isPublicRoute = createRouteMatcher([
   "/",
   "/learn-more",
+  "/pricing",
+  "/features",
+  "/about",
   "/api/trpc/(.*)",
   "/api/webhooks/(.*)",
 ]);
 
 const isAuthRoute = createRouteMatcher([
-  "/dashboard/sign-in(.*)",
-  "/dashboard/sign-up(.*)",
+  "/auth/sign-in(.*)",
+  "/auth/sign-up(.*)",
+  "/dashboard/sign-in(.*)", // Keep for backward compatibility
+  "/dashboard/sign-up(.*)", // Keep for backward compatibility
 ]);
 
 const isDashboardRoute = createRouteMatcher([
@@ -23,23 +28,31 @@ const isCreateShopRoute = createRouteMatcher([
   "/dashboard/create-shop",
 ]);
 
+const isOnboardingRoute = createRouteMatcher([
+  "/dashboard/onboarding",
+]);
+
 // Export the middleware
 export default clerkMiddleware(async (auth, req: NextRequest) => {
   const { userId, orgId, orgRole } = await auth();
   const url = new URL(req.url);
+  const hostname = req.headers.get("host") ?? "";
+
+  // Check if this is a dashboard subdomain request
+  const isDashboardSubdomain = hostname.startsWith("dashboard.") || hostname.includes("localhost:3000/dashboard");
 
   // Allow public routes
   if (isPublicRoute(req)) {
     return NextResponse.next();
   }
 
-  // Allow auth routes (sign-in and sign-up)
+  // Handle auth routes (sign-in and sign-up)
   if (isAuthRoute(req)) {
     // If user is already signed in and has an organization, redirect to dashboard
     if (userId && orgId) {
       return NextResponse.redirect(new URL("/dashboard", req.url));
     }
-    // If user is signed in but has no organization, redirect to create-shop
+    // If user is signed in but has no organization, redirect to onboarding
     if (userId && !orgId) {
       return NextResponse.redirect(new URL("/dashboard/create-shop", req.url));
     }
@@ -48,7 +61,7 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
 
   // Handle unauthenticated users
   if (!userId) {
-    const signInUrl = new URL("/dashboard/sign-in", req.url);
+    const signInUrl = new URL("/auth/sign-in", req.url);
     signInUrl.searchParams.set("redirect_url", url.pathname);
     return NextResponse.redirect(signInUrl);
   }

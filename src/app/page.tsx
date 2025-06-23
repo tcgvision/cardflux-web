@@ -10,7 +10,7 @@ export default function Home() {
   const router = useRouter();
 
   const handleGetStarted = () => {
-    router.push("/dashboard/sign-up");
+    router.push("/auth/sign-up");
   };
 
   return (

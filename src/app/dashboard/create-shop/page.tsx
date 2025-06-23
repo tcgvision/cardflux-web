@@ -113,13 +113,13 @@ export default function CreateShopPage() {
       // Small delay to ensure Clerk processes the organization change
       await new Promise(resolve => setTimeout(resolve, 500));
       
-      // Navigate to dashboard - the middleware should now recognize the organization
-      router.push("/dashboard");
+      // Navigate to onboarding - guide users through the setup process
+      router.push("/dashboard/onboarding");
       
       // Fallback: if router.push doesn't work due to middleware timing, force refresh
       setTimeout(() => {
-        if (window.location.pathname !== "/dashboard") {
-          window.location.href = "/dashboard";
+        if (window.location.pathname !== "/dashboard/onboarding") {
+          window.location.href = "/dashboard/onboarding";
         }
       }, 2000);
     } catch (error) {
