@@ -17,7 +17,7 @@ export default function LearnMore() {
               Discover TCG Vision
             </h1>
             <p className="mx-auto mb-8 max-w-2xl text-lg leading-8 text-muted-foreground">
-              The all-in-one solution for modern TCG businesses. Learn how we're revolutionizing card shop management.
+              The all-in-one solution for modern TCG businesses. Learn how we&apos;re revolutionizing card shop management.
             </p>
           </div>
         </div>
