@@ -2,6 +2,7 @@
 
 import { useOrganization } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { SectionCards } from "~/components/section-cards";
 import { DataTable } from "~/components/data-table";
 import { ChartAreaInteractive } from "~/components/chart-area-interactive";
@@ -11,6 +12,37 @@ import { sampleProducts, salesData, stats } from "./data";
 export default function DashboardPage() {
   const { organization, isLoaded: orgLoaded } = useOrganization();
   const router = useRouter();
+  const [isCheckingMembership, setIsCheckingMembership] = useState(false);
+  
+  // Check for shop membership when user doesn't have organization
+  useEffect(() => {
+    if (orgLoaded && !organization && !isCheckingMembership) {
+      setIsCheckingMembership(true);
+      
+      // Check if user is linked to a shop via invitation
+      fetch('/api/check-shop-membership')
+        .then(response => response.json())
+        .then(data => {
+          if (data.hasShop) {
+            console.log("User is linked to shop via invitation, redirecting to dashboard");
+            // Force a page reload to refresh Clerk's organization state
+            window.location.reload();
+          } else {
+            // User has no organization and no shop membership, redirect to create-shop
+            console.log("User has no organization and no shop membership, redirecting to create-shop");
+            router.push("/dashboard/create-shop");
+          }
+        })
+        .catch(error => {
+          console.error("Error checking shop membership:", error);
+          // On error, redirect to create-shop as fallback
+          router.push("/dashboard/create-shop");
+        })
+        .finally(() => {
+          setIsCheckingMembership(false);
+        });
+    }
+  }, [orgLoaded, organization, isCheckingMembership, router]);
   
   // Fetch shop statistics using tRPC - only if user has an organization
   const { data: shopStats, isLoading: statsLoading, error: statsError } = api.shop.getStats.useQuery(
@@ -41,14 +73,21 @@ export default function DashboardPage() {
     reviewer: product.condition,
   }));
 
-  // Show loading state while organization is loading
-  if (!orgLoaded) {
+  // Show loading state while organization is loading or checking membership
+  if (!orgLoaded || isCheckingMembership) {
     return (
       <div className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Loading...</h1>
-            <p className="text-muted-foreground">Please wait while we load your dashboard.</p>
+            <h1 className="text-2xl font-semibold tracking-tight">
+              {isCheckingMembership ? "Checking your membership..." : "Loading..."}
+            </h1>
+            <p className="text-muted-foreground">
+              {isCheckingMembership 
+                ? "Please wait while we verify your shop membership."
+                : "Please wait while we load your dashboard."
+              }
+            </p>
           </div>
         </div>
       </div>

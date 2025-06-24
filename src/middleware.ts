@@ -64,9 +64,11 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
     if (userId && orgId) {
       return NextResponse.redirect(new URL("/dashboard", req.url));
     }
-    // If user is signed in but has no organization, redirect to onboarding
+    // If user is signed in but has no organization, check database for shop membership
     if (userId && !orgId) {
-      return NextResponse.redirect(new URL("/dashboard/create-shop", req.url));
+      // Note: We can't make database calls from middleware, so we'll let the dashboard handle this
+      // The dashboard will check for shop membership and reload if needed
+      return NextResponse.redirect(new URL("/dashboard", req.url));
     }
     return NextResponse.next();
   }
@@ -109,9 +111,11 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
 
   // Handle dashboard routes
   if (isDashboardRoute(req)) {
-    // If user has no organization and isn't on create-shop, redirect to create-shop
+    // If user has no organization and isn't on create-shop, let dashboard handle routing
+    // The dashboard will check for shop membership and redirect appropriately
     if (!orgId && !isCreateShopRoute(req)) {
-      return NextResponse.redirect(new URL("/dashboard/create-shop", req.url));
+      // Don't redirect here - let the dashboard page handle it
+      return NextResponse.next();
     }
     // Allow access to dashboard if user has an organization
     return NextResponse.next();

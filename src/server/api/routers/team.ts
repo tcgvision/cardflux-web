@@ -3,6 +3,7 @@ import { createTRPCRouter, shopProcedure, staffProcedure } from "~/server/api/tr
 import { TRPCError } from "@trpc/server";
 import { Prisma } from "@prisma/client";
 import { ROLES, hasRolePermission, getNormalizedRole, type Role } from "~/lib/roles";
+import { clerkClient } from "@clerk/nextjs/server";
 
 export const teamRouter = createTRPCRouter({
   // Get all team members
@@ -37,20 +38,32 @@ export const teamRouter = createTRPCRouter({
             name: true,
             email: true,
             shopId: true,
+            createdAt: true,
           },
         }),
         ctx.db.user.count({ where }),
       ]);
 
+      // Get organization memberships from Clerk for role information
+      const orgMemberships = await clerkClient.organizations.getOrganizationMembershipList({
+        organizationId: ctx.shop.id,
+      });
+
       // Map users to team members with roles from Clerk
-      const members = users.map(user => ({
-        id: user.clerkId,
-        name: user.name,
-        email: user.email,
-        role: getNormalizedRole(ctx.auth.orgRole),
-        databaseId: user.id,
-        joinedAt: new Date(), // You'd want to store this in your database
-      }));
+      const members = users.map(user => {
+        const membership = orgMemberships.find(m => m.publicUserData?.identifier === user.email);
+        const role = membership ? getNormalizedRole(membership.role) : ROLES.MEMBER;
+        
+        return {
+          id: user.clerkId,
+          name: user.name,
+          email: user.email,
+          role,
+          databaseId: user.id,
+          joinedAt: user.createdAt,
+          membershipId: membership?.id,
+        };
+      });
 
       return {
         members,
@@ -78,11 +91,11 @@ export const teamRouter = createTRPCRouter({
     };
   }),
 
-  // Invite new member (Admin only)
+  // Invite new member (Admin only) - Uses Clerk's invitation system
   inviteMember: shopProcedure
     .input(z.object({
       email: z.string().email(),
-      role: z.enum([ROLES.MEMBER]), // Only allow inviting as member, admin can be promoted later
+      role: z.enum([ROLES.MEMBER, ROLES.ADMIN]), // Allow both roles
       name: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -96,38 +109,77 @@ export const teamRouter = createTRPCRouter({
         });
       }
 
-      // Check if user already exists
+      // Check if user already exists in our database
       const existingUser = await ctx.db.user.findUnique({
         where: { email: input.email },
       });
 
-      if (existingUser) {
+      if (existingUser && existingUser.shopId === ctx.shop.id) {
         throw new TRPCError({
           code: "CONFLICT",
-          message: "User with this email already exists",
+          message: "User is already a member of this shop",
         });
       }
 
-      // Create user record in our database
-      const user = await ctx.db.user.create({
-        data: {
-          email: input.email,
-          name: input.name,
-          clerkId: "", // Will be set when they accept invitation
-          shopId: ctx.shop.id,
-        },
-      });
+      try {
+        // Create invitation using Clerk's organization invitation system
+        const invitation = await clerkClient.organizations.createOrganizationInvitation({
+          organizationId: ctx.shop.id,
+          emailAddress: input.email,
+          role: input.role,
+          redirectUrl: `${process.env.NEXT_PUBLIC_APP_URL}/auth/sign-up?invitation=${ctx.shop.id}`,
+        });
 
-      // In a real implementation, you'd send an invitation via Clerk here
-      // For now, we'll just return the created user
-      return {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: input.role,
-        status: "pending",
-        message: "User created. Invitation functionality requires Clerk integration.",
-      };
+        // Create or update user record in our database with invitation status
+        const user = await ctx.db.user.upsert({
+          where: { email: input.email },
+          update: {
+            shopId: ctx.shop.id,
+            name: input.name || undefined,
+          },
+          create: {
+            email: input.email,
+            name: input.name,
+            clerkId: "", // Will be set when they accept invitation
+            shopId: ctx.shop.id,
+          },
+        });
+
+        console.log(`Invitation created for ${input.email} to join ${ctx.shop.name}`);
+
+        return {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: input.role,
+          status: "invited",
+          invitationId: invitation.id,
+          message: "Invitation sent successfully",
+        };
+      } catch (error) {
+        console.error("Error creating invitation:", error);
+        
+        // Handle specific Clerk errors
+        if (error instanceof Error) {
+          if (error.message.includes("already invited")) {
+            throw new TRPCError({
+              code: "CONFLICT",
+              message: "User has already been invited to this organization",
+            });
+          }
+          if (error.message.includes("already a member")) {
+            throw new TRPCError({
+              code: "CONFLICT",
+              message: "User is already a member of this organization",
+            });
+          }
+        }
+        
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to send invitation. Please try again.",
+        });
+      }
     }),
 
   // Update member role (Admin only)
@@ -155,12 +207,25 @@ export const teamRouter = createTRPCRouter({
         });
       }
 
-      // In a real implementation, you'd update the role in Clerk here
-      // For now, we'll just return success
-      return { 
-        success: true,
-        message: "Role update functionality requires Clerk integration.",
-      };
+      try {
+        // Update role in Clerk
+        await clerkClient.organizations.updateOrganizationMembership({
+          organizationId: ctx.shop.id,
+          userId: input.userId,
+          role: input.role,
+        });
+
+        return { 
+          success: true,
+          message: "Role updated successfully",
+        };
+      } catch (error) {
+        console.error("Error updating role:", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to update role. Please try again.",
+        });
+      }
     }),
 
   // Remove member (Admin only)
@@ -187,22 +252,36 @@ export const teamRouter = createTRPCRouter({
         });
       }
 
-      // Remove user from shop in our database
-      await ctx.db.user.updateMany({
-        where: { 
-          clerkId: input.userId,
-          shopId: ctx.shop.id,
-        },
-        data: { shopId: null },
-      });
+      try {
+        // Remove from Clerk organization
+        await clerkClient.organizations.removeOrganizationMember({
+          organizationId: ctx.shop.id,
+          userId: input.userId,
+        });
 
-      return { 
-        success: true,
-        message: "Member removed from shop. Clerk integration required for full removal.",
-      };
+        // Remove user from shop in our database
+        await ctx.db.user.updateMany({
+          where: { 
+            clerkId: input.userId,
+            shopId: ctx.shop.id,
+          },
+          data: { shopId: null },
+        });
+
+        return { 
+          success: true,
+          message: "Member removed successfully",
+        };
+      } catch (error) {
+        console.error("Error removing member:", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to remove member. Please try again.",
+        });
+      }
     }),
 
-  // Get pending invitations (placeholder)
+  // Get pending invitations
   getPendingInvitations: shopProcedure.query(async ({ ctx }) => {
     const userRole = getNormalizedRole(ctx.auth.orgRole);
 
@@ -214,7 +293,108 @@ export const teamRouter = createTRPCRouter({
       });
     }
 
-    // Return empty array for now - would be populated with Clerk invitations
-    return [];
+    try {
+      // Get pending invitations from Clerk
+      const invitations = await clerkClient.organizations.getOrganizationInvitationList({
+        organizationId: ctx.shop.id,
+        status: "pending",
+      });
+
+      return invitations.map(invitation => ({
+        id: invitation.id,
+        email: invitation.emailAddress,
+        role: getNormalizedRole(invitation.role),
+        status: invitation.status,
+        createdAt: invitation.createdAt,
+        expiresAt: invitation.expiresAt,
+      }));
+    } catch (error) {
+      console.error("Error fetching invitations:", error);
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Failed to fetch invitations",
+      });
+    }
   }),
+
+  // Cancel invitation
+  cancelInvitation: shopProcedure
+    .input(z.object({
+      invitationId: z.string(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const userRole = getNormalizedRole(ctx.auth.orgRole);
+
+      // Check if user has permission
+      if (!hasRolePermission(userRole, ROLES.ADMIN)) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Admin privileges required to cancel invitations",
+        });
+      }
+
+      try {
+        // Revoke invitation in Clerk
+        await clerkClient.organizations.revokeOrganizationInvitation({
+          organizationId: ctx.shop.id,
+          invitationId: input.invitationId,
+        });
+
+        return {
+          success: true,
+          message: "Invitation cancelled successfully",
+        };
+      } catch (error) {
+        console.error("Error cancelling invitation:", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to cancel invitation",
+        });
+      }
+    }),
+
+  // Resend invitation
+  resendInvitation: shopProcedure
+    .input(z.object({
+      invitationId: z.string(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const userRole = getNormalizedRole(ctx.auth.orgRole);
+
+      // Check if user has permission
+      if (!hasRolePermission(userRole, ROLES.ADMIN)) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Admin privileges required to resend invitations",
+        });
+      }
+
+      try {
+        // Resend invitation in Clerk
+        await clerkClient.organizations.revokeOrganizationInvitation({
+          organizationId: ctx.shop.id,
+          invitationId: input.invitationId,
+        });
+
+        // Create new invitation
+        const invitation = await clerkClient.organizations.createOrganizationInvitation({
+          organizationId: ctx.shop.id,
+          emailAddress: "", // Will be filled by Clerk
+          role: "member", // Default role
+          redirectUrl: `${process.env.NEXT_PUBLIC_APP_URL}/auth/sign-up?invitation=${ctx.shop.id}`,
+        });
+
+        return {
+          success: true,
+          message: "Invitation resent successfully",
+          newInvitationId: invitation.id,
+        };
+      } catch (error) {
+        console.error("Error resending invitation:", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to resend invitation",
+        });
+      }
+    }),
 }); 

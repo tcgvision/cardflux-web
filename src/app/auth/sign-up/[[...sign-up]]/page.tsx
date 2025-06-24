@@ -113,16 +113,44 @@ export default function SignUpPage() {
       setIsRedirecting(true);
       console.log("Routing after verification...");
       
-      // Check if user is in an organization
-      if (organization) {
-        console.log("User is in organization, redirecting to dashboard");
-        router.push("/dashboard");
-      } else {
-        console.log("User not in organization, redirecting to create-shop");
-        router.push("/dashboard/create-shop");
-      }
+      // Give webhook time to process organization membership
+      setTimeout(async () => {
+        try {
+          // Check if user is already linked to a shop via invitation
+          const membershipResponse = await fetch('/api/check-shop-membership');
+          const membershipData = await membershipResponse.json();
+          
+          if (membershipData.hasShop) {
+            console.log("User is linked to shop via invitation, redirecting to dashboard");
+            router.push("/dashboard");
+          } else if (organization) {
+            console.log("User is in organization, redirecting to dashboard");
+            router.push("/dashboard");
+          } else {
+            console.log("User not in organization, redirecting to create-shop");
+            router.push("/dashboard/create-shop");
+          }
+        } catch (error) {
+          console.error("Error checking shop membership:", error);
+          // Fallback to organization check
+          if (organization) {
+            router.push("/dashboard");
+          } else {
+            router.push("/dashboard/create-shop");
+          }
+        }
+      }, 2000);
     }
   }, [isVerified, isRedirecting, organization, router]);
+
+  // Check for existing organization membership on component load
+  useEffect(() => {
+    if (userLoaded && orgLoaded && user && !organization) {
+      // Check if user might be linked to a shop via invitation
+      // This will be handled by the webhook, but we can check here too
+      console.log("User loaded but no organization found - checking for invitation status");
+    }
+  }, [userLoaded, orgLoaded, user, organization]);
 
   const signUpWithOAuth = async (strategy: "oauth_google" | "oauth_discord") => {
     if (!isLoaded) return;
@@ -132,7 +160,7 @@ export default function SignUpPage() {
       await signUp.authenticateWithRedirect({
         strategy,
         redirectUrl: "/auth/sso-callback",
-        redirectUrlComplete: "/dashboard/create-shop",
+        redirectUrlComplete: organization ? "/dashboard" : "/dashboard/create-shop",
       });
     } catch (err: unknown) {
       console.error("OAuth error:", err);
@@ -199,9 +227,8 @@ export default function SignUpPage() {
           toast.success("Email already verified! Redirecting...");
           setVerificationCode("");
           
-          setTimeout(() => {
-            router.push("/dashboard/create-shop");
-          }, 2000);
+          // Use helper function to handle routing with organization check
+          void handleRouting();
           
           return; // Exit early since we're already complete
         } catch (sessionError) {
@@ -244,9 +271,8 @@ export default function SignUpPage() {
             toast.success("Email already verified! Redirecting...");
             setVerificationCode("");
             
-            setTimeout(() => {
-              router.push("/dashboard/create-shop");
-            }, 2000);
+            // Use helper function to handle routing with organization check
+            void handleRouting();
             
             return;
           } catch (sessionError) {
@@ -285,10 +311,32 @@ export default function SignUpPage() {
         setVerificationCode("");
         
         // Give webhook time to process user creation before redirecting
-        setTimeout(() => {
+        setTimeout(async () => {
           if (!isRedirecting) {
             console.log("Fallback routing triggered");
-            router.push("/dashboard/create-shop");
+            
+            try {
+              // Check if user is already linked to a shop via invitation
+              const membershipResponse = await fetch('/api/check-shop-membership');
+              const membershipData = await membershipResponse.json();
+              
+              if (membershipData.hasShop) {
+                console.log("User is linked to shop via invitation, redirecting to dashboard");
+                router.push("/dashboard");
+                return;
+              }
+            } catch (error) {
+              console.error("Error checking shop membership:", error);
+            }
+            
+            // Fallback to organization check
+            if (organization) {
+              console.log("User is in organization, redirecting to dashboard");
+              router.push("/dashboard");
+            } else {
+              console.log("User not in organization, redirecting to create-shop");
+              router.push("/dashboard/create-shop");
+            }
           }
         }, 5000);
       } else {
@@ -327,6 +375,35 @@ export default function SignUpPage() {
     } catch (syncError) {
       console.log('User sync error:', syncError);
       // Don't fail the flow if sync fails - webhook might have worked
+    }
+  };
+
+  // Helper function to handle routing with organization check
+  const handleRouting = async () => {
+    // Give webhook time to process organization membership
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    try {
+      // Check if user is already linked to a shop via invitation
+      const membershipResponse = await fetch('/api/check-shop-membership');
+      const membershipData = await membershipResponse.json();
+      
+      if (membershipData.hasShop) {
+        console.log("User is linked to shop via invitation, redirecting to dashboard");
+        router.push("/dashboard");
+        return;
+      }
+    } catch (error) {
+      console.error("Error checking shop membership:", error);
+    }
+    
+    // Fallback to organization check
+    if (organization) {
+      console.log("User is in organization, redirecting to dashboard");
+      router.push("/dashboard");
+    } else {
+      console.log("User not in organization, redirecting to create-shop");
+      router.push("/dashboard/create-shop");
     }
   };
 
