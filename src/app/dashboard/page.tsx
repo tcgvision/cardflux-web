@@ -32,13 +32,6 @@ export default function DashboardPage() {
   const [isLoadingDebug, setIsLoadingDebug] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // Check if user is loaded and has no organization
-  useEffect(() => {
-    if (isLoaded && user && !user.organizationMemberships?.length) {
-      console.log("🚀 Dashboard: User has no organization memberships, checking database membership");
-    }
-  }, [isLoaded, user]);
-
   const fetchDebugInfo = useCallback(async () => {
     setIsLoadingDebug(true);
     try {
@@ -48,9 +41,8 @@ export default function DashboardPage() {
       }
       const data = await response.json() as Record<string, unknown>;
       setDebugInfo(data);
-      console.log("🔍 Debug info:", data);
     } catch (error) {
-      console.error("❌ Failed to fetch debug info:", error);
+      console.error("Failed to fetch debug info:", error);
       setDebugInfo({ error: "Failed to fetch debug info" });
     } finally {
       setIsLoadingDebug(false);
@@ -72,7 +64,6 @@ export default function DashboardPage() {
       }
       
       const data = await response.json() as SyncResponse;
-      console.log("🔄 Sync result:", data);
       
       if (data.success) {
         // Refresh the page to update Clerk context
@@ -84,7 +75,7 @@ export default function DashboardPage() {
         alert(`Sync failed: ${data.error}`);
       }
     } catch (error) {
-      console.error("❌ Failed to sync organization:", error);
+      console.error("Failed to sync organization:", error);
       alert("Failed to sync organization. Please try again.");
     } finally {
       setIsSyncing(false);

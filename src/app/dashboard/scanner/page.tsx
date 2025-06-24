@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { Camera, Upload, Search, RotateCcw, CheckCircle, AlertCircle, Database, Receipt, ShoppingCart } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
@@ -27,8 +27,14 @@ export default function ScannerPage() {
   const [scannedCards, setScannedCards] = useState<ScannedCard[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("camera");
+  const [isClient, setIsClient] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // Fix hydration by ensuring we're on client
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   // Mock AI scanning function
   const scanCard = useCallback(async (imageData: string) => {
@@ -129,6 +135,20 @@ export default function ScannerPage() {
     card.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     card.set.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  // Don't render until client-side to prevent hydration mismatch
+  if (!isClient) {
+    return (
+      <div className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
+            <p>Loading scanner...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6">

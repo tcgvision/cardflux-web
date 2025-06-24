@@ -46,14 +46,12 @@ export function useShopMembership() {
       return;
     }
 
-    console.log('🚀 Making membership check request...');
     hasCheckedRef.current = true;
     setIsChecking(true);
 
     fetch('/api/check-shop-membership')
       .then(response => response.json())
       .then((data: ShopMembershipData) => {
-        console.log('✅ Membership check result:', data);
         setMembershipData(data);
         
         // Mark that we found a shop to prevent re-checking
@@ -62,7 +60,7 @@ export function useShopMembership() {
         }
       })
       .catch(error => {
-        console.error("❌ Error checking membership:", error);
+        console.error("Error checking membership:", error);
         setMembershipData({ hasShop: false, message: "Failed to check membership" });
       })
       .finally(() => {

@@ -1,18 +1,29 @@
 "use client";
 
-import { useLoading } from "~/components/loading-provider";
-import { LoadingOverlay } from "~/components/loading-overlay";
+import { useUnifiedShop } from "~/hooks/use-unified-shop";
+import { useEffect } from "react";
 
 interface DashboardContentProps {
   children: React.ReactNode;
 }
 
 export function DashboardContent({ children }: DashboardContentProps) {
-  const { isLoading } = useLoading();
+  const { shopName, isLoaded, hasShop } = useUnifiedShop();
 
-  if (isLoading) {
-    return <LoadingOverlay />;
-  }
+  // Update document title based on shop context
+  useEffect(() => {
+    if (isLoaded && hasShop && shopName) {
+      document.title = `${shopName} | TCG Vision`;
+    } else if (isLoaded) {
+      document.title = "TCG Vision Dashboard";
+    }
+  }, [shopName, isLoaded, hasShop]);
 
-  return <>{children}</>;
+  return (
+    <div className="flex min-h-screen flex-col">
+      <main className="flex flex-1 flex-col">
+        {children}
+      </main>
+    </div>
+  );
 } 

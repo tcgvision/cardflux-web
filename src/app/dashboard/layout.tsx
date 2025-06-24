@@ -52,13 +52,6 @@ export async function generateMetadata(): Promise<Metadata> {
   }
 }
 
-// This tells Next.js not to inherit the root layout
-export const dynamic = "force-dynamic";
-
-
-// This tells Next.js not to inherit the root layout
-export const layout = false;
-
 export default function DashboardLayout({
   children,
 }: {
