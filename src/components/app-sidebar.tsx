@@ -19,6 +19,7 @@ import {
   IconShoppingCart,
   IconReceipt,
 } from "@tabler/icons-react"
+import { useOrganization } from "@clerk/nextjs"
 
 import { NavDocuments } from "~/components/nav-documents"
 import { NavMain } from "~/components/nav-main"
@@ -109,6 +110,8 @@ const data = {
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const { organization, isLoaded } = useOrganization()
+
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
@@ -120,7 +123,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             >
               <a href="/dashboard">
                 <IconInnerShadowTop className="!size-5" />
-                <span className="text-base font-semibold">TCG Vision</span>
+                <span className="text-base font-semibold">
+                  {isLoaded && organization ? organization.name : "TCG Vision"}
+                </span>
               </a>
             </SidebarMenuButton>
           </SidebarMenuItem>
