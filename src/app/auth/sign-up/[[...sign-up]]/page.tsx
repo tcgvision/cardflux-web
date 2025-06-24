@@ -340,6 +340,9 @@ export default function SignUpPage() {
                 )}
               />
 
+              {/* CAPTCHA Widget - Required for custom sign-up flows */}
+              <div id="clerk-captcha" data-cl-theme="auto" data-cl-size="normal" />
+
               <Button 
                 type="submit" 
                 className="w-full bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer disabled:cursor-not-allowed" 
