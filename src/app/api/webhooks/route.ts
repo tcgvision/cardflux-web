@@ -28,7 +28,7 @@ export async function POST(req: Request) {
   }
 
   // Get body
-  const payload = await req.json()
+  const payload = await req.json() as Record<string, unknown>;
   const body = JSON.stringify(payload)
 
   let evt: WebhookEvent
@@ -49,40 +49,61 @@ export async function POST(req: Request) {
 
   // // Do something with payload
   // // For this guide, log payload to console
-  const { id } = evt.data
+  const eventData = evt.data as unknown as Record<string, unknown>;
+  const { id } = eventData;
   const eventType = evt.type
-  console.log(`Received webhook with ID ${id} and event type of ${eventType}`)
+  console.log(`Received webhook with ID ${String(id)} and event type of ${eventType}`)
   console.log('Webhook payload:', body)
 
   if(evt.type === 'user.created') {
-    const { id, email_addresses, first_name } = evt.data
+    const userData = evt.data as {
+      id: string;
+      email_addresses: Array<{ email_address: string }>;
+      first_name?: string;
+      last_name?: string;
+    };
+    
+    const { id, email_addresses, first_name, last_name } = userData;
+    console.log('Creating user in database:', { id, email: email_addresses[0]?.email_address, first_name, last_name })
+    
     try {
       const newUser = await db.user.create({
         data: {
           clerkId: id,
-          email: email_addresses[0].email_address,
-          name: first_name,
+          email: email_addresses[0]?.email_address ?? '',
+          name: `${first_name ?? ''} ${last_name ?? ''}`.trim() || null,
         }
       });
+      
+      console.log('Successfully created user in database:', newUser)
       return new Response(JSON.stringify(newUser), {
         status: 201,
       })
     } catch(error) {
-      console.error('Error: Failed to store event in the database:', error)
-      return new Response('Error: Failed to store event in the database', {
+      console.error('Error: Failed to store user in the database:', error)
+      return new Response('Error: Failed to store user in the database', {
         status: 500,
       });
     }
   }
 
   if (evt.type === 'organization.created') {
-    const { id, name, slug } = evt.data as { id: string; name: string; slug: string };
+    const orgData = evt.data as { 
+      id: string; 
+      name: string; 
+      slug: string; 
+    };
+    
+    const { id, name, slug } = orgData;
     try {
       const newShop = await db.shop.upsert({
         where: { id },
         update: {},
         create: {
-          id, name, slug,
+          id, 
+          name, 
+          slug,
+          type: "local", // Default type since it's required
         },
       });
       console.log("Created Shop (Org):", newShop);

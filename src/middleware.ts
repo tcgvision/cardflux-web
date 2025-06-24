@@ -12,7 +12,9 @@ const isPublicRoute = createRouteMatcher([
   "/features",
   "/about",
   "/api/trpc/(.*)",
-  "/api/webhooks/(.*)",
+  "/api/webhooks(.*)", // Fixed: removed the slash before (.*) for better matching
+  "/api/reset-signup(.*)",
+  "/api/sync-user(.*)",
 ]);
 
 const isAuthRoute = createRouteMatcher([
@@ -47,8 +49,12 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
   // Check if this is a dashboard subdomain request
   const isDashboardSubdomain = hostname.startsWith("dashboard.") || hostname.includes("localhost:3000/dashboard");
 
-  // Allow public routes
+  // Allow public routes (including webhooks) - early return for performance
   if (isPublicRoute(req)) {
+    // Add explicit logging for webhook requests to help with debugging
+    if (req.nextUrl.pathname.startsWith('/api/webhooks')) {
+      console.log(`🪝 Webhook request allowed: ${req.method} ${req.nextUrl.pathname}`);
+    }
     return NextResponse.next();
   }
 

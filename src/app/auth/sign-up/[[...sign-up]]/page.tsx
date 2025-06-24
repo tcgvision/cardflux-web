@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useSignUp } from "@clerk/nextjs";
+import { useSignUp, useOrganization, useUser } from "@clerk/nextjs";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -20,7 +20,8 @@ import { Input } from "~/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Separator } from "~/components/ui/separator";
 import { toast } from "sonner";
-import { Eye, EyeOff, Loader2, Mail } from "lucide-react";
+import { Eye, EyeOff, Loader2, Mail, CheckCircle, ArrowRight } from "lucide-react";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "~/components/ui/input-otp";
 
 /**
  * SignUpPage Component
@@ -34,12 +35,14 @@ import { Eye, EyeOff, Loader2, Mail } from "lucide-react";
  * - Error handling
  * - Automatic redirect if already signed in
  * - Responsive design
+ * - OTP verification with improved UX
  */
 
 // Form validation schema
 const signUpSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
+  username: z.string().min(3, "Username must be at least 3 characters").regex(/^[a-zA-Z0-9_]+$/, "Username can only contain letters, numbers, and underscores"),
   emailAddress: z.string().email("Please enter a valid email address"),
   password: z.string().min(8, "Password must be at least 8 characters"),
 });
@@ -48,22 +51,78 @@ type SignUpFormData = z.infer<typeof signUpSchema>;
 
 export default function SignUpPage() {
   const { isLoaded, signUp, setActive } = useSignUp();
+  const { organization, isLoaded: orgLoaded } = useOrganization();
+  const { user, isLoaded: userLoaded } = useUser();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [pendingVerification, setPendingVerification] = useState(false);
-  const [code, setCode] = useState("");
+  const [verificationCode, setVerificationCode] = useState("");
+  const [isVerified, setIsVerified] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<string | null>(null);
   const router = useRouter();
 
   const form = useForm<SignUpFormData>({
     resolver: zodResolver(signUpSchema),
+    mode: "onChange",
     defaultValues: {
       firstName: "",
       lastName: "",
+      username: "",
       emailAddress: "",
       password: "",
     },
   });
+
+  // Check if user is already verified (e.g., after page refresh)
+  useEffect(() => {
+    if (isLoaded && signUp && signUp.status === "complete") {
+      console.log("User already verified on component load, attempting to complete flow...");
+      
+      const completeFlow = async () => {
+        try {
+          if (signUp.createdSessionId) {
+            await setActive({ session: signUp.createdSessionId });
+            await syncUserToDatabase();
+            setIsVerified(true);
+            toast.success("Email already verified! Redirecting...");
+          }
+        } catch (error) {
+          console.error("Error completing flow for already verified user:", error);
+          toast.error("Account verified but unable to sign in. Please try signing in instead.");
+          setTimeout(() => {
+            router.push("/auth/sign-in");
+          }, 3000);
+        }
+      };
+      
+      void completeFlow();
+    }
+  }, [isLoaded, signUp]);
+
+  // Reset verification code when component mounts or when pendingVerification changes
+  useEffect(() => {
+    if (pendingVerification) {
+      setVerificationCode("");
+    }
+  }, [pendingVerification]);
+
+  // Handle routing after verification
+  useEffect(() => {
+    if (isVerified && !isRedirecting) {
+      setIsRedirecting(true);
+      console.log("Routing after verification...");
+      
+      // Check if user is in an organization
+      if (organization) {
+        console.log("User is in organization, redirecting to dashboard");
+        router.push("/dashboard");
+      } else {
+        console.log("User not in organization, redirecting to create-shop");
+        router.push("/dashboard/create-shop");
+      }
+    }
+  }, [isVerified, isRedirecting, organization, router]);
 
   const signUpWithOAuth = async (strategy: "oauth_google" | "oauth_discord") => {
     if (!isLoaded) return;
@@ -86,21 +145,25 @@ export default function SignUpPage() {
   const onSubmit = async (data: SignUpFormData) => {
     if (!isLoaded) return;
 
+    console.log("Form submission started:", data);
     setIsLoading(true);
     try {
-      await signUp.create({
+      const result = await signUp.create({
         firstName: data.firstName,
         lastName: data.lastName,
+        username: data.username,
         emailAddress: data.emailAddress,
         password: data.password,
       });
+
+      console.log("Sign up creation result:", result);
 
       // Send email verification
       await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
       setPendingVerification(true);
       toast.success("Verification email sent! Please check your inbox.");
     } catch (err: unknown) {
-      console.error("Error:", err);
+      console.error("Sign up error:", err);
       const error = err as { errors?: Array<{ message: string }> };
       toast.error(error.errors?.[0]?.message ?? "Something went wrong. Please try again.");
     } finally {
@@ -110,30 +173,216 @@ export default function SignUpPage() {
 
   const onPressVerify = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isLoaded) return;
+    if (!isLoaded || !verificationCode || verificationCode.length !== 6) return;
+
+    // Prevent multiple simultaneous verification attempts
+    if (isLoading) return;
 
     setIsLoading(true);
+    
     try {
-      const completeSignUp = await signUp.attemptEmailAddressVerification({
-        code,
-      });
-
-      if (completeSignUp.status !== "complete") {
-        console.log(JSON.stringify(completeSignUp, null, 2));
+      console.log("Attempting verification with code:", verificationCode);
+      console.log("SignUp status:", signUp.status);
+      console.log("SignUp object:", signUp);
+      
+      // Check if the sign-up is already complete
+      if (signUp.status === "complete") {
+        console.log("Sign-up already complete, activating session...");
+        
+        try {
+          await setActive({ session: signUp.createdSessionId });
+          
+          // Manually sync user to database
+          await syncUserToDatabase();
+          
+          setIsVerified(true);
+          toast.success("Email already verified! Redirecting...");
+          setVerificationCode("");
+          
+          setTimeout(() => {
+            router.push("/dashboard/create-shop");
+          }, 2000);
+          
+          return; // Exit early since we're already complete
+        } catch (sessionError) {
+          console.error("Session activation error:", sessionError);
+          toast.error("Account verified but unable to sign in. Please try signing in instead.");
+          
+          setTimeout(() => {
+            router.push("/auth/sign-in");
+          }, 3000);
+          return;
+        }
       }
+      
+      // Attempt verification
+      let completeSignUp;
+      try {
+        completeSignUp = await signUp.attemptEmailAddressVerification({
+          code: verificationCode,
+        });
+      } catch (verificationError) {
+        // Handle the "already verified" error specifically
+        const errorMessage = verificationError instanceof Error ? verificationError.message : String(verificationError);
+        
+        if (errorMessage.includes("already been verified") || 
+            errorMessage.includes("already verified") ||
+            errorMessage.includes("verification has already been verified")) {
+          
+          console.log("Email already verified, attempting to complete sign-up...");
+          
+          // Try to activate session with existing session ID
+          try {
+            if (signUp.createdSessionId) {
+              await setActive({ session: signUp.createdSessionId });
+            }
+            
+            // Manually sync user to database
+            await syncUserToDatabase();
+            
+            setIsVerified(true);
+            toast.success("Email already verified! Redirecting...");
+            setVerificationCode("");
+            
+            setTimeout(() => {
+              router.push("/dashboard/create-shop");
+            }, 2000);
+            
+            return;
+          } catch (sessionError) {
+            console.error("Session activation error:", sessionError);
+            toast.error("Account verified but unable to sign in. Please try signing in instead.");
+            
+            setTimeout(() => {
+              router.push("/auth/sign-in");
+            }, 3000);
+            return;
+          }
+        } else {
+          // Re-throw other verification errors to be handled below
+          throw verificationError;
+        }
+      }
+
+      console.log("Verification result:", completeSignUp);
 
       if (completeSignUp.status === "complete") {
+        console.log("Verification completed successfully");
+        console.log("User ID:", completeSignUp.createdUserId);
+        console.log("Session ID:", completeSignUp.createdSessionId);
+        
+        // Set the session as active
         await setActive({ session: completeSignUp.createdSessionId });
-        router.push("/dashboard/create-shop");
+        
+        // Manually sync user to database
+        await syncUserToDatabase();
+        
+        // Mark as verified and let useEffect handle routing
+        setIsVerified(true);
+        toast.success("Email verified successfully!");
+        
+        // Clear verification code to prevent re-submission
+        setVerificationCode("");
+        
+        // Give webhook time to process user creation before redirecting
+        setTimeout(() => {
+          if (!isRedirecting) {
+            console.log("Fallback routing triggered");
+            router.push("/dashboard/create-shop");
+          }
+        }, 5000);
+      } else {
+        // Handle incomplete verification
+        console.log("Incomplete verification:", completeSignUp);
+        toast.error("Verification incomplete. Please try again.");
       }
     } catch (err: unknown) {
-      console.error("Error:", err);
+      console.error("Verification error:", err);
+      
+      // Handle other errors
       const error = err as { errors?: Array<{ message: string }> };
-      toast.error(error.errors?.[0]?.message ?? "Invalid verification code. Please try again.");
+      const errorMsg = error.errors?.[0]?.message ?? "Invalid verification code. Please try again.";
+      toast.error(errorMsg);
     } finally {
       setIsLoading(false);
     }
   };
+
+  // Helper function to sync user to database
+  const syncUserToDatabase = async () => {
+    try {
+      const syncResponse = await fetch('/api/sync-user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (syncResponse.ok) {
+        const syncData = await syncResponse.json() as { message: string; user?: unknown };
+        console.log('User sync result:', syncData);
+      } else {
+        console.log('User sync failed, but continuing with flow');
+      }
+    } catch (syncError) {
+      console.log('User sync error:', syncError);
+      // Don't fail the flow if sync fails - webhook might have worked
+    }
+  };
+
+  const handleResendCode = async () => {
+    if (!isLoaded) return;
+    
+    try {
+      await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
+      toast.success("New verification code sent!");
+    } catch (err: unknown) {
+      console.error("Error resending code:", err);
+      toast.error("Failed to resend verification code. Please try again.");
+    }
+  };
+
+  const handleStartOver = () => {
+    // Reset all states
+    setPendingVerification(false);
+    setVerificationCode("");
+    setIsVerified(false);
+    setIsRedirecting(false);
+    
+    // Reset form
+    form.reset();
+    
+    toast.info("Starting over with a fresh sign-up form");
+  };
+
+  if (isVerified) {
+    return (
+      <div className="min-h-[calc(100vh-7rem)] flex items-center justify-center p-4 bg-background">
+        <Card className="w-full max-w-md border-border shadow-lg">
+          <CardHeader className="text-center space-y-2">
+            <div className="flex justify-center">
+              <CheckCircle className="h-12 w-12 text-green-500" />
+            </div>
+            <CardTitle className="text-2xl font-semibold text-foreground">Email Verified!</CardTitle>
+            <CardDescription className="text-muted-foreground">
+              {organization 
+                ? "Redirecting you to your organization dashboard..."
+                : "Setting up your account..."
+              }
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-center">
+            <div className="flex items-center justify-center gap-2 text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span className="text-sm">
+                {organization ? "Joining your team..." : "Creating your workspace..."}
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (pendingVerification) {
     return (
@@ -142,31 +391,113 @@ export default function SignUpPage() {
           <CardHeader className="text-center space-y-2">
             <CardTitle className="text-2xl font-semibold text-foreground">Verify your email</CardTitle>
             <CardDescription className="text-muted-foreground">
-              We&apos;ve sent a verification code to your email address
+              We&apos;ve sent a 6-digit verification code to your email address
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <form onSubmit={onPressVerify} className="space-y-4">
-              <div className="space-y-2">
-                <label htmlFor="code" className="text-sm font-medium text-foreground">
-                  Verification code
-                </label>
-                <Input
-                  id="code"
-                  value={code}
-                  placeholder="Enter verification code"
-                  onChange={(e) => setCode(e.target.value)}
-                  disabled={isLoading}
-                  className="bg-background border-border text-foreground placeholder:text-muted-foreground"
-                />
+          <CardContent className="space-y-6">
+            <form onSubmit={onPressVerify} className="space-y-6">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">
+                    Enter verification code
+                  </label>
+                  <InputOTP
+                    value={verificationCode}
+                    onChange={(value) => setVerificationCode(value)}
+                    maxLength={6}
+                    disabled={isLoading}
+                    containerClassName="justify-center"
+                  >
+                    <InputOTPGroup>
+                      <InputOTPSlot index={0} />
+                      <InputOTPSlot index={1} />
+                      <InputOTPSlot index={2} />
+                      <InputOTPSlot index={3} />
+                      <InputOTPSlot index={4} />
+                      <InputOTPSlot index={5} />
+                    </InputOTPGroup>
+                  </InputOTP>
+                </div>
+                
+                <div className="text-center">
+                  <Button
+                    type="button"
+                    variant="link"
+                    onClick={handleResendCode}
+                    disabled={isLoading}
+                    className="text-sm text-muted-foreground hover:text-foreground"
+                  >
+                    Didn&apos;t receive the code? Resend
+                  </Button>
+                </div>
+
+                {/* <div className="text-center">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleStartOver}
+                    disabled={isLoading}
+                    className="text-sm"
+                  >
+                    Start Over with New Email
+                  </Button>
+                </div> */}
+
+                <div className="text-center">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => {
+                      console.log("=== DEBUG INFO ===");
+                      console.log("SignUp status:", signUp?.status);
+                      console.log("SignUp object:", signUp);
+                      console.log("Created Session ID:", signUp?.createdSessionId);
+                      console.log("Created User ID:", signUp?.createdUserId);
+                      console.log("Pending verification:", pendingVerification);
+                      console.log("Is verified:", isVerified);
+                      console.log("==================");
+                      
+                      // Try to manually complete the flow
+                      if (signUp?.status === "complete" && signUp?.createdSessionId) {
+                        void (async () => {
+                          try {
+                            await setActive({ session: signUp.createdSessionId });
+                            await syncUserToDatabase();
+                            setIsVerified(true);
+                            toast.success("Manually completed verification!");
+                          } catch (error) {
+                            console.error("Manual completion error:", error);
+                            toast.error("Manual completion failed. Try signing in instead.");
+                          }
+                        })();
+                      } else {
+                        toast.info("Check console for debug info");
+                      }
+                    }}
+                    disabled={isLoading}
+                    className="text-xs text-muted-foreground"
+                  >
+                    Debug & Force Complete
+                  </Button>
+                </div>
               </div>
+              
               <Button 
                 type="submit" 
                 className="w-full bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer disabled:cursor-not-allowed" 
-                disabled={isLoading}
+                disabled={isLoading || verificationCode.length !== 6}
               >
-                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Verify Email
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Verifying...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="mr-2 h-4 w-4" />
+                    Verify Email
+                  </>
+                )}
               </Button>
             </form>
           </CardContent>
@@ -286,6 +617,25 @@ export default function SignUpPage() {
                   )}
                 />
               </div>
+
+              <FormField
+                control={form.control}
+                name="username"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-foreground">Username</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="johndoe_123"
+                        {...field}
+                        disabled={isLoading}
+                        className="bg-background border-border text-foreground placeholder:text-muted-foreground"
+                      />
+                    </FormControl>
+                    <FormMessage className="text-destructive" />
+                  </FormItem>
+                )}
+              />
 
               <FormField
                 control={form.control}
