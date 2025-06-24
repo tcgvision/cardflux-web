@@ -67,13 +67,13 @@ const roleConfig = {
   [ROLES.ADMIN]: {
     label: "Admin",
     description: "Full access to all features including team management",
-    color: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
+    color: "bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-300 dark:border-red-800",
     icon: IconCrown,
   },
   [ROLES.MEMBER]: {
     label: "Member",
     description: "Can process transactions and manage inventory",
-    color: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+    color: "bg-green-50 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-300 dark:border-green-800",
     icon: IconUserCheck,
   },
 }
@@ -152,19 +152,19 @@ export default function TeamPage() {
   const canRemoveMembers = userRoleData?.permissions.canRemoveMembers
 
   return (
-    <div className="space-y-6">
+    <div className="container mx-auto p-6 space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Team Management</h1>
-          <p className="text-muted-foreground">
+          <p className="text-muted-foreground mt-1">
             Manage your team members and their roles
           </p>
         </div>
         {canInvite && (
           <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
             <DialogTrigger asChild>
-              <Button>
+              <Button className="w-full sm:w-auto">
                 <IconUserPlus className="mr-2 h-4 w-4" />
                 Invite Member
               </Button>
@@ -231,50 +231,60 @@ export default function TeamPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <Card className="hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Members</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Members</CardTitle>
             <IconUsers className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{teamData?.total || 0}</div>
+            <div className="text-2xl font-bold">{teamData?.total ?? 0}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Active team members
+            </p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Admins</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Admins</CardTitle>
             <IconCrown className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {teamData?.members.filter(m => m.role === ROLES.ADMIN).length || 0}
+              {teamData?.members.filter(m => m.role === ROLES.ADMIN).length ?? 0}
             </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Full access users
+            </p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Members</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Members</CardTitle>
             <IconUserCheck className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {teamData?.members.filter(m => m.role === ROLES.MEMBER).length || 0}
+              {teamData?.members.filter(m => m.role === ROLES.MEMBER).length ?? 0}
             </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Standard users
+            </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Filters */}
-      <Card>
+      {/* Team Members Section */}
+      <Card className="shadow-sm">
         <CardHeader>
           <CardTitle>Team Members</CardTitle>
           <CardDescription>
             Manage your team members and their access levels
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="flex gap-4 mb-6">
+        <CardContent className="space-y-6">
+          {/* Filters */}
+          <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1">
               <div className="relative">
                 <IconSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -287,7 +297,7 @@ export default function TeamPage() {
               </div>
             </div>
             <Select value={selectedRole} onValueChange={(value) => setSelectedRole(value as Role | "all")}>
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-full sm:w-[180px]">
                 <SelectValue placeholder="Filter by role" />
               </SelectTrigger>
               <SelectContent>
@@ -302,37 +312,37 @@ export default function TeamPage() {
           </div>
 
           {/* Members Table */}
-          <div className="rounded-md border">
+          <div className="rounded-md border overflow-hidden">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>Member</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Joined</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                <TableRow className="bg-muted/50">
+                  <TableHead className="font-semibold">Member</TableHead>
+                  <TableHead className="font-semibold">Role</TableHead>
+                  <TableHead className="font-semibold">Email</TableHead>
+                  <TableHead className="font-semibold">Joined</TableHead>
+                  <TableHead className="text-right font-semibold">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {teamData?.members.map((member) => {
-                  const roleInfo = roleConfig[member.role as keyof typeof roleConfig] || roleConfig[ROLES.MEMBER]
+                  const roleInfo = roleConfig[member.role as keyof typeof roleConfig] ?? roleConfig[ROLES.MEMBER]
                   const RoleIcon = roleInfo.icon
                   
                   return (
-                    <TableRow key={member.id}>
-                      <TableCell>
+                    <TableRow key={member.id} className="hover:bg-muted/30">
+                      <TableCell className="py-4">
                         <div className="flex items-center gap-3">
-                          <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
-                            <IconUser className="h-4 w-4" />
+                          <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
+                            <IconUser className="h-5 w-5" />
                           </div>
                           <div>
-                            <div className="font-medium">{member.name || "Unnamed User"}</div>
+                            <div className="font-medium">{member.name ?? "Unnamed User"}</div>
                             <div className="text-sm text-muted-foreground">ID: {member.id}</div>
                           </div>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge className={roleInfo.color}>
+                        <Badge variant="outline" className={`${roleInfo.color} border`}>
                           <RoleIcon className="mr-1 h-3 w-3" />
                           {roleInfo.label}
                         </Badge>
@@ -340,13 +350,13 @@ export default function TeamPage() {
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <IconMail className="h-4 w-4 text-muted-foreground" />
-                          {member.email}
+                          <span className="text-sm">{member.email}</span>
                         </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <IconCalendar className="h-4 w-4 text-muted-foreground" />
-                          {member.joinedAt.toLocaleDateString()}
+                          <span className="text-sm">{member.joinedAt.toLocaleDateString()}</span>
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
@@ -356,7 +366,7 @@ export default function TeamPage() {
                               value={member.role}
                               onValueChange={(value) => handleRoleUpdate(member.id, value as Role)}
                             >
-                              <SelectTrigger className="w-[120px]">
+                              <SelectTrigger className="w-[120px] h-8">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
@@ -374,7 +384,7 @@ export default function TeamPage() {
                           {canRemoveMembers && (
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
-                                <Button variant="outline" size="sm">
+                                <Button variant="outline" size="sm" className="h-8 w-8 p-0">
                                   <IconTrash className="h-4 w-4" />
                                 </Button>
                               </AlertDialogTrigger>
@@ -382,7 +392,7 @@ export default function TeamPage() {
                                 <AlertDialogHeader>
                                   <AlertDialogTitle>Remove Team Member</AlertDialogTitle>
                                   <AlertDialogDescription>
-                                    Are you sure you want to remove {member.name || member.email} from the team? 
+                                    Are you sure you want to remove {member.name ?? member.email} from the team? 
                                     This action cannot be undone.
                                   </AlertDialogDescription>
                                 </AlertDialogHeader>
@@ -405,12 +415,17 @@ export default function TeamPage() {
                 })}
                 {(!teamData?.members || teamData.members.length === 0) && (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8">
-                      <div className="flex flex-col items-center gap-2">
-                        <IconUsers className="h-8 w-8 text-muted-foreground" />
-                        <p className="text-muted-foreground">No team members found</p>
+                    <TableCell colSpan={5} className="text-center py-12">
+                      <div className="flex flex-col items-center gap-3">
+                        <IconUsers className="h-12 w-12 text-muted-foreground" />
+                        <div>
+                          <p className="text-muted-foreground font-medium">No team members found</p>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            {searchQuery ? "Try adjusting your search criteria" : "Get started by inviting your first team member"}
+                          </p>
+                        </div>
                         {canInvite && (
-                          <Button variant="outline" onClick={() => setInviteDialogOpen(true)}>
+                          <Button variant="outline" onClick={() => setInviteDialogOpen(true)} className="mt-2">
                             <IconUserPlus className="mr-2 h-4 w-4" />
                             Invite First Member
                           </Button>
@@ -426,7 +441,7 @@ export default function TeamPage() {
       </Card>
 
       {/* Role Permissions Guide */}
-      <Card>
+      <Card className="shadow-sm">
         <CardHeader>
           <CardTitle>Role Permissions</CardTitle>
           <CardDescription>
@@ -434,17 +449,17 @@ export default function TeamPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-6 md:grid-cols-2">
             {Object.entries(roleConfig).map(([role, config]) => {
               const RoleIcon = config.icon
               return (
-                <div key={role} className="flex items-start gap-3 p-4 rounded-lg border">
-                  <div className={`p-2 rounded-full ${config.color}`}>
-                    <RoleIcon className="h-4 w-4" />
+                <div key={role} className="flex items-start gap-4 p-6 rounded-lg border bg-card hover:shadow-sm transition-shadow">
+                  <div className={`p-3 rounded-full ${config.color} border`}>
+                    <RoleIcon className="h-5 w-5" />
                   </div>
-                  <div>
-                    <h4 className="font-medium">{config.label}</h4>
-                    <p className="text-sm text-muted-foreground">{config.description}</p>
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-lg mb-2">{config.label}</h4>
+                    <p className="text-sm text-muted-foreground leading-relaxed">{config.description}</p>
                   </div>
                 </div>
               )
