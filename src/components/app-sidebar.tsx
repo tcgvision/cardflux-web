@@ -25,6 +25,7 @@ import { NavDocuments } from "~/components/nav-documents"
 import { NavMain } from "~/components/nav-main"
 import { NavSecondary } from "~/components/nav-secondary"
 import { NavUser } from "~/components/nav-user"
+import { ThemeToggle } from "~/app/_components/theme-toggle"
 import {
   Sidebar,
   SidebarContent,
@@ -74,6 +75,12 @@ const data = {
     },
   ],
   navSecondary: [
+    {
+      title: "Theme",
+      url: "#",
+      icon: null,
+      customComponent: <ThemeToggle />,
+    },
     {
       title: "Settings",
       url: "/dashboard/settings",

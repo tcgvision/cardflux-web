@@ -43,10 +43,19 @@ export const shopRouter = createTRPCRouter({
         });
       }
 
+      // Get the organization ID from Clerk context
+      const orgId = ctx.auth.orgId;
+      if (!orgId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Organization ID is required to create a shop",
+        });
+      }
+
       // Create shop and link user
       const shop = await ctx.db.shop.create({
         data: {
-          id: ctx.auth.orgId!, // Use Clerk org ID
+          id: orgId, // Use Clerk org ID
           name: input.name,
           slug: input.slug,
           description: input.description,
@@ -127,6 +136,24 @@ export const shopRouter = createTRPCRouter({
 
   // Get shop statistics
   getStats: shopProcedure.query(async ({ ctx }) => {
+    console.log('🔍 Debug: Full ctx object:', Object.keys(ctx));
+    console.log('🔍 Debug: ctx.db exists?', !!ctx.db);
+    console.log('🔍 Debug: ctx.db type:', typeof ctx.db);
+    console.log('🔍 Debug: ctx.shop exists?', !!ctx.shop);
+    console.log('🔍 Debug: ctx.shop.id', ctx.shop?.id);
+    console.log('🔍 Debug: ctx.auth exists?', !!ctx.auth);
+    
+    if (!ctx.db) {
+      console.error('❌ ctx.db is undefined!');
+      console.error('❌ Available ctx keys:', Object.keys(ctx));
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Database connection not available",
+      });
+    }
+
+    console.log('✅ ctx.db is available, proceeding with queries...');
+
     const [
       customerCount,
       productCount,

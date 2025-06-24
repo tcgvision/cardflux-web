@@ -104,10 +104,10 @@ export default function CreateShopPage() {
       // Create shop in database
       await createShopMutation.mutateAsync({
         name: data.name,
+        slug: data.name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, ""),
         description: data.description,
         location: data.location.label,
         type: data.type,
-        clerkOrgId: org.id,
       });
 
       // Small delay to ensure Clerk processes the organization change

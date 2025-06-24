@@ -10,7 +10,6 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import { ZodError } from "zod";
 import { auth } from "@clerk/nextjs/server";
-import type { Context } from "./context";
 
 import { db } from "~/server/db";
 
@@ -116,6 +115,7 @@ const isAuthed = t.middleware(({ next, ctx }) => {
   return next({
     ctx: {
       auth: ctx.auth,
+      db: ctx.db,
     },
   });
 });
@@ -136,13 +136,22 @@ const isShopMember = t.middleware(async ({ next, ctx }) => {
     });
   }
 
-  // Get shop details
-  const shop = await ctx.db.shop.findUnique({
-    where: { id: ctx.auth.orgId },
-    include: {
-      settings: true,
-    },
-  });
+  // Get shop details - try with settings first, fallback without if it fails
+  let shop;
+  try {
+    shop = await ctx.db.shop.findUnique({
+      where: { id: ctx.auth.orgId },
+      include: {
+        settings: true,
+      },
+    });
+  } catch (error) {
+    // If settings relation doesn't exist yet, try without it
+    console.warn('Settings relation not found, falling back to basic shop query:', error);
+    shop = await ctx.db.shop.findUnique({
+      where: { id: ctx.auth.orgId },
+    });
+  }
 
   if (!shop) {
     throw new TRPCError({ 
@@ -168,6 +177,7 @@ const isShopMember = t.middleware(async ({ next, ctx }) => {
       auth: ctx.auth,
       shop,
       user,
+      db: ctx.db,
     },
   });
 });
@@ -207,6 +217,7 @@ const isStaff = t.middleware(async ({ next, ctx }) => {
     ctx: {
       auth: ctx.auth,
       user,
+      db: ctx.db,
     },
   });
 });

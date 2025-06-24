@@ -1,6 +1,7 @@
 "use client";
 
 import { useOrganization } from "@clerk/nextjs";
+import { useRouter } from "next/navigation";
 import { SectionCards } from "~/components/section-cards";
 import { DataTable } from "~/components/data-table";
 import { ChartAreaInteractive } from "~/components/chart-area-interactive";
@@ -8,13 +9,16 @@ import { api } from "~/trpc/react";
 import { sampleProducts, salesData, stats } from "./data";
 
 export default function DashboardPage() {
-  const { organization } = useOrganization();
+  const { organization, isLoaded: orgLoaded } = useOrganization();
+  const router = useRouter();
   
-  // Fetch shop statistics using tRPC
-  const { data: shopStats, isLoading: statsLoading } = api.shop.getStats.useQuery(
+  // Fetch shop statistics using tRPC - only if user has an organization
+  const { data: shopStats, isLoading: statsLoading, error: statsError } = api.shop.getStats.useQuery(
     undefined,
     {
       refetchInterval: 30000, // Refetch every 30 seconds
+      enabled: !!organization, // Only run query if user has an organization
+      retry: 1, // Only retry once to avoid infinite loops
     }
   );
 
@@ -37,6 +41,56 @@ export default function DashboardPage() {
     reviewer: product.condition,
   }));
 
+  // Show loading state while organization is loading
+  if (!orgLoaded) {
+    return (
+      <div className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Loading...</h1>
+            <p className="text-muted-foreground">Please wait while we load your dashboard.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show setup message if user doesn't have an organization
+  if (!organization) {
+    return (
+      <div className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Welcome to TCG Vision!</h1>
+            <p className="text-muted-foreground">
+              You need to create or join a shop to get started.
+            </p>
+          </div>
+        </div>
+        
+        <div className="rounded-lg border bg-card p-6">
+          <h3 className="text-lg font-semibold mb-4">Get Started</h3>
+          <div className="space-y-4">
+            <p className="text-muted-foreground">
+              To use TCG Vision, you need to either create a new shop or join an existing one.
+            </p>
+            <div className="flex gap-4">
+              <button 
+                onClick={() => router.push("/dashboard/create-shop")}
+                className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
+              >
+                Create Shop
+              </button>
+              <button className="px-4 py-2 border border-border rounded-md hover:bg-accent">
+                Join Shop
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6">
       {/* Welcome Section */}
@@ -46,7 +100,7 @@ export default function DashboardPage() {
             Welcome back{organization ? `, ${organization.name}` : ""}!
           </h1>
           <p className="text-muted-foreground">
-            Here's what's happening with your TCG business today.
+            Here&apos;s what&apos;s happening with your TCG business today.
           </p>
         </div>
       </div>
