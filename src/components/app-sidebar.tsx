@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { usePathname, useRouter } from "next/navigation"
 import {
   IconCamera,
   IconChartBar,
@@ -37,6 +38,7 @@ import {
   SidebarGroup,
   SidebarGroupContent,
 } from "~/components/ui/sidebar"
+import { useLoading } from "~/components/loading-provider"
 
 const data = {
   navMain: [
@@ -114,6 +116,19 @@ const data = {
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { organization, isLoaded } = useOrganization()
+  const pathname = usePathname()
+  const router = useRouter()
+  const { startLoading } = useLoading()
+
+  const handleLogoClick = () => {
+    // Start loading immediately for instant feedback
+    startLoading()
+    
+    // Use setTimeout to ensure the loading state is set before navigation
+    setTimeout(() => {
+      router.push("/dashboard")
+    }, 0)
+  }
 
   return (
     <Sidebar collapsible="offcanvas" {...props}>
@@ -122,39 +137,40 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarMenuItem>
             <SidebarMenuButton
               asChild
-              className="data-[slot=sidebar-menu-button]:!p-1.5"
+              className="data-[slot=sidebar-menu-button]:!p-1.5 transition-all duration-200 hover:bg-accent hover:text-accent-foreground active:scale-95 hover:cursor-pointer"
             >
-              <a href="/dashboard">
+              <button 
+                onClick={handleLogoClick}
+                className="flex items-center gap-2 w-full text-left"
+              >
                 <IconInnerShadowTop className="!size-5" />
                 <span className="text-base font-semibold">
                   {isLoaded && organization ? organization.name : "TCG Vision"}
                 </span>
-              </a>
+              </button>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
-        <NavDocuments items={data.documents} />
+        <NavMain items={data.navMain} currentPath={pathname} />
+        <NavDocuments items={data.documents} currentPath={pathname} />
         
         {/* Theme Toggle Section */}
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <div className="flex items-center justify-between w-full">
-                    <span>Theme</span>
-                    <ThemeToggle />
-                  </div>
-                </SidebarMenuButton>
+                <div className="flex items-center justify-between w-full px-3 py-2 rounded-md transition-all duration-200 hover:bg-accent hover:text-accent-foreground">
+                  <span>Theme</span>
+                  <ThemeToggle />
+                </div>
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
         
-        <NavSecondary items={data.navSecondary} className="mt-auto" />
+        <NavSecondary items={data.navSecondary} currentPath={pathname} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
         <NavUser />
