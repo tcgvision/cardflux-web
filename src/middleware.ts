@@ -1,10 +1,12 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { ROLES } from "~/lib/roles";
 
 // Define route matchers
 const isPublicRoute = createRouteMatcher([
   "/",
+  "/get-started",
   "/learn-more",
   "/pricing",
   "/features",
@@ -30,6 +32,10 @@ const isCreateShopRoute = createRouteMatcher([
 
 const isOnboardingRoute = createRouteMatcher([
   "/dashboard/onboarding",
+]);
+
+const isTeamManagementRoute = createRouteMatcher([
+  "/dashboard/team",
 ]);
 
 // Export the middleware
@@ -73,6 +79,25 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
       return NextResponse.redirect(new URL("/dashboard", req.url));
     }
     // Allow access to create-shop if user has no organization
+    return NextResponse.next();
+  }
+
+  // Handle team management route - only allow admins
+  if (isTeamManagementRoute(req)) {
+    // If user has no organization, redirect to create-shop
+    if (!orgId) {
+      return NextResponse.redirect(new URL("/dashboard/create-shop", req.url));
+    }
+    
+    // Check if user has admin role
+    if (orgRole !== ROLES.ADMIN) {
+      // Redirect to dashboard with access denied message
+      const dashboardUrl = new URL("/dashboard", req.url);
+      dashboardUrl.searchParams.set("error", "access_denied");
+      dashboardUrl.searchParams.set("message", "You need admin privileges to access team management.");
+      return NextResponse.redirect(dashboardUrl);
+    }
+    
     return NextResponse.next();
   }
 

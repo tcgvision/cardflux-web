@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { createTRPCRouter, shopProcedure, staffProcedure, protectedProcedure } from "~/server/api/trpc";
 import { TRPCError } from "@trpc/server";
+import { ROLES, hasRolePermission, getDefaultRole } from "~/lib/roles";
 
 export const shopRouter = createTRPCRouter({
   // Get current shop details
@@ -81,8 +82,8 @@ export const shopRouter = createTRPCRouter({
       return shop;
     }),
 
-  // Update shop details
-  update: staffProcedure
+  // Update shop details (Admin only)
+  update: shopProcedure
     .input(z.object({
       name: z.string().min(1).optional(),
       description: z.string().optional(),
@@ -90,6 +91,15 @@ export const shopRouter = createTRPCRouter({
       type: z.enum(["local", "online", "both"]).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      // Check if user has permission to update shop details
+      const userRole = ctx.auth.orgRole ?? getDefaultRole();
+      if (!hasRolePermission(userRole, ROLES.ADMIN)) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Admin privileges required to update shop details",
+        });
+      }
+
       const shop = await ctx.db.shop.update({
         where: { id: ctx.auth.orgId! },
         data: input,
@@ -110,8 +120,8 @@ export const shopRouter = createTRPCRouter({
     return settings;
   }),
 
-  // Update shop settings
-  updateSettings: staffProcedure
+  // Update shop settings (Admin only)
+  updateSettings: shopProcedure
     .input(z.object({
       defaultCurrency: z.string().optional(),
       enableNotifications: z.boolean().optional(),
@@ -122,6 +132,15 @@ export const shopRouter = createTRPCRouter({
       maxCreditAmount: z.number().min(0).nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      // Check if user has permission to update settings
+      const userRole = ctx.auth.orgRole ?? getDefaultRole();
+      if (!hasRolePermission(userRole, ROLES.ADMIN)) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Admin privileges required to update shop settings",
+        });
+      }
+
       const settings = await ctx.db.shopSettings.upsert({
         where: { shopId: ctx.auth.orgId! },
         update: input,
@@ -136,24 +155,6 @@ export const shopRouter = createTRPCRouter({
 
   // Get shop statistics
   getStats: shopProcedure.query(async ({ ctx }) => {
-    console.log('🔍 Debug: Full ctx object:', Object.keys(ctx));
-    console.log('🔍 Debug: ctx.db exists?', !!ctx.db);
-    console.log('🔍 Debug: ctx.db type:', typeof ctx.db);
-    console.log('🔍 Debug: ctx.shop exists?', !!ctx.shop);
-    console.log('🔍 Debug: ctx.shop.id', ctx.shop?.id);
-    console.log('🔍 Debug: ctx.auth exists?', !!ctx.auth);
-    
-    if (!ctx.db) {
-      console.error('❌ ctx.db is undefined!');
-      console.error('❌ Available ctx keys:', Object.keys(ctx));
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: "Database connection not available",
-      });
-    }
-
-    console.log('✅ ctx.db is available, proceeding with queries...');
-
     const [
       customerCount,
       productCount,
@@ -204,8 +205,17 @@ export const shopRouter = createTRPCRouter({
     };
   }),
 
-  // Get shop members
+  // Get shop members (Admin only)
   getMembers: shopProcedure.query(async ({ ctx }) => {
+    // Check if user has permission to view members
+    const userRole = ctx.auth.orgRole ?? getDefaultRole();
+    if (!hasRolePermission(userRole, ROLES.ADMIN)) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "Admin privileges required to view team members",
+      });
+    }
+
     const members = await ctx.db.user.findMany({
       where: { shopId: ctx.shop.id },
       select: {
@@ -220,13 +230,22 @@ export const shopRouter = createTRPCRouter({
     return members;
   }),
 
-  // Add member to shop (invite)
-  addMember: staffProcedure
+  // Add member to shop (invite) - Admin only
+  addMember: shopProcedure
     .input(z.object({
       email: z.string().email(),
       name: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      // Check if user has permission to add members
+      const userRole = ctx.auth.orgRole ?? getDefaultRole();
+      if (!hasRolePermission(userRole, ROLES.ADMIN)) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Admin privileges required to add team members",
+        });
+      }
+
       // Check if user already exists
       const existingUser = await ctx.db.user.findUnique({
         where: { email: input.email },

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { createTRPCRouter, shopProcedure, staffProcedure } from "~/server/api/trpc";
 import { TRPCError } from "@trpc/server";
+import { Prisma } from "@prisma/client";
 
 export const customerRouter = createTRPCRouter({
   // Get all customers for the shop
@@ -12,20 +13,20 @@ export const customerRouter = createTRPCRouter({
       offset: z.number().int().min(0).default(0),
     }))
     .query(async ({ ctx, input }) => {
-      // const where = {
-      //   shopId: ctx.shop.id,
-      //   ...(input.isActive !== undefined && { isActive: input.isActive }),
-      //   ...(input.search && {
-      //     OR: [
-      //       { name: { contains: input.search, mode: "insensitive" } },
-      //       { phone: { contains: input.search, mode: "insensitive" } },
-      //     ],
-      //   }),
-      // };
+      const where = {
+        shopId: ctx.shop.id,
+        ...(input.isActive !== undefined && { isActive: input.isActive }),
+        ...(input.search && {
+          OR: [
+            { name: { contains: input.search, mode: Prisma.QueryMode.insensitive } },
+            { phone: { contains: input.search, mode: Prisma.QueryMode.insensitive } },
+          ],
+        }),
+      };
 
       const [customers, total] = await Promise.all([
         ctx.db.customer.findMany({
-          where: {shopId: ctx.shop.id},
+          where,
           orderBy: { name: "asc" },
           take: input.limit,
           skip: input.offset,
@@ -38,7 +39,7 @@ export const customerRouter = createTRPCRouter({
             },
           },
         }),
-        ctx.db.customer.count({ where: {shopId: ctx.shop.id} }),
+        ctx.db.customer.count({ where }),
       ]);
 
       return {

@@ -19,6 +19,7 @@ import {
   IconCreditCard,
   IconShoppingCart,
   IconReceipt,
+  IconUsersGroup,
 } from "@tabler/icons-react"
 import { useOrganization } from "@clerk/nextjs"
 
@@ -79,6 +80,11 @@ const data = {
     },
   ],
   navSecondary: [
+    {
+      title: "Team Management",
+      url: "/dashboard/team",
+      icon: IconUsersGroup,
+    },
     {
       title: "Settings",
       url: "/dashboard/settings",

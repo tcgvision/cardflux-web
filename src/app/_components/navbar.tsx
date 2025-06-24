@@ -86,7 +86,7 @@ export function Navbar() {
                       Sign in
                     </Button>
                   </Link>
-                  <Link href="/auth/sign-up">
+                  <Link href="/get-started">
                     <Button size="sm">Get Started</Button>
                   </Link>
                 </div>
@@ -131,7 +131,7 @@ export function Navbar() {
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
-                    <Link href="/auth/sign-up" className="w-full">
+                    <Link href="/get-started" className="w-full">
                       Get Started
                     </Link>
                   </DropdownMenuItem>
