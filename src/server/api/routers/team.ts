@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createTRPCRouter, shopProcedure, staffProcedure } from "~/server/api/trpc";
+import { createTRPCRouter, shopProcedure, staffProcedure, shopProcedureDb } from "~/server/api/trpc";
 import { TRPCError } from "@trpc/server";
 import { Prisma } from "@prisma/client";
 import { ROLES, hasRolePermission, getNormalizedRole, type Role } from "~/lib/roles";
@@ -7,7 +7,7 @@ import { clerkClient } from "@clerk/nextjs/server";
 
 export const teamRouter = createTRPCRouter({
   // Get all team members
-  getMembers: shopProcedure
+  getMembers: shopProcedureDb
     .input(z.object({
       search: z.string().optional(),
       role: z.enum([ROLES.ADMIN, ROLES.MEMBER]).optional(),
@@ -73,7 +73,7 @@ export const teamRouter = createTRPCRouter({
     }),
 
   // Get current user's role and permissions
-  getCurrentUserRole: shopProcedure.query(async ({ ctx }) => {
+  getCurrentUserRole: shopProcedureDb.query(async ({ ctx }) => {
     const role = getNormalizedRole(ctx.auth.orgRole);
     
     return {

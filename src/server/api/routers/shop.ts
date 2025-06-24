@@ -5,7 +5,7 @@ import { ROLES, hasRolePermission, getNormalizedRole } from "~/lib/roles";
 
 export const shopRouter = createTRPCRouter({
   // Get current shop details
-  getCurrent: shopProcedure.query(async ({ ctx }) => {
+  getCurrent: shopProcedureDb.query(async ({ ctx }) => {
     return ctx.shop;
   }),
 
@@ -117,7 +117,7 @@ export const shopRouter = createTRPCRouter({
     }),
 
   // Get shop settings
-  getSettings: shopProcedure.query(async ({ ctx }) => {
+  getSettings: shopProcedureDb.query(async ({ ctx }) => {
     const settings = await ctx.db.shopSettings.findUnique({
       where: { shopId: ctx.shop.id },
     });
@@ -211,7 +211,7 @@ export const shopRouter = createTRPCRouter({
   }),
 
   // Get shop members (Admin only)
-  getMembers: shopProcedure.query(async ({ ctx }) => {
+  getMembers: shopProcedureDb.query(async ({ ctx }) => {
     // Check if user has permission to view members
     const userRole = getNormalizedRole(ctx.auth.orgRole);
     if (!hasRolePermission(userRole, ROLES.ADMIN)) {

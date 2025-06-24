@@ -1,10 +1,10 @@
 import { z } from "zod";
-import { createTRPCRouter, shopProcedure, staffProcedure } from "~/server/api/trpc";
+import { createTRPCRouter, shopProcedure, staffProcedure, shopProcedureDb } from "~/server/api/trpc";
 import { TRPCError } from "@trpc/server";
 
 export const transactionRouter = createTRPCRouter({
   // Get all transactions for the shop
-  getAll: shopProcedure
+  getAll: shopProcedureDb
     .input(z.object({
       search: z.string().optional(),
       status: z.enum(["COMPLETED", "PENDING", "CANCELLED", "REFUNDED"]).optional(),
@@ -64,7 +64,7 @@ export const transactionRouter = createTRPCRouter({
     }),
 
   // Get transaction by ID
-  getById: shopProcedure
+  getById: shopProcedureDb
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
       const transaction = await ctx.db.transaction.findFirst({
@@ -194,7 +194,7 @@ export const transactionRouter = createTRPCRouter({
     }),
 
   // Get transaction statistics
-  getStats: shopProcedure
+  getStats: shopProcedureDb
     .input(z.object({
       period: z.enum(["today", "week", "month", "quarter", "year"]).default("month"),
     }))

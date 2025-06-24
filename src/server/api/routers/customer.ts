@@ -1,11 +1,11 @@
 import { z } from "zod";
-import { createTRPCRouter, shopProcedure, staffProcedure } from "~/server/api/trpc";
+import { createTRPCRouter, shopProcedure, staffProcedure, shopProcedureDb } from "~/server/api/trpc";
 import { TRPCError } from "@trpc/server";
 import { Prisma } from "@prisma/client";
 
 export const customerRouter = createTRPCRouter({
   // Get all customers for the shop
-  getAll: shopProcedure
+  getAll: shopProcedureDb
     .input(z.object({
       search: z.string().optional(),
       isActive: z.boolean().optional(),
@@ -50,7 +50,7 @@ export const customerRouter = createTRPCRouter({
     }),
 
   // Get customer by ID
-  getById: shopProcedure
+  getById: shopProcedureDb
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
       const customer = await ctx.db.customer.findFirst({
@@ -185,7 +185,7 @@ export const customerRouter = createTRPCRouter({
     }),
 
   // Get customer store credit balance
-  getCreditBalance: shopProcedure
+  getCreditBalance: shopProcedureDb
     .input(z.object({ customerId: z.string() }))
     .query(async ({ ctx, input }) => {
       const customer = await ctx.db.customer.findFirst({
@@ -212,7 +212,7 @@ export const customerRouter = createTRPCRouter({
     }),
 
   // Get customer credit history
-  getCreditHistory: shopProcedure
+  getCreditHistory: shopProcedureDb
     .input(z.object({
       customerId: z.string(),
       limit: z.number().int().min(1).max(100).default(50),
@@ -353,7 +353,7 @@ export const customerRouter = createTRPCRouter({
     }),
 
   // Search customers by phone or name
-  search: shopProcedure
+  search: shopProcedureDb
     .input(z.object({
       query: z.string().min(1),
       limit: z.number().int().min(1).max(20).default(10),
