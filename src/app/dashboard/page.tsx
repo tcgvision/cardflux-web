@@ -1,56 +1,104 @@
 "use client";
 
-import { useOrganization } from "@clerk/nextjs";
+import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { useShopMembership } from "~/hooks/use-shop-membership";
+import { useUnifiedShop } from "~/hooks/use-unified-shop";
+import { Button } from "~/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import { Alert, AlertDescription } from "~/components/ui/alert";
+import { AlertCircle, RefreshCw, ExternalLink } from "lucide-react";
 import { SectionCards } from "~/components/section-cards";
 import { DataTable } from "~/components/data-table";
 import { ChartAreaInteractive } from "~/components/chart-area-interactive";
 import { api } from "~/trpc/react";
 import { sampleProducts, salesData, stats } from "./data";
 
+interface SyncResponse {
+  success?: boolean;
+  needsInvitation?: boolean;
+  shopName?: string;
+  message?: string;
+  error?: string;
+}
+
 export default function DashboardPage() {
-  const { organization, isLoaded: orgLoaded } = useOrganization();
+  const { user, isLoaded } = useUser();
   const router = useRouter();
-  const [isCheckingMembership, setIsCheckingMembership] = useState(false);
-  
-  // Check for shop membership when user doesn't have organization
+  const { membershipData, isChecking } = useShopMembership();
+  const { shopName, isLoaded: shopLoaded, hasShop, source, needsSync } = useUnifiedShop();
+  const [debugInfo, setDebugInfo] = useState<Record<string, unknown> | null>(null);
+  const [isLoadingDebug, setIsLoadingDebug] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  // Check if user is loaded and has no organization
   useEffect(() => {
-    if (orgLoaded && !organization && !isCheckingMembership) {
-      setIsCheckingMembership(true);
-      
-      // Check if user is linked to a shop via invitation
-      fetch('/api/check-shop-membership')
-        .then(response => response.json())
-        .then(data => {
-          if (data.hasShop) {
-            console.log("User is linked to shop via invitation, redirecting to dashboard");
-            // Force a page reload to refresh Clerk's organization state
-            window.location.reload();
-          } else {
-            // User has no organization and no shop membership, redirect to create-shop
-            console.log("User has no organization and no shop membership, redirecting to create-shop");
-            router.push("/dashboard/create-shop");
-          }
-        })
-        .catch(error => {
-          console.error("Error checking shop membership:", error);
-          // On error, redirect to create-shop as fallback
-          router.push("/dashboard/create-shop");
-        })
-        .finally(() => {
-          setIsCheckingMembership(false);
-        });
+    if (isLoaded && user && !user.organizationMemberships?.length) {
+      console.log("🚀 Dashboard: User has no organization memberships, checking database membership");
     }
-  }, [orgLoaded, organization, isCheckingMembership, router]);
-  
-  // Fetch shop statistics using tRPC - only if user has an organization
+  }, [isLoaded, user]);
+
+  const fetchDebugInfo = useCallback(async () => {
+    setIsLoadingDebug(true);
+    try {
+      const response = await fetch('/api/debug-clerk');
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json() as Record<string, unknown>;
+      setDebugInfo(data);
+      console.log("🔍 Debug info:", data);
+    } catch (error) {
+      console.error("❌ Failed to fetch debug info:", error);
+      setDebugInfo({ error: "Failed to fetch debug info" });
+    } finally {
+      setIsLoadingDebug(false);
+    }
+  }, []);
+
+  const syncOrganization = useCallback(async () => {
+    setIsSyncing(true);
+    try {
+      const response = await fetch('/api/sync-organization', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json() as SyncResponse;
+      console.log("🔄 Sync result:", data);
+      
+      if (data.success) {
+        // Refresh the page to update Clerk context
+        window.location.reload();
+      } else if (data.needsInvitation) {
+        // Show message that user needs to accept invitation
+        alert(`You need to accept the invitation to join "${data.shopName}". Please check your email.`);
+      } else if (data.error) {
+        alert(`Sync failed: ${data.error}`);
+      }
+    } catch (error) {
+      console.error("❌ Failed to sync organization:", error);
+      alert("Failed to sync organization. Please try again.");
+    } finally {
+      setIsSyncing(false);
+    }
+  }, []);
+
+  // Fetch shop statistics using tRPC - only if user has shop membership
   const { data: shopStats, isLoading: statsLoading, error: statsError } = api.shop.getStats.useQuery(
     undefined,
     {
       refetchInterval: 30000, // Refetch every 30 seconds
-      enabled: !!organization, // Only run query if user has an organization
+      enabled: hasShop, // Run query if user has shop membership
       retry: 1, // Only retry once to avoid infinite loops
+      staleTime: 10000, // Consider data fresh for 10 seconds
     }
   );
 
@@ -73,70 +121,213 @@ export default function DashboardPage() {
     reviewer: product.condition,
   }));
 
-  // Show loading state while organization is loading or checking membership
-  if (!orgLoaded || isCheckingMembership) {
+  // Show loading while Clerk is loading
+  if (!isLoaded) {
     return (
-      <div className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">
-              {isCheckingMembership ? "Checking your membership..." : "Loading..."}
-            </h1>
-            <p className="text-muted-foreground">
-              {isCheckingMembership 
-                ? "Please wait while we verify your shop membership."
-                : "Please wait while we load your dashboard."
-              }
-            </p>
-          </div>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
+          <p>Loading...</p>
         </div>
       </div>
     );
   }
 
-  // Show setup message if user doesn't have an organization
-  if (!organization) {
+  // Show sign-in if not authenticated
+  if (!user) {
+    router.push("/sign-in");
+    return null;
+  }
+
+  // Show create shop if no organization and no database membership
+  if (!hasShop && !isChecking && shopLoaded) {
     return (
-      <div className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Welcome to TCG Vision!</h1>
-            <p className="text-muted-foreground">
-              You need to create or join a shop to get started.
+      <div className="container mx-auto px-4 py-8">
+        <Card className="max-w-md mx-auto">
+          <CardHeader>
+            <CardTitle>Welcome to TCG Vision</CardTitle>
+            <CardDescription>
+              You need to join a shop to get started
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              You don&apos;t have access to any shops yet. Please check your email for an invitation or contact your shop administrator.
             </p>
-          </div>
-        </div>
-        
-        <div className="rounded-lg border bg-card p-6">
-          <h3 className="text-lg font-semibold mb-4">Get Started</h3>
-          <div className="space-y-4">
-            <p className="text-muted-foreground">
-              To use TCG Vision, you need to either create a new shop or join an existing one.
-            </p>
-            <div className="flex gap-4">
-              <button 
-                onClick={() => router.push("/dashboard/create-shop")}
-                className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
-              >
-                Create Shop
-              </button>
-              <button className="px-4 py-2 border border-border rounded-md hover:bg-accent">
-                Join Shop
-              </button>
+            <Button 
+              onClick={() => router.push("/create-shop")}
+              className="w-full"
+            >
+              Create New Shop
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Show organization sync issue
+  if (needsSync && hasShop) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <Card className="max-w-2xl mx-auto">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-orange-500" />
+              Organization Sync Required
+            </CardTitle>
+            <CardDescription>
+              Your account is linked to &quot;{shopName}&quot; in our database, but Clerk needs to sync your organization membership.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                <strong>Status:</strong> You are linked to <strong>{shopName}</strong> in our database ({source}), but your Clerk organization membership needs to be refreshed.
+              </AlertDescription>
+            </Alert>
+
+            <div className="space-y-4">
+              <h4 className="font-medium">Solutions to try:</h4>
+              
+              <div className="space-y-2">
+                <p className="text-sm font-medium">1. Sync Organization</p>
+                <p className="text-sm text-muted-foreground">
+                  Try to automatically sync your organization membership:
+                </p>
+                <Button 
+                  onClick={syncOrganization}
+                  disabled={isSyncing}
+                  className="w-full"
+                >
+                  {isSyncing ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      Syncing...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Sync Organization
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-sm font-medium">2. Accept the invitation email again</p>
+                <p className="text-sm text-muted-foreground">
+                  Check your email for the invitation from &quot;{shopName}&quot; and click the acceptance link.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-sm font-medium">3. Manual organization refresh</p>
+                <p className="text-sm text-muted-foreground">
+                  Try refreshing your Clerk session by signing out and back in.
+                </p>
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    window.location.href = "/sign-out";
+                  }}
+                  className="w-full"
+                >
+                  Sign Out and Sign Back In
+                </Button>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-sm font-medium">4. Debug information</p>
+                <p className="text-sm text-muted-foreground">
+                  Check your current Clerk organization status:
+                </p>
+                <Button 
+                  variant="outline" 
+                  onClick={fetchDebugInfo}
+                  disabled={isLoadingDebug}
+                  className="w-full"
+                >
+                  {isLoadingDebug ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      Loading...
+                    </>
+                  ) : (
+                    <>
+                      <ExternalLink className="h-4 w-4 mr-2" />
+                      Check Clerk Status
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
-          </div>
+
+            {debugInfo && (
+              <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+                <h4 className="font-medium mb-2">Debug Information:</h4>
+                <pre className="text-xs overflow-auto">
+                  {JSON.stringify(debugInfo, null, 2)}
+                </pre>
+              </div>
+            )}
+
+            <div className="pt-4 border-t">
+              <Button 
+                onClick={() => window.location.reload()}
+                variant="outline"
+                className="w-full"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh Page
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Show loading while checking membership
+  if (isChecking || !shopLoaded) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
+          <p>Checking your membership...</p>
         </div>
       </div>
     );
   }
 
+  // Show error
+  if (membershipData?.error) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <Card className="max-w-md mx-auto">
+          <CardHeader>
+            <CardTitle className="text-red-600">Error</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-red-600 mb-4">{membershipData.error}</p>
+            <Button onClick={() => window.location.reload()} className="w-full">
+              Try Again
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Show dashboard content
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6">
       {/* Welcome Section */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">
-            Welcome back{organization ? `, ${organization.name}` : ""}!
+            Welcome back, {shopName}!
           </h1>
           <p className="text-muted-foreground">
             Here&apos;s what&apos;s happening with your TCG business today.
@@ -214,25 +405,20 @@ export default function DashboardPage() {
         </div>
         
         <div className="rounded-lg border bg-card p-6">
-          <h3 className="text-lg font-semibold mb-2">Top Performing Cards</h3>
-          <div className="space-y-2">
-            <div className="flex justify-between">
-              <span className="text-sm">{stats.mostSoldCard}</span>
-              <span className="text-sm font-medium">Most Sold</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-sm">{stats.mostValuableCard}</span>
-              <span className="text-sm font-medium">Most Valuable</span>
-            </div>
+          <h3 className="text-lg font-semibold mb-2">Recent Activity</h3>
+          <div className="space-y-2 text-sm text-muted-foreground">
+            <p>• New customer John D. added</p>
+            <p>• Inventory updated for Pokemon cards</p>
+            <p>• Transaction #1234 completed</p>
           </div>
         </div>
         
         <div className="rounded-lg border bg-card p-6">
-          <h3 className="text-lg font-semibold mb-2">Recent Activity</h3>
-          <div className="space-y-2 text-sm text-muted-foreground">
-            <div>• 3 cards scanned today</div>
-            <div>• 2 transactions completed</div>
-            <div>• 1 new customer added</div>
+          <h3 className="text-lg font-semibold mb-2">Alerts</h3>
+          <div className="space-y-2 text-sm">
+            <p className="text-amber-600">⚠️ Low stock: 5 items</p>
+            <p className="text-green-600">✅ Backup completed</p>
+            <p className="text-blue-600">ℹ️ Price sync available</p>
           </div>
         </div>
       </div>

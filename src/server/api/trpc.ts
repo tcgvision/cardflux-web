@@ -223,6 +223,69 @@ const isStaff = t.middleware(async ({ next, ctx }) => {
 });
 
 /**
+ * Shop context middleware (database fallback)
+ * Ensures user has access to a shop via database membership, even without Clerk org context
+ */
+const isShopMemberDb = t.middleware(async ({ next, ctx }) => {
+  if (!ctx.auth.userId) {
+    throw new TRPCError({ code: "UNAUTHORIZED" });
+  }
+
+  // Get user details
+  const user = await ctx.db.user.findUnique({
+    where: { clerkId: ctx.auth.userId },
+    include: { shop: true },
+  });
+
+  if (!user) {
+    throw new TRPCError({ 
+      code: "NOT_FOUND", 
+      message: "User not found in database" 
+    });
+  }
+
+  if (!user.shopId) {
+    throw new TRPCError({ 
+      code: "FORBIDDEN", 
+      message: "You must be a member of a shop to access this resource" 
+    });
+  }
+
+  // Get shop details
+  let shop;
+  try {
+    shop = await ctx.db.shop.findUnique({
+      where: { id: user.shopId },
+      include: {
+        settings: true,
+      },
+    });
+  } catch (error) {
+    // If settings relation doesn't exist yet, try without it
+    console.warn('Settings relation not found, falling back to basic shop query:', error);
+    shop = await ctx.db.shop.findUnique({
+      where: { id: user.shopId },
+    });
+  }
+
+  if (!shop) {
+    throw new TRPCError({ 
+      code: "NOT_FOUND", 
+      message: "Shop not found" 
+    });
+  }
+
+  return next({
+    ctx: {
+      auth: ctx.auth,
+      shop,
+      user,
+      db: ctx.db,
+    },
+  });
+});
+
+/**
  * Public (unauthenticated) procedure
  *
  * This is the base piece you use to build new queries and mutations on your tRPC API. It does not
@@ -254,3 +317,11 @@ export const shopProcedure = t.procedure.use(timingMiddleware).use(isShopMember)
  * Use this for operations that require staff privileges.
  */
 export const staffProcedure = t.procedure.use(timingMiddleware).use(isStaff);
+
+/**
+ * Shop member procedure (database fallback)
+ *
+ * This procedure ensures the user is a member of a shop via database membership.
+ * Use this for users who are linked to shops but don't have Clerk organization context.
+ */
+export const shopProcedureDb = t.procedure.use(timingMiddleware).use(isShopMemberDb);

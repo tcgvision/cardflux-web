@@ -14,6 +14,8 @@ export default function DebugPage() {
   const { organization, isLoaded: orgLoaded } = useOrganization();
   const [isLoading, setIsLoading] = useState<string | null>(null);
   const [results, setResults] = useState<Record<string, any>>({});
+  const [result, setResult] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
 
   const runAction = async (action: string, apiCall: () => Promise<any>) => {
     setIsLoading(action);
@@ -54,6 +56,20 @@ export default function DebugPage() {
     const response = await fetch('/api/reset-signup', { method: 'POST' });
     return await response.json();
   });
+
+  const fixUserShop = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch('/api/fix-user-shop', { method: 'POST' });
+      const data = await response.json();
+      setResult(data);
+      console.log('Fix result:', data);
+    } catch (error) {
+      setResult({ error: error.message });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (!userLoaded || !orgLoaded) {
     return (
@@ -165,6 +181,15 @@ export default function DebugPage() {
               {isLoading === "resetSignup" ? <Loader2 className="h-4 w-4 animate-spin" /> : <AlertCircle className="h-4 w-4" />}
               Reset Signup
             </Button>
+
+            <Button
+              onClick={fixUserShop}
+              disabled={loading}
+              className="flex items-center gap-2"
+            >
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Database className="h-4 w-4" />}
+              Fix User-Shop Linking
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -213,6 +238,22 @@ export default function DebugPage() {
           </div>
         </CardContent>
       </Card>
+
+      {result && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Fix Result</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <h4 className="font-semibold mb-2">Result:</h4>
+              <pre className="bg-muted p-4 rounded-md text-sm overflow-auto">
+                {JSON.stringify(result, null, 2)}
+              </pre>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 } 

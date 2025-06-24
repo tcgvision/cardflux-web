@@ -1,13 +1,13 @@
 "use client"
 
-import { useOrganization } from "@clerk/nextjs"
 import { Button } from "~/components/ui/button"
 import { Separator } from "~/components/ui/separator"
 import { SidebarTrigger } from "~/components/ui/sidebar"
 import { usePathname } from "next/navigation"
+import { useUnifiedShop } from "~/hooks/use-unified-shop"
 
 export function SiteHeader() {
-  const { organization } = useOrganization()
+  const { shopName, hasShop } = useUnifiedShop()
   const pathname = usePathname()
 
   const getPageTitle = () => {
@@ -43,10 +43,10 @@ export function SiteHeader() {
           className="mx-2 data-[orientation=vertical]:h-4"
         />
         <h1 className="text-base font-medium">{getPageTitle()}</h1>
-        {organization && (
+        {hasShop && shopName && (
           <div className="ml-auto flex items-center gap-2">
             <span className="text-sm text-muted-foreground">/</span>
-            <span className="text-sm font-medium">{organization.name}</span>
+            <span className="text-sm font-medium">{shopName}</span>
           </div>
         )}
       </div>

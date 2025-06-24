@@ -21,7 +21,6 @@ import {
   IconReceipt,
   IconUsersGroup,
 } from "@tabler/icons-react"
-import { useOrganization } from "@clerk/nextjs"
 
 import { NavDocuments } from "~/components/nav-documents"
 import { NavMain } from "~/components/nav-main"
@@ -29,6 +28,7 @@ import { NavSecondary } from "~/components/nav-secondary"
 import { NavUser } from "~/components/nav-user"
 import { ThemeToggle } from "~/app/_components/theme-toggle"
 import { useRolePermissions } from "~/hooks/use-role-permissions"
+import { useUnifiedShop } from "~/hooks/use-unified-shop"
 import {
   Sidebar,
   SidebarContent,
@@ -43,7 +43,7 @@ import {
 import { useLoading } from "~/components/loading-provider"
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const { organization, isLoaded } = useOrganization()
+  const { shopName, isLoaded, hasShop, source, needsSync } = useUnifiedShop()
   const { isAdmin } = useRolePermissions()
   const pathname = usePathname()
   const router = useRouter()
@@ -154,8 +154,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               >
                 <IconInnerShadowTop className="!size-5" />
                 <span className="text-base font-semibold">
-                  {isLoaded && organization ? organization.name : "TCG Vision"}
+                  {isLoaded && hasShop ? shopName : "TCG Vision"}
                 </span>
+                {needsSync && (
+                  <span className="text-xs text-orange-500 ml-1">
+                    (needs sync)
+                  </span>
+                )}
               </button>
             </SidebarMenuButton>
           </SidebarMenuItem>

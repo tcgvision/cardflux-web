@@ -1,11 +1,16 @@
 import { z } from "zod";
-import { createTRPCRouter, shopProcedure, staffProcedure, protectedProcedure } from "~/server/api/trpc";
+import { createTRPCRouter, shopProcedure, staffProcedure, protectedProcedure, shopProcedureDb } from "~/server/api/trpc";
 import { TRPCError } from "@trpc/server";
 import { ROLES, hasRolePermission, getNormalizedRole } from "~/lib/roles";
 
 export const shopRouter = createTRPCRouter({
   // Get current shop details
   getCurrent: shopProcedure.query(async ({ ctx }) => {
+    return ctx.shop;
+  }),
+
+  // Get current shop details (database fallback)
+  getCurrentDb: shopProcedureDb.query(async ({ ctx }) => {
     return ctx.shop;
   }),
 
@@ -153,8 +158,8 @@ export const shopRouter = createTRPCRouter({
       return settings;
     }),
 
-  // Get shop statistics
-  getStats: shopProcedure.query(async ({ ctx }) => {
+  // Get shop statistics (database fallback)
+  getStats: shopProcedureDb.query(async ({ ctx }) => {
     const [
       customerCount,
       productCount,
