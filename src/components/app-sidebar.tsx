@@ -28,6 +28,7 @@ import { NavMain } from "~/components/nav-main"
 import { NavSecondary } from "~/components/nav-secondary"
 import { NavUser } from "~/components/nav-user"
 import { ThemeToggle } from "~/app/_components/theme-toggle"
+import { useRolePermissions } from "~/hooks/use-role-permissions"
 import {
   Sidebar,
   SidebarContent,
@@ -41,87 +42,9 @@ import {
 } from "~/components/ui/sidebar"
 import { useLoading } from "~/components/loading-provider"
 
-const data = {
-  navMain: [
-    {
-      title: "Dashboard",
-      url: "/dashboard",
-      icon: IconDashboard,
-    },
-    {
-      title: "Scanner",
-      url: "/dashboard/scanner",
-      icon: IconCamera,
-    },
-    {
-      title: "Inventory",
-      url: "/dashboard/inventory",
-      icon: IconDatabase,
-    },
-    {
-      title: "Customers",
-      url: "/dashboard/customers",
-      icon: IconUsers,
-    },
-    {
-      title: "Transactions",
-      url: "/dashboard/transactions",
-      icon: IconReceipt,
-    },
-    {
-      title: "Buylists",
-      url: "/dashboard/buylists",
-      icon: IconShoppingCart,
-    },
-    {
-      title: "Analytics",
-      url: "/dashboard/analytics",
-      icon: IconChartBar,
-    },
-  ],
-  navSecondary: [
-    {
-      title: "Team Management",
-      url: "/dashboard/team",
-      icon: IconUsersGroup,
-    },
-    {
-      title: "Settings",
-      url: "/dashboard/settings",
-      icon: IconSettings,
-    },
-    {
-      title: "Help",
-      url: "/help",
-      icon: IconHelp,
-    },
-    {
-      title: "Search",
-      url: "#",
-      icon: IconSearch,
-    },
-  ],
-  documents: [
-    {
-      name: "Reports",
-      url: "/dashboard/reports",
-      icon: IconReport,
-    },
-    {
-      name: "Documents",
-      url: "/dashboard/documents",
-      icon: IconFileDescription,
-    },
-    {
-      name: "Store Credit",
-      url: "/dashboard/store-credit",
-      icon: IconCreditCard,
-    },
-  ],
-}
-
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { organization, isLoaded } = useOrganization()
+  const { isAdmin } = useRolePermissions()
   const pathname = usePathname()
   const router = useRouter()
   const { startLoading } = useLoading()
@@ -134,6 +57,86 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     setTimeout(() => {
       router.push("/dashboard")
     }, 0)
+  }
+
+  const data = {
+    navMain: [
+      {
+        title: "Dashboard",
+        url: "/dashboard",
+        icon: IconDashboard,
+      },
+      {
+        title: "Scanner",
+        url: "/dashboard/scanner",
+        icon: IconCamera,
+      },
+      {
+        title: "Inventory",
+        url: "/dashboard/inventory",
+        icon: IconDatabase,
+      },
+      {
+        title: "Customers",
+        url: "/dashboard/customers",
+        icon: IconUsers,
+      },
+      {
+        title: "Transactions",
+        url: "/dashboard/transactions",
+        icon: IconReceipt,
+      },
+      {
+        title: "Buylists",
+        url: "/dashboard/buylists",
+        icon: IconShoppingCart,
+      },
+      {
+        title: "Analytics",
+        url: "/dashboard/analytics",
+        icon: IconChartBar,
+      },
+    ],
+    navSecondary: [
+      // Only show team management for admins
+      ...(isAdmin ? [{
+        title: "Team Management",
+        url: "/dashboard/team",
+        icon: IconUsersGroup,
+      }] : []),
+      {
+        title: "Settings",
+        url: "/dashboard/settings",
+        icon: IconSettings,
+      },
+      {
+        title: "Help",
+        url: "/help",
+        icon: IconHelp,
+      },
+      {
+        title: "Search",
+        url: "#",
+        icon: IconSearch,
+      },
+    ],
+    documents: [
+      {
+        name: "Reports",
+        url: "/dashboard/reports",
+        icon: IconReport,
+      },
+      {
+        name: "Documents",
+        url: "/dashboard/documents",
+        icon: IconFileDescription,
+      },
+      {
+        name: "Store Credit",
+        url: "/dashboard/store-credit",
+        icon: IconCreditCard,
+      },
+    ],
   }
 
   return (

@@ -11,17 +11,20 @@ import {
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 import { Menu, Settings, Store, BarChart3, Users } from "lucide-react";
-
-const navigation = [
-  { name: "Dashboard", href: "/dashboard", icon: BarChart3 },
-  { name: "Inventory", href: "/dashboard/inventory", icon: Store },
-  { name: "Team", href: "/dashboard/team", icon: Users },
-  { name: "Settings", href: "/dashboard/settings", icon: Settings },
-];
+import { useRolePermissions } from "~/hooks/use-role-permissions";
 
 export function DashboardNavbar() {
   const pathname = usePathname();
   const { organization } = useOrganization();
+  const { isAdmin } = useRolePermissions();
+
+  const navigation = [
+    { name: "Dashboard", href: "/dashboard", icon: BarChart3 },
+    { name: "Inventory", href: "/dashboard/inventory", icon: Store },
+    // Only show team link for admins
+    ...(isAdmin ? [{ name: "Team", href: "/dashboard/team", icon: Users }] : []),
+    { name: "Settings", href: "/dashboard/settings", icon: Settings },
+  ];
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">

@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { createTRPCRouter, shopProcedure } from "~/server/api/trpc";
+import { createTRPCRouter, shopProcedure, staffProcedure } from "~/server/api/trpc";
 import { TRPCError } from "@trpc/server";
 import { Prisma } from "@prisma/client";
-import { ROLES, hasRolePermission, getDefaultRole, type Role } from "~/lib/roles";
+import { ROLES, hasRolePermission, getNormalizedRole, type Role } from "~/lib/roles";
 
 export const teamRouter = createTRPCRouter({
   // Get all team members
@@ -47,7 +47,7 @@ export const teamRouter = createTRPCRouter({
         id: user.clerkId,
         name: user.name,
         email: user.email,
-        role: (ctx.auth.orgRole as Role) || getDefaultRole(),
+        role: getNormalizedRole(ctx.auth.orgRole),
         databaseId: user.id,
         joinedAt: new Date(), // You'd want to store this in your database
       }));
@@ -61,7 +61,7 @@ export const teamRouter = createTRPCRouter({
 
   // Get current user's role and permissions
   getCurrentUserRole: shopProcedure.query(async ({ ctx }) => {
-    const role = (ctx.auth.orgRole as Role) || getDefaultRole();
+    const role = getNormalizedRole(ctx.auth.orgRole);
     
     return {
       role,
@@ -86,7 +86,7 @@ export const teamRouter = createTRPCRouter({
       name: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      const userRole = (ctx.auth.orgRole as Role) || getDefaultRole();
+      const userRole = getNormalizedRole(ctx.auth.orgRole);
 
       // Check if user has permission to invite
       if (!hasRolePermission(userRole, ROLES.ADMIN)) {
@@ -137,7 +137,7 @@ export const teamRouter = createTRPCRouter({
       role: z.enum([ROLES.ADMIN, ROLES.MEMBER]),
     }))
     .mutation(async ({ ctx, input }) => {
-      const userRole = (ctx.auth.orgRole as Role) || getDefaultRole();
+      const userRole = getNormalizedRole(ctx.auth.orgRole);
 
       // Check if user is admin
       if (!hasRolePermission(userRole, ROLES.ADMIN)) {
@@ -151,7 +151,7 @@ export const teamRouter = createTRPCRouter({
       if (input.userId === ctx.auth.userId && input.role !== ROLES.ADMIN) {
         throw new TRPCError({
           code: "FORBIDDEN",
-          message: "You cannot remove your own admin privileges",
+          message: "You cannot remove your own admin role",
         });
       }
 
@@ -169,7 +169,7 @@ export const teamRouter = createTRPCRouter({
       userId: z.string(),
     }))
     .mutation(async ({ ctx, input }) => {
-      const userRole = (ctx.auth.orgRole as Role) || getDefaultRole();
+      const userRole = getNormalizedRole(ctx.auth.orgRole);
 
       // Check if user is admin
       if (!hasRolePermission(userRole, ROLES.ADMIN)) {
@@ -183,7 +183,7 @@ export const teamRouter = createTRPCRouter({
       if (input.userId === ctx.auth.userId) {
         throw new TRPCError({
           code: "FORBIDDEN",
-          message: "You cannot remove yourself from the organization",
+          message: "You cannot remove yourself from the team",
         });
       }
 
@@ -204,7 +204,7 @@ export const teamRouter = createTRPCRouter({
 
   // Get pending invitations (placeholder)
   getPendingInvitations: shopProcedure.query(async ({ ctx }) => {
-    const userRole = (ctx.auth.orgRole as Role) || getDefaultRole();
+    const userRole = getNormalizedRole(ctx.auth.orgRole);
 
     // Check if user has permission
     if (!hasRolePermission(userRole, ROLES.ADMIN)) {

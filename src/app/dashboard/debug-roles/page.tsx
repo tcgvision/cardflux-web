@@ -28,15 +28,15 @@ export default function DebugRolesPage() {
   });
 
   const handleTestBasic = () => {
-    refetchBasic();
+    void refetchBasic();
   };
 
   const handleTestAdmin = () => {
-    refetchAdmin();
+    void refetchAdmin();
   };
 
   const handleTestMember = () => {
-    refetchMember();
+    void refetchMember();
   };
 
   return (

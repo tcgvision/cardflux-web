@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { createTRPCRouter, shopProcedure, staffProcedure, protectedProcedure } from "~/server/api/trpc";
 import { TRPCError } from "@trpc/server";
-import { ROLES, hasRolePermission, getDefaultRole } from "~/lib/roles";
+import { ROLES, hasRolePermission, getNormalizedRole } from "~/lib/roles";
 
 export const shopRouter = createTRPCRouter({
   // Get current shop details
@@ -92,7 +92,7 @@ export const shopRouter = createTRPCRouter({
     }))
     .mutation(async ({ ctx, input }) => {
       // Check if user has permission to update shop details
-      const userRole = ctx.auth.orgRole ?? getDefaultRole();
+      const userRole = getNormalizedRole(ctx.auth.orgRole);
       if (!hasRolePermission(userRole, ROLES.ADMIN)) {
         throw new TRPCError({
           code: "FORBIDDEN",
@@ -133,7 +133,7 @@ export const shopRouter = createTRPCRouter({
     }))
     .mutation(async ({ ctx, input }) => {
       // Check if user has permission to update settings
-      const userRole = ctx.auth.orgRole ?? getDefaultRole();
+      const userRole = getNormalizedRole(ctx.auth.orgRole);
       if (!hasRolePermission(userRole, ROLES.ADMIN)) {
         throw new TRPCError({
           code: "FORBIDDEN",
@@ -208,7 +208,7 @@ export const shopRouter = createTRPCRouter({
   // Get shop members (Admin only)
   getMembers: shopProcedure.query(async ({ ctx }) => {
     // Check if user has permission to view members
-    const userRole = ctx.auth.orgRole ?? getDefaultRole();
+    const userRole = getNormalizedRole(ctx.auth.orgRole);
     if (!hasRolePermission(userRole, ROLES.ADMIN)) {
       throw new TRPCError({
         code: "FORBIDDEN",
@@ -238,7 +238,7 @@ export const shopRouter = createTRPCRouter({
     }))
     .mutation(async ({ ctx, input }) => {
       // Check if user has permission to add members
-      const userRole = ctx.auth.orgRole ?? getDefaultRole();
+      const userRole = getNormalizedRole(ctx.auth.orgRole);
       if (!hasRolePermission(userRole, ROLES.ADMIN)) {
         throw new TRPCError({
           code: "FORBIDDEN",
