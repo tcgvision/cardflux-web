@@ -2,10 +2,12 @@ import { type Metadata } from "next";
 import { Geist } from "next/font/google";
 import { TRPCReactProvider } from "~/trpc/react";
 import { ClerkProvider } from "@clerk/nextjs";
-import { DashboardNavbar } from "./_components/dashboard-navbar";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "~/server/db";
 import type { PrismaClient } from "@prisma/client";
+import { SidebarInset, SidebarProvider } from "~/components/ui/sidebar";
+import { AppSidebar } from "~/components/app-sidebar";
+import { SiteHeader } from "~/components/site-header";
 
 // const geist = Geist;
 
@@ -67,10 +69,20 @@ export default function DashboardLayout({
       afterSignUpUrl="/dashboard"
     >
       <TRPCReactProvider>
-        <div className="min-h-screen bg-background font-sans antialiased">
-          <DashboardNavbar />
-          <main className="container mx-auto px-4 py-6">{children}</main>
-        </div>
+      <SidebarProvider
+      style={
+        {
+          "--sidebar-width": "calc(var(--spacing) * 72)",
+          "--header-height": "calc(var(--spacing) * 12)",
+        } as React.CSSProperties
+      }
+    >
+      <AppSidebar variant="inset" />
+      <SidebarInset>
+        <SiteHeader />
+          {children}
+      </SidebarInset>
+    </SidebarProvider>
       </TRPCReactProvider>
     </ClerkProvider>
   );

@@ -172,7 +172,7 @@ export const shopRouter = createTRPCRouter({
       customerCount,
       productCount,
       transactionCount,
-      totalRevenue: totalRevenue._sum.totalAmount || 0,
+      totalRevenue: totalRevenue._sum.totalAmount ?? 0,
       activeBuylists,
     };
   }),
@@ -186,9 +186,8 @@ export const shopRouter = createTRPCRouter({
         clerkId: true,
         email: true,
         name: true,
-        createdAt: true,
       },
-      orderBy: { createdAt: "asc" },
+      orderBy: { id: "asc" },
     });
 
     return members;
@@ -207,7 +206,7 @@ export const shopRouter = createTRPCRouter({
       });
 
       if (existingUser) {
-        if (existingUser.shopId === ctx.shop.id) {
+        if (existingUser.shopId === ctx.user.shopId) {
           throw new TRPCError({
             code: "CONFLICT",
             message: "User is already a member of this shop",

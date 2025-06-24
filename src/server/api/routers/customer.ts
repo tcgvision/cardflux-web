@@ -12,20 +12,20 @@ export const customerRouter = createTRPCRouter({
       offset: z.number().int().min(0).default(0),
     }))
     .query(async ({ ctx, input }) => {
-      const where = {
-        shopId: ctx.shop.id,
-        ...(input.isActive !== undefined && { isActive: input.isActive }),
-        ...(input.search && {
-          OR: [
-            { name: { contains: input.search, mode: "insensitive" } },
-            { phone: { contains: input.search, mode: "insensitive" } },
-          ],
-        }),
-      };
+      // const where = {
+      //   shopId: ctx.shop.id,
+      //   ...(input.isActive !== undefined && { isActive: input.isActive }),
+      //   ...(input.search && {
+      //     OR: [
+      //       { name: { contains: input.search, mode: "insensitive" } },
+      //       { phone: { contains: input.search, mode: "insensitive" } },
+      //     ],
+      //   }),
+      // };
 
       const [customers, total] = await Promise.all([
         ctx.db.customer.findMany({
-          where,
+          where: {shopId: ctx.shop.id},
           orderBy: { name: "asc" },
           take: input.limit,
           skip: input.offset,
@@ -38,7 +38,7 @@ export const customerRouter = createTRPCRouter({
             },
           },
         }),
-        ctx.db.customer.count({ where }),
+        ctx.db.customer.count({ where: {shopId: ctx.shop.id} }),
       ]);
 
       return {
@@ -98,11 +98,18 @@ export const customerRouter = createTRPCRouter({
       notes: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      if (!ctx.user.shopId) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You must be associated with a shop to create customers",
+        });
+      }
+
       // Check if customer already exists
       const existingCustomer = await ctx.db.customer.findUnique({
         where: {
           shopId_phone: {
-            shopId: ctx.shop.id,
+            shopId: ctx.user.shopId,
             phone: input.phone,
           },
         },
@@ -117,7 +124,7 @@ export const customerRouter = createTRPCRouter({
 
       const customer = await ctx.db.customer.create({
         data: {
-          shopId: ctx.shop.id,
+          shopId: ctx.user.shopId,
           name: input.name,
           phone: input.phone,
           notes: input.notes,
@@ -137,6 +144,13 @@ export const customerRouter = createTRPCRouter({
       isActive: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      if (!ctx.user.shopId) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You must be associated with a shop to update customers",
+        });
+      }
+
       const { id, ...updateData } = input;
 
       // Check if phone number is being changed and if it conflicts
@@ -144,7 +158,7 @@ export const customerRouter = createTRPCRouter({
         const existingCustomer = await ctx.db.customer.findUnique({
           where: {
             shopId_phone: {
-              shopId: ctx.shop.id,
+              shopId: ctx.user.shopId,
               phone: updateData.phone,
             },
           },
@@ -161,7 +175,7 @@ export const customerRouter = createTRPCRouter({
       const customer = await ctx.db.customer.update({
         where: {
           id,
-          shopId: ctx.shop.id,
+          shopId: ctx.user.shopId,
         },
         data: updateData,
       });
@@ -248,11 +262,18 @@ export const customerRouter = createTRPCRouter({
       referenceType: z.enum(["TRANSACTION", "BUYLIST", "MANUAL", "REFUND"]).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      if (!ctx.user.shopId) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You must be associated with a shop to adjust credit",
+        });
+      }
+
       // Get customer current balance
       const customer = await ctx.db.customer.findFirst({
         where: {
           id: input.customerId,
-          shopId: ctx.shop.id,
+          shopId: ctx.user.shopId,
         },
       });
 
@@ -282,7 +303,7 @@ export const customerRouter = createTRPCRouter({
 
       // Validate minimum credit amount
       const settings = await ctx.db.shopSettings.findUnique({
-        where: { shopId: ctx.shop.id },
+        where: { shopId: ctx.user.shopId },
       });
 
       if (settings?.minCreditAmount && balanceAfter < settings.minCreditAmount) {
@@ -304,7 +325,7 @@ export const customerRouter = createTRPCRouter({
       const creditTransaction = await ctx.db.storeCreditTransaction.create({
         data: {
           customerId: input.customerId,
-          shopId: ctx.shop.id,
+          shopId: ctx.user.shopId,
           type: input.type,
           amount: input.amount,
           balanceBefore,
