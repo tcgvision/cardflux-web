@@ -34,6 +34,8 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarGroup,
+  SidebarGroupContent,
 } from "~/components/ui/sidebar"
 
 const data = {
@@ -75,12 +77,6 @@ const data = {
     },
   ],
   navSecondary: [
-    {
-      title: "Theme",
-      url: "#",
-      icon: null,
-      customComponent: <ThemeToggle />,
-    },
     {
       title: "Settings",
       url: "/dashboard/settings",
@@ -141,6 +137,23 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarContent>
         <NavMain items={data.navMain} />
         <NavDocuments items={data.documents} />
+        
+        {/* Theme Toggle Section */}
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <div className="flex items-center justify-between w-full">
+                    <span>Theme</span>
+                    <ThemeToggle />
+                  </div>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
