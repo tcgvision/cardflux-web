@@ -29,6 +29,7 @@ import { NavUser } from "~/components/nav-user"
 import { ThemeToggle } from "~/app/_components/theme-toggle"
 import { useRolePermissions } from "~/hooks/use-role-permissions"
 import { useUnifiedShop } from "~/hooks/use-unified-shop"
+import { useSyncStatus } from "~/hooks/use-sync-status"
 import {
   Sidebar,
   SidebarContent,
@@ -44,6 +45,7 @@ import { useLoading } from "~/components/loading-provider"
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { shopName, isLoaded, hasShop, source, needsSync } = useUnifiedShop()
+  const { needsSync: syncNeeded, syncReason } = useSyncStatus()
   const { isAdmin } = useRolePermissions()
   const pathname = usePathname()
   const router = useRouter()
@@ -156,7 +158,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 <span className="text-base font-semibold">
                   {isLoaded && hasShop ? shopName : "TCG Vision"}
                 </span>
-                {needsSync && (
+                {syncNeeded && syncReason && (
                   <span className="text-xs text-orange-500 ml-1">
                     (needs sync)
                   </span>

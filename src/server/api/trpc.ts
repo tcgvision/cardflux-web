@@ -286,6 +286,80 @@ const isShopMemberDb = t.middleware(async ({ next, ctx }) => {
 });
 
 /**
+ * Team management middleware
+ * Ensures user has access to team management features via either Clerk org context or database membership
+ */
+const isTeamManager = t.middleware(async ({ next, ctx }) => {
+  if (!ctx.auth.userId) {
+    throw new TRPCError({ code: "UNAUTHORIZED" });
+  }
+
+  // Get user details first
+  const user = await ctx.db.user.findUnique({
+    where: { clerkId: ctx.auth.userId },
+    include: { shop: true },
+  });
+
+  if (!user) {
+    throw new TRPCError({ 
+      code: "NOT_FOUND", 
+      message: "User not found in database" 
+    });
+  }
+
+  if (!user.shopId) {
+    throw new TRPCError({ 
+      code: "FORBIDDEN", 
+      message: "You must be a member of a shop to access team management" 
+    });
+  }
+
+  // Get shop details
+  let shop;
+  try {
+    shop = await ctx.db.shop.findUnique({
+      where: { id: user.shopId },
+      include: {
+        settings: true,
+      },
+    });
+  } catch (error) {
+    // If settings relation doesn't exist yet, try without it
+    console.warn('Settings relation not found, falling back to basic shop query:', error);
+    shop = await ctx.db.shop.findUnique({
+      where: { id: user.shopId },
+    });
+  }
+
+  if (!shop) {
+    throw new TRPCError({ 
+      code: "NOT_FOUND", 
+      message: "Shop not found" 
+    });
+  }
+
+  // Check if user has Clerk organization context
+  const hasClerkOrgContext = !!ctx.auth.orgId && ctx.auth.orgId === user.shopId;
+  
+  // If no Clerk org context, we'll need to handle this in the procedure
+  const authContext = {
+    ...ctx.auth,
+    hasClerkOrgContext,
+    // If no Clerk org context, we'll need to determine role from database or other means
+    orgRole: hasClerkOrgContext ? ctx.auth.orgRole : null,
+  };
+
+  return next({
+    ctx: {
+      auth: authContext,
+      shop,
+      user,
+      db: ctx.db,
+    },
+  });
+});
+
+/**
  * Public (unauthenticated) procedure
  *
  * This is the base piece you use to build new queries and mutations on your tRPC API. It does not
@@ -325,3 +399,11 @@ export const staffProcedure = t.procedure.use(timingMiddleware).use(isStaff);
  * Use this for users who are linked to shops but don't have Clerk organization context.
  */
 export const shopProcedureDb = t.procedure.use(timingMiddleware).use(isShopMemberDb);
+
+/**
+ * Team management procedure
+ *
+ * This procedure ensures the user is a member of a shop and can access team management.
+ * It works with both Clerk organization context and database membership.
+ */
+export const teamProcedure = t.procedure.use(timingMiddleware).use(isTeamManager);

@@ -1,5 +1,6 @@
 import { useOrganization, useUser } from "@clerk/nextjs";
 import { useShopMembership } from "./use-shop-membership";
+import { useSyncStatus } from "./use-sync-status";
 import { useMemo } from "react";
 
 interface UnifiedShopContext {
@@ -25,6 +26,7 @@ export function useUnifiedShop(): UnifiedShopContext {
   const { organization, isLoaded: clerkLoaded } = useOrganization();
   const { user } = useUser();
   const { membershipData, isChecking } = useShopMembership();
+  const { needsSync } = useSyncStatus();
 
   // Use useMemo to prevent unnecessary recalculations
   const unifiedContext = useMemo((): UnifiedShopContext => {
@@ -35,11 +37,6 @@ export function useUnifiedShop(): UnifiedShopContext {
     // Determine the primary source of shop information
     const hasClerkOrg = !!organization;
     const hasDbMembership = !!membershipData?.hasShop;
-    
-    // Check if there's a mismatch that needs syncing
-    const needsSync = clerkLoaded && !isChecking && 
-      ((hasClerkOrg && !hasDbMembership) || (!hasClerkOrg && hasDbMembership) || 
-       (hasUserOrgMembership && !hasDbMembership) || (!hasUserOrgMembership && hasDbMembership));
 
     // Priority: Clerk organization > User org memberships > Database membership
     if (hasClerkOrg && organization) {
@@ -49,7 +46,7 @@ export function useUnifiedShop(): UnifiedShopContext {
         isLoaded: clerkLoaded,
         hasShop: true,
         source: "clerk",
-        needsSync,
+        needsSync: false, // No sync needed when we have active Clerk org
         isVerified: true,
       };
     }
@@ -73,6 +70,7 @@ export function useUnifiedShop(): UnifiedShopContext {
       }
     }
 
+    // If we have database membership but no Clerk org, this might need sync
     if (hasDbMembership && membershipData?.shop) {
       return {
         shopId: membershipData.shop.id,
@@ -85,6 +83,7 @@ export function useUnifiedShop(): UnifiedShopContext {
       };
     }
 
+    // No shop found
     return {
       shopId: null,
       shopName: null,
@@ -101,6 +100,7 @@ export function useUnifiedShop(): UnifiedShopContext {
     membershipData?.shop,
     organization,
     user,
+    needsSync,
   ]);
 
   return unifiedContext;

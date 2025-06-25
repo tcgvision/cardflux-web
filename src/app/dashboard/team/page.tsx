@@ -95,13 +95,19 @@ export default function TeamPage() {
   const [isInviting, setIsInviting] = useState(false)
 
   // Fetch team data
-  const { data: teamData, refetch: refetchTeam } = api.team.getMembers.useQuery({
+  const { data: teamData, refetch: refetchTeam, error: teamError } = api.team.getMembers.useQuery({
     search: searchQuery || undefined,
     role: selectedRole !== "all" ? selectedRole : undefined,
+  }, {
+    enabled: !!organization, // Only run query if user has organization context
+    retry: false, // Don't retry on failure
   })
 
   // Fetch current user's role and permissions
-  const { data: userRoleData } = api.team.getCurrentUserRole.useQuery()
+  const { data: userRoleData, error: roleError } = api.team.getCurrentUserRole.useQuery(undefined, {
+    enabled: !!organization, // Only run query if user has organization context
+    retry: false, // Don't retry on failure
+  })
 
   // Invite member mutation
   const inviteMember = api.team.inviteMember.useMutation({
@@ -173,6 +179,84 @@ export default function TeamPage() {
             </p>
           </div>
         </div>
+      </div>
+    )
+  }
+
+  // Show error if user doesn't have admin permissions
+  if (roleError?.data?.code === "FORBIDDEN" || teamError?.data?.code === "FORBIDDEN") {
+    return (
+      <div className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Team Management</h1>
+            <p className="text-muted-foreground">
+              Admin privileges required to manage team members.
+            </p>
+          </div>
+        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-red-600">Access Denied</CardTitle>
+            <CardDescription>
+              You don't have permission to view or manage team members.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-4">
+              Team management requires admin privileges. Please contact your shop administrator if you need access.
+            </p>
+            <Button 
+              variant="outline" 
+              onClick={() => router.push("/dashboard")}
+            >
+              Back to Dashboard
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  // Show error if there are other issues
+  if (roleError || teamError) {
+    return (
+      <div className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Team Management</h1>
+            <p className="text-muted-foreground">
+              Error loading team information.
+            </p>
+          </div>
+        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-red-600">Error</CardTitle>
+            <CardDescription>
+              Unable to load team information.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-4">
+              {roleError?.message || teamError?.message || "An unexpected error occurred."}
+            </p>
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                onClick={() => window.location.reload()}
+              >
+                Try Again
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => router.push("/dashboard")}
+              >
+                Back to Dashboard
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     )
   }

@@ -65,6 +65,16 @@ export function useShopMembership() {
       }
       hasCheckedRef.current = true;
       hasShopRef.current = true;
+      // Set membership data to indicate we have a shop via Clerk
+      setMembershipData({
+        hasShop: true,
+        shop: {
+          id: organization.id,
+          name: organization.name,
+          slug: organization.slug ?? organization.id,
+        },
+        message: "Shop membership via Clerk organization"
+      });
       return;
     }
 

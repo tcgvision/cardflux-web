@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
 import { useShopMembership } from "~/hooks/use-shop-membership";
 import { useUnifiedShop } from "~/hooks/use-unified-shop";
+import { useSyncStatus } from "~/hooks/use-sync-status";
 import { SkeletonWrapper } from "~/components/skeleton-wrapper";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
@@ -29,6 +30,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const { membershipData, isChecking, clearCache } = useShopMembership();
   const { shopName, isLoaded: shopLoaded, hasShop, source, needsSync, isVerified } = useUnifiedShop();
+  const { syncReason, syncAction, canAutoSync } = useSyncStatus();
   const [debugInfo, setDebugInfo] = useState<Record<string, unknown> | null>(null);
   const [isLoadingDebug, setIsLoadingDebug] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -161,8 +163,8 @@ export default function DashboardPage() {
     );
   }
 
-  // Show organization sync issue only if user is not verified
-  if (needsSync && hasShop && !isVerified) {
+  // Show organization sync issue only if user is not verified and sync is actually needed
+  if (needsSync && hasShop && !isVerified && syncReason) {
     return (
       <div className="container mx-auto px-4 py-8">
         <Card className="max-w-2xl mx-auto">
@@ -172,53 +174,57 @@ export default function DashboardPage() {
               Organization Sync Required
             </CardTitle>
             <CardDescription>
-              Your account is linked to &quot;{shopName}&quot; in our database, but Clerk needs to sync your organization membership.
+              Your account is linked to &quot;{shopName}&quot; in our database, but there&apos;s a sync issue with your organization membership.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <Alert>
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
-                <strong>Status:</strong> You are linked to <strong>{shopName}</strong> in our database ({source}), but your Clerk organization membership needs to be refreshed.
+                <strong>Status:</strong> {syncReason}
               </AlertDescription>
             </Alert>
 
             <div className="space-y-4">
               <h4 className="font-medium">Solutions to try:</h4>
               
-              <div className="space-y-2">
-                <p className="text-sm font-medium">1. Sync Organization</p>
-                <p className="text-sm text-muted-foreground">
-                  Try to automatically sync your organization membership:
-                </p>
-                <Button 
-                  onClick={syncOrganization}
-                  disabled={isSyncing}
-                  className="w-full"
-                >
-                  {isSyncing ? (
-                    <>
-                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                      Syncing...
-                    </>
-                  ) : (
-                    <>
-                      <RefreshCw className="h-4 w-4 mr-2" />
-                      Sync Organization
-                    </>
-                  )}
-                </Button>
-              </div>
+              {syncAction === "invitation" && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">1. Accept the invitation email</p>
+                  <p className="text-sm text-muted-foreground">
+                    Check your email for the invitation from &quot;{shopName}&quot; and click the acceptance link.
+                  </p>
+                </div>
+              )}
+
+              {syncAction === "refresh" && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">1. Sync Organization</p>
+                  <p className="text-sm text-muted-foreground">
+                    Try to automatically sync your organization membership:
+                  </p>
+                  <Button 
+                    onClick={syncOrganization}
+                    disabled={isSyncing}
+                    className="w-full"
+                  >
+                    {isSyncing ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                        Syncing...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Sync Organization
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
 
               <div className="space-y-2">
-                <p className="text-sm font-medium">2. Accept the invitation email again</p>
-                <p className="text-sm text-muted-foreground">
-                  Check your email for the invitation from &quot;{shopName}&quot; and click the acceptance link.
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <p className="text-sm font-medium">3. Manual organization refresh</p>
+                <p className="text-sm font-medium">2. Manual organization refresh</p>
                 <p className="text-sm text-muted-foreground">
                   Try refreshing your Clerk session by signing out and back in.
                 </p>
@@ -234,7 +240,7 @@ export default function DashboardPage() {
               </div>
 
               <div className="space-y-2">
-                <p className="text-sm font-medium">4. Debug information</p>
+                <p className="text-sm font-medium">3. Debug information</p>
                 <p className="text-sm text-muted-foreground">
                   Check your current Clerk organization status:
                 </p>

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createTRPCRouter, shopProcedure, staffProcedure, shopProcedureDb } from "~/server/api/trpc";
+import { createTRPCRouter, shopProcedure, staffProcedure, shopProcedureDb, teamProcedure } from "~/server/api/trpc";
 import { TRPCError } from "@trpc/server";
 import { Prisma } from "@prisma/client";
 import { ROLES, hasRolePermission, getNormalizedRole, type Role } from "~/lib/roles";
@@ -7,7 +7,7 @@ import { clerkClient } from "@clerk/nextjs/server";
 
 export const teamRouter = createTRPCRouter({
   // Get all team members
-  getMembers: shopProcedureDb
+  getMembers: teamProcedure
     .input(z.object({
       search: z.string().optional(),
       role: z.enum([ROLES.ADMIN, ROLES.MEMBER]).optional(),
@@ -15,6 +15,24 @@ export const teamRouter = createTRPCRouter({
       offset: z.number().int().min(0).default(0),
     }))
     .query(async ({ ctx, input }) => {
+      // Check if user has admin permissions
+      let userRole: Role;
+      
+      if (ctx.auth.hasClerkOrgContext && ctx.auth.orgRole) {
+        // Use Clerk role if available
+        userRole = getNormalizedRole(ctx.auth.orgRole);
+      } else {
+        // Fallback: assume member role for users without Clerk org context
+        userRole = ROLES.MEMBER;
+      }
+
+      if (!hasRolePermission(userRole, ROLES.ADMIN)) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Admin privileges required to view team members",
+        });
+      }
+
       // Get users from our database
       const where: Prisma.UserWhereInput = {
         shopId: ctx.shop.id,
@@ -38,43 +56,91 @@ export const teamRouter = createTRPCRouter({
             name: true,
             email: true,
             shopId: true,
-            createdAt: true,
           },
         }),
         ctx.db.user.count({ where }),
       ]);
 
-      // Get organization memberships from Clerk for role information
-      const orgMemberships = await clerkClient.organizations.getOrganizationMembershipList({
-        organizationId: ctx.shop.id,
-      });
+      // If user has Clerk org context, try to get role information from Clerk
+      if (ctx.auth.hasClerkOrgContext) {
+        try {
+          // Get organization memberships from Clerk for role information
+          const orgMemberships = await clerkClient.organizations.getOrganizationMembershipList({
+            organizationId: ctx.shop.id,
+          });
 
-      // Map users to team members with roles from Clerk
-      const members = users.map(user => {
-        const membership = orgMemberships.find(m => m.publicUserData?.identifier === user.email);
-        const role = membership ? getNormalizedRole(membership.role) : ROLES.MEMBER;
-        
-        return {
+          // Map users to team members with roles from Clerk
+          const members = users.map(user => {
+            const membership = orgMemberships.find((m: any) => m.publicUserData?.identifier === user.email);
+            const role = membership ? getNormalizedRole(membership.role) : ROLES.MEMBER;
+            
+            return {
+              id: user.clerkId,
+              name: user.name,
+              email: user.email,
+              role,
+              databaseId: user.id,
+              joinedAt: new Date(), // Use current date as fallback
+              membershipId: membership?.id,
+            };
+          });
+
+          return {
+            members,
+            total,
+            hasMore: input.offset + input.limit < total,
+          };
+        } catch (error) {
+          console.error("Error fetching Clerk organization memberships:", error);
+          
+          // Fallback: return users with default member role if Clerk API fails
+          const members = users.map(user => ({
+            id: user.clerkId,
+            name: user.name,
+            email: user.email,
+            role: ROLES.MEMBER as Role,
+            databaseId: user.id,
+            joinedAt: new Date(), // Use current date as fallback
+            membershipId: null,
+          }));
+
+          return {
+            members,
+            total,
+            hasMore: input.offset + input.limit < total,
+          };
+        }
+      } else {
+        // No Clerk org context - return users with default member role
+        const members = users.map(user => ({
           id: user.clerkId,
           name: user.name,
           email: user.email,
-          role,
+          role: ROLES.MEMBER as Role,
           databaseId: user.id,
-          joinedAt: user.createdAt,
-          membershipId: membership?.id,
-        };
-      });
+          joinedAt: new Date(), // Use current date as fallback
+          membershipId: null,
+        }));
 
-      return {
-        members,
-        total,
-        hasMore: input.offset + input.limit < total,
-      };
+        return {
+          members,
+          total,
+          hasMore: input.offset + input.limit < total,
+        };
+      }
     }),
 
   // Get current user's role and permissions
-  getCurrentUserRole: shopProcedureDb.query(async ({ ctx }) => {
-    const role = getNormalizedRole(ctx.auth.orgRole);
+  getCurrentUserRole: teamProcedure.query(async ({ ctx }) => {
+    let role: Role;
+    
+    if (ctx.auth.hasClerkOrgContext && ctx.auth.orgRole) {
+      // Use Clerk role if available
+      role = getNormalizedRole(ctx.auth.orgRole);
+    } else {
+      // Fallback: assume member role for users without Clerk org context
+      role = ROLES.MEMBER;
+    }
     
     return {
       role,
