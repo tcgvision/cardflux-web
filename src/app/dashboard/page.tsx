@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
 import { useShopMembership } from "~/hooks/use-shop-membership";
 import { useUnifiedShop } from "~/hooks/use-unified-shop";
+import { SkeletonWrapper } from "~/components/skeleton-wrapper";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Alert, AlertDescription } from "~/components/ui/alert";
@@ -26,8 +27,8 @@ interface SyncResponse {
 export default function DashboardPage() {
   const { user, isLoaded } = useUser();
   const router = useRouter();
-  const { membershipData, isChecking } = useShopMembership();
-  const { shopName, isLoaded: shopLoaded, hasShop, source, needsSync } = useUnifiedShop();
+  const { membershipData, isChecking, clearCache } = useShopMembership();
+  const { shopName, isLoaded: shopLoaded, hasShop, source, needsSync, isVerified } = useUnifiedShop();
   const [debugInfo, setDebugInfo] = useState<Record<string, unknown> | null>(null);
   const [isLoadingDebug, setIsLoadingDebug] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -52,6 +53,9 @@ export default function DashboardPage() {
   const syncOrganization = useCallback(async () => {
     setIsSyncing(true);
     try {
+      // Clear cache before syncing to ensure fresh data
+      clearCache();
+      
       const response = await fetch('/api/sync-organization', {
         method: 'POST',
         headers: {
@@ -80,7 +84,7 @@ export default function DashboardPage() {
     } finally {
       setIsSyncing(false);
     }
-  }, []);
+  }, [clearCache]);
 
   // Fetch shop statistics using tRPC - only if user has shop membership
   const { data: shopStats, isLoading: statsLoading, error: statsError } = api.shop.getStats.useQuery(
@@ -157,8 +161,8 @@ export default function DashboardPage() {
     );
   }
 
-  // Show organization sync issue
-  if (needsSync && hasShop) {
+  // Show organization sync issue only if user is not verified
+  if (needsSync && hasShop && !isVerified) {
     return (
       <div className="container mx-auto px-4 py-8">
         <Card className="max-w-2xl mx-auto">
@@ -280,20 +284,8 @@ export default function DashboardPage() {
     );
   }
 
-  // Show loading while checking membership
-  if (isChecking || !shopLoaded) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
-          <p>Checking your membership...</p>
-        </div>
-      </div>
-    );
-  }
-
   // Show error
-  if (membershipData?.error) {
+  if (membershipData?.error && !isVerified) {
     return (
       <div className="container mx-auto px-4 py-8">
         <Card className="max-w-md mx-auto">
@@ -311,108 +303,110 @@ export default function DashboardPage() {
     );
   }
 
-  // Show dashboard content
+  // Wrap the dashboard content with skeleton loading
   return (
-    <div className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6">
-      {/* Welcome Section */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Welcome back, {shopName}!
-          </h1>
-          <p className="text-muted-foreground">
-            Here&apos;s what&apos;s happening with your TCG business today.
-          </p>
+    <SkeletonWrapper>
+      <div className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6">
+        {/* Welcome Section */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">
+              Welcome back, {shopName}!
+            </h1>
+            <p className="text-muted-foreground">
+              Here&apos;s what&apos;s happening with your TCG business today.
+            </p>
+          </div>
         </div>
-      </div>
 
-      {/* Stats Cards */}
-      <SectionCards 
-        totalRevenue={transformedStats.totalRevenue}
-        newCustomers={transformedStats.newCustomers}
-        activeInventory={transformedStats.activeInventory}
-        growthRate={transformedStats.growthRate}
-      />
+        {/* Stats Cards */}
+        <SectionCards 
+          totalRevenue={transformedStats.totalRevenue}
+          newCustomers={transformedStats.newCustomers}
+          activeInventory={transformedStats.activeInventory}
+          growthRate={transformedStats.growthRate}
+        />
 
-      {/* Charts Section */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        <ChartAreaInteractive data={salesData} />
+        {/* Charts Section */}
+        <div className="grid gap-4 lg:grid-cols-2">
+          <ChartAreaInteractive data={salesData} />
+          <div className="rounded-lg border bg-card">
+            <div className="p-6">
+              <h3 className="text-lg font-semibold">Recent Sales Activity</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Sales and scans over the last 30 days
+              </p>
+              <div className="space-y-4">
+                {salesData.slice(-5).map((item, index) => (
+                  <div key={index} className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">{item.date}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {item.sales} sales, {item.scans} scans
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-medium">${item.sales * 25}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {((item.sales / Math.max(...salesData.map(d => d.sales))) * 100).toFixed(0)}% of peak
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Inventory Table */}
         <div className="rounded-lg border bg-card">
           <div className="p-6">
-            <h3 className="text-lg font-semibold">Recent Sales Activity</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              Sales and scans over the last 30 days
-            </p>
-            <div className="space-y-4">
-              {salesData.slice(-5).map((item, index) => (
-                <div key={index} className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">{item.date}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {item.sales} sales, {item.scans} scans
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-medium">${item.sales * 25}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {((item.sales / Math.max(...salesData.map(d => d.sales))) * 100).toFixed(0)}% of peak
-                    </p>
-                  </div>
-                </div>
-              ))}
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Inventory Overview</h3>
+              <p className="text-sm text-muted-foreground">
+                {stats.totalInventory} items in stock
+              </p>
+            </div>
+            <DataTable data={tableData} />
+          </div>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="grid gap-4 lg:grid-cols-3">
+          <div className="rounded-lg border bg-card p-6">
+            <h3 className="text-lg font-semibold mb-2">Quick Actions</h3>
+            <div className="space-y-2">
+              <button className="w-full text-left p-2 rounded hover:bg-accent transition-colors">
+                📷 Scan New Cards
+              </button>
+              <button className="w-full text-left p-2 rounded hover:bg-accent transition-colors">
+                👥 Add Customer
+              </button>
+              <button className="w-full text-left p-2 rounded hover:bg-accent transition-colors">
+                💰 Create Transaction
+              </button>
+            </div>
+          </div>
+          
+          <div className="rounded-lg border bg-card p-6">
+            <h3 className="text-lg font-semibold mb-2">Recent Activity</h3>
+            <div className="space-y-2 text-sm text-muted-foreground">
+              <p>• New customer John D. added</p>
+              <p>• Inventory updated for Pokemon cards</p>
+              <p>• Transaction #1234 completed</p>
+            </div>
+          </div>
+          
+          <div className="rounded-lg border bg-card p-6">
+            <h3 className="text-lg font-semibold mb-2">Alerts</h3>
+            <div className="space-y-2 text-sm">
+              <p className="text-amber-600">⚠️ Low stock: 5 items</p>
+              <p className="text-green-600">✅ Backup completed</p>
+              <p className="text-blue-600">ℹ️ Price sync available</p>
             </div>
           </div>
         </div>
       </div>
-
-      {/* Inventory Table */}
-      <div className="rounded-lg border bg-card">
-        <div className="p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold">Inventory Overview</h3>
-            <p className="text-sm text-muted-foreground">
-              {stats.totalInventory} items in stock
-            </p>
-          </div>
-          <DataTable data={tableData} />
-        </div>
-      </div>
-
-      {/* Quick Actions */}
-      <div className="grid gap-4 lg:grid-cols-3">
-        <div className="rounded-lg border bg-card p-6">
-          <h3 className="text-lg font-semibold mb-2">Quick Actions</h3>
-          <div className="space-y-2">
-            <button className="w-full text-left p-2 rounded hover:bg-accent transition-colors">
-              📷 Scan New Cards
-            </button>
-            <button className="w-full text-left p-2 rounded hover:bg-accent transition-colors">
-              👥 Add Customer
-            </button>
-            <button className="w-full text-left p-2 rounded hover:bg-accent transition-colors">
-              💰 Create Transaction
-            </button>
-          </div>
-        </div>
-        
-        <div className="rounded-lg border bg-card p-6">
-          <h3 className="text-lg font-semibold mb-2">Recent Activity</h3>
-          <div className="space-y-2 text-sm text-muted-foreground">
-            <p>• New customer John D. added</p>
-            <p>• Inventory updated for Pokemon cards</p>
-            <p>• Transaction #1234 completed</p>
-          </div>
-        </div>
-        
-        <div className="rounded-lg border bg-card p-6">
-          <h3 className="text-lg font-semibold mb-2">Alerts</h3>
-          <div className="space-y-2 text-sm">
-            <p className="text-amber-600">⚠️ Low stock: 5 items</p>
-            <p className="text-green-600">✅ Backup completed</p>
-            <p className="text-blue-600">ℹ️ Price sync available</p>
-          </div>
-        </div>
-      </div>
-    </div>
+    </SkeletonWrapper>
   );
 } 

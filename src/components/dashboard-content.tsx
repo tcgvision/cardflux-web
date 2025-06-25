@@ -8,7 +8,7 @@ interface DashboardContentProps {
 }
 
 export function DashboardContent({ children }: DashboardContentProps) {
-  const { shopName, isLoaded, hasShop } = useUnifiedShop();
+  const { shopName, isLoaded, hasShop, isVerified } = useUnifiedShop();
 
   // Update document title based on shop context
   useEffect(() => {

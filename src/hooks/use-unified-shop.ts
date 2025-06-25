@@ -9,6 +9,7 @@ interface UnifiedShopContext {
   hasShop: boolean;
   source: "clerk" | "database" | null;
   needsSync: boolean;
+  isVerified: boolean;
 }
 
 // Type for Clerk organization membership
@@ -49,6 +50,7 @@ export function useUnifiedShop(): UnifiedShopContext {
         hasShop: true,
         source: "clerk",
         needsSync,
+        isVerified: true,
       };
     }
 
@@ -66,6 +68,7 @@ export function useUnifiedShop(): UnifiedShopContext {
           hasShop: true,
           source: "clerk",
           needsSync: false, // No sync needed since we found a match
+          isVerified: true,
         };
       }
     }
@@ -78,6 +81,7 @@ export function useUnifiedShop(): UnifiedShopContext {
         hasShop: true,
         source: "database",
         needsSync,
+        isVerified: false,
       };
     }
 
@@ -88,6 +92,7 @@ export function useUnifiedShop(): UnifiedShopContext {
       hasShop: false,
       source: null,
       needsSync: false,
+      isVerified: false,
     };
   }, [
     clerkLoaded,
