@@ -71,8 +71,45 @@ export const teamRouter = createTRPCRouter({
 
           // Map users to team members with roles from Clerk
           const members = users.map(user => {
-            const membership = orgMemberships.find((m: any) => m.publicUserData?.identifier === user.email);
+            // Try multiple ways to find the membership
+            const membership = orgMemberships.find((m) => {
+              // Try matching by email in publicUserData
+              if (m.publicUserData?.identifier === user.email) {
+                return true;
+              }
+              
+              // Try matching by email in user data
+              if (m.publicUserData?.emailAddress === user.email) {
+                return true;
+              }
+              
+              // Try matching by user ID
+              if (m.userId === user.clerkId) {
+                return true;
+              }
+              
+              // Try matching by email in user object
+              if (m.user?.emailAddress === user.email) {
+                return true;
+              }
+              
+              return false;
+            });
+            
             const role = membership ? getNormalizedRole(membership.role) : ROLES.MEMBER;
+            
+            // Enhanced logging for debugging
+            console.log(`Role mapping for ${user.email} (clerkId: ${user.clerkId}):`, {
+              clerkRole: membership?.role,
+              normalizedRole: role,
+              hasMembership: !!membership,
+              isCurrentUser: user.clerkId === ctx.auth.userId,
+              membershipId: membership?.id,
+              membershipUserId: membership?.userId,
+              membershipEmail: membership?.publicUserData?.identifier || membership?.publicUserData?.emailAddress,
+              userEmail: user.email,
+              userClerkId: user.clerkId
+            });
             
             return {
               id: user.clerkId,
@@ -82,6 +119,11 @@ export const teamRouter = createTRPCRouter({
               databaseId: user.id,
               joinedAt: new Date(), // Use current date as fallback
               membershipId: membership?.id,
+              // Add avatar and user info from Clerk if available
+              avatarUrl: membership?.publicUserData?.imageUrl || null,
+              firstName: membership?.publicUserData?.firstName || null,
+              lastName: membership?.publicUserData?.lastName || null,
+              isCurrentUser: user.clerkId === ctx.auth.userId,
             };
           });
 
@@ -102,6 +144,10 @@ export const teamRouter = createTRPCRouter({
             databaseId: user.id,
             joinedAt: new Date(), // Use current date as fallback
             membershipId: null,
+            avatarUrl: null,
+            firstName: null,
+            lastName: null,
+            isCurrentUser: user.clerkId === ctx.auth.userId,
           }));
 
           return {
@@ -120,6 +166,10 @@ export const teamRouter = createTRPCRouter({
           databaseId: user.id,
           joinedAt: new Date(), // Use current date as fallback
           membershipId: null,
+          avatarUrl: null,
+          firstName: null,
+          lastName: null,
+          isCurrentUser: user.clerkId === ctx.auth.userId,
         }));
 
         return {
@@ -193,7 +243,7 @@ export const teamRouter = createTRPCRouter({
           organizationId: ctx.shop.id,
           emailAddress: input.email,
           role: input.role,
-          redirectUrl: `${process.env.NEXT_PUBLIC_APP_URL}/auth/sign-up?invitation=${ctx.shop.id}`,
+          redirectUrl: `${process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL || 'http://localhost:3000'}/auth/sign-up?invitation=${ctx.shop.id}`,
         });
 
         // Create or update user record in our database with invitation status
@@ -447,7 +497,7 @@ export const teamRouter = createTRPCRouter({
           organizationId: ctx.shop.id,
           emailAddress: "", // Will be filled by Clerk
           role: "member", // Default role
-          redirectUrl: `${process.env.NEXT_PUBLIC_APP_URL}/auth/sign-up?invitation=${ctx.shop.id}`,
+          redirectUrl: `${process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL || 'http://localhost:3000'}/auth/sign-up?invitation=${ctx.shop.id}`,
         });
 
         return {

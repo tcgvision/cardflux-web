@@ -2,13 +2,16 @@ import { Webhook } from 'svix'
 import { headers } from 'next/headers'
 import type { WebhookEvent } from '@clerk/nextjs/server'
 import { db } from '~/server/db'
-
+import { env } from '~/env'
 
 export async function POST(req: Request) {
-  const SIGNING_SECRET = process.env.SIGNING_SECRET
+  const SIGNING_SECRET = env.SIGNING_SECRET || process.env.SIGNING_SECRET
 
   if (!SIGNING_SECRET) {
-    throw new Error('Error: Please add SIGNING_SECRET from Clerk Dashboard to .env or .env.local')
+    console.error('SIGNING_SECRET is not configured')
+    return new Response('Webhook signing secret not configured', {
+      status: 500,
+    })
   }
 
   // Create new Svix instance with secret
