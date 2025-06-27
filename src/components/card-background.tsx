@@ -2,7 +2,7 @@
 
 import { useParallax } from "~/hooks/use-parallax";
 import { motion } from "motion/react";
-import { useMemo, useEffect, useState, useCallback, useRef, memo } from "react";
+import { useMemo, useEffect, useState, useRef, memo } from "react";
 import Image from "next/image";
 
 interface CardBackgroundProps {
@@ -42,19 +42,19 @@ const LAYER_CONFIG = {
   1: {
     baseSize: { width: 80, height: 112 },
     className: "w-12 h-18 sm:w-16 sm:h-24 md:w-20 md:h-28",
-    opacity: "opacity-20 dark:opacity-[0.15]",
+    opacity: "opacity-40 dark:opacity-[0.25]",
     parallaxSpeed: 0.2,
   },
   2: {
     baseSize: { width: 64, height: 96 },
     className: "w-10 h-15 sm:w-12 sm:h-18 md:w-16 md:h-24",
-    opacity: "opacity-20 dark:opacity-[0.15]",
+    opacity: "opacity-40 dark:opacity-[0.25]",
     parallaxSpeed: 0.3,
   },
   3: {
     baseSize: { width: 96, height: 144 },
     className: "w-14 h-21 sm:w-18 sm:h-27 md:w-24 md:h-32",
-    opacity: "opacity-20 dark:opacity-[0.15]",
+    opacity: "opacity-40 dark:opacity-[0.25]",
     parallaxSpeed: 0.4,
   },
 } as const;
@@ -74,90 +74,113 @@ class SeededRandom {
   }
 }
 
-// Memoized position generation with better algorithms
-const generateOptimizedPositions = (() => {
-  const cache = new Map<string, CardPosition[]>();
+// NEW: Cross-layer collision detection function
+const generateNonOverlappingPositions = (
+  counts: { layer1: number; layer2: number; layer3: number },
+  maxCards: number,
+  seed = 1
+): Record<string, CardPosition[]> => {
+  const allPositions: CardPosition[] = [];
+  const layerPositions: Record<string, CardPosition[]> = {
+    layer1: [],
+    layer2: [],
+    layer3: [],
+  };
   
-  return (count: number, layer: number, maxCards = 20, seed = 1): CardPosition[] => {
-    const cacheKey = `${count}-${layer}-${maxCards}-${seed}`;
+  const rng = new SeededRandom(seed);
+  const minDistance = 18; // Minimum distance between any two cards across all layers
+  const maxAttempts = 100;
+  
+  // Process layers in order of priority (layer 1 first, then 2, then 3)
+  const layerConfigs = [
+    { key: 'layer1', count: Math.min(counts.layer1, maxCards), layer: 1 },
+    { key: 'layer2', count: Math.min(counts.layer2, maxCards), layer: 2 },
+    { key: 'layer3', count: Math.min(counts.layer3, maxCards), layer: 3 },
+  ];
+  
+  for (const { key, count, layer } of layerConfigs) {
+    for (let i = 0; i < count; i++) {
+      let bestPosition: CardPosition | null = null;
+      let maxMinDistance = 0;
+      
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        // Generate candidate position with layer-specific offset
+        const layerOffset = (layer - 1) * 1.5; // Reduced offset since we're preventing overlap
+        const candidate: CardPosition = {
+          x: 8 + rng.next() * 84 + layerOffset, // 8% to 92% + small layer offset
+          y: 8 + rng.next() * 84 + layerOffset,
+          rotation: rng.next() * 360,
+        };
+        
+        // Ensure bounds
+        candidate.x = Math.max(5, Math.min(95, candidate.x));
+        candidate.y = Math.max(5, Math.min(95, candidate.y));
+        
+        // Check distance from ALL existing cards across ALL layers
+        let minDistanceToAny = Infinity;
+        
+        if (allPositions.length > 0) {
+          minDistanceToAny = Math.min(
+            ...allPositions.map(pos => 
+              Math.sqrt((candidate.x - pos.x) ** 2 + (candidate.y - pos.y) ** 2)
+            )
+          );
+        }
+        
+        // If this is the best position so far, save it
+        if (minDistanceToAny > maxMinDistance) {
+          maxMinDistance = minDistanceToAny;
+          bestPosition = candidate;
+        }
+        
+        // If we found a position with sufficient distance, use it
+        if (minDistanceToAny >= minDistance) {
+          break;
+        }
+      }
+      
+      // Use the best position found (even if not ideal)
+      if (bestPosition) {
+        allPositions.push(bestPosition);
+        layerPositions[key]!.push(bestPosition);
+      } else {
+        // Fallback: place card in a safe area with some randomization
+        const fallbackPosition: CardPosition = {
+          x: 10 + (i * 8) % 80 + rng.next() * 5,
+          y: 10 + (Math.floor(i / 10) * 15) % 70 + rng.next() * 5,
+          rotation: rng.next() * 360,
+        };
+        
+        allPositions.push(fallbackPosition);
+        layerPositions[key]!.push(fallbackPosition);
+      }
+    }
+  }
+  
+  return layerPositions;
+};
+
+// UPDATED: Cached position generation function
+const generateOptimizedPositions = (() => {
+  const cache = new Map<string, Record<string, CardPosition[]>>();
+  
+  return (
+    layer1Count: number,
+    layer2Count: number, 
+    layer3Count: number,
+    maxCards = 20, 
+    seed = 1
+  ): Record<string, CardPosition[]> => {
+    const cacheKey = `${layer1Count}-${layer2Count}-${layer3Count}-${maxCards}-${seed}`;
     if (cache.has(cacheKey)) {
       return cache.get(cacheKey)!;
     }
 
-    const positions: CardPosition[] = [];
-    const rng = new SeededRandom(seed + layer * 1000);
-    const actualCount = Math.min(count, maxCards);
-    
-    if (actualCount <= 8) {
-      // Optimized grid approach
-      const gridSize = Math.ceil(Math.sqrt(actualCount * 1.2));
-      const cellSize = 90 / gridSize; // Use 90% of space
-      const usedCells = new Set<string>();
-      
-      for (let i = 0; i < actualCount; i++) {
-        let gridX: number, gridY: number, cellKey: string;
-        let attempts = 0;
-        
-        do {
-          gridX = Math.floor(rng.next() * gridSize);
-          gridY = Math.floor(rng.next() * gridSize);
-          cellKey = `${gridX}-${gridY}`;
-          attempts++;
-        } while (usedCells.has(cellKey) && attempts < 50);
-        
-        usedCells.add(cellKey);
-        
-        const x = 5 + (gridX * cellSize) + (rng.next() * cellSize * 0.6) + (layer - 1) * 2;
-        const y = 5 + (gridY * cellSize) + (rng.next() * cellSize * 0.6) + (layer - 1) * 2;
-        
-        positions.push({
-          x: Math.max(5, Math.min(95, x)),
-          y: Math.max(5, Math.min(95, y)),
-          rotation: rng.next() * 360,
-        });
-      }
-    } else {
-      // Optimized Poisson disk sampling for larger counts
-      const minDistance = Math.max(12, 25 - actualCount * 0.5);
-      const maxAttempts = Math.min(30, actualCount * 2);
-      
-      // Start with a random point
-      positions.push({
-        x: 20 + rng.next() * 60,
-        y: 20 + rng.next() * 60,
-        rotation: rng.next() * 360,
-      });
-      
-      for (let i = 1; i < actualCount; i++) {
-        let bestPosition: CardPosition | null = null;
-        let maxMinDistance = 0;
-        
-        for (let attempt = 0; attempt < maxAttempts; attempt++) {
-          const candidate = {
-            x: 5 + rng.next() * 90 + (layer - 1) * 2,
-            y: 5 + rng.next() * 90 + (layer - 1) * 2,
-            rotation: rng.next() * 360,
-          };
-          
-          const minDistanceToExisting = Math.min(
-            ...positions.map(pos => 
-              Math.sqrt((candidate.x - pos.x) ** 2 + (candidate.y - pos.y) ** 2)
-            )
-          );
-          
-          if (minDistanceToExisting > maxMinDistance) {
-            maxMinDistance = minDistanceToExisting;
-            bestPosition = candidate;
-          }
-          
-          if (minDistanceToExisting >= minDistance) break;
-        }
-        
-        if (bestPosition) {
-          positions.push(bestPosition);
-        }
-      }
-    }
+    const positions = generateNonOverlappingPositions(
+      { layer1: layer1Count, layer2: layer2Count, layer3: layer3Count },
+      maxCards,
+      seed
+    );
     
     cache.set(cacheKey, positions);
     return positions;
@@ -346,12 +369,11 @@ export function CardBackground({
   const parallax2 = useParallax({ speed: LAYER_CONFIG[2].parallaxSpeed });
   const parallax3 = useParallax({ speed: LAYER_CONFIG[3].parallaxSpeed });
 
-  // Memoize card positions (only recalculate when counts change)
-  const cardPositions = useMemo(() => ({
-    layer1: generateOptimizedPositions(layer1Count, 1, maxCardsPerLayer, 1),
-    layer2: generateOptimizedPositions(layer2Count, 2, maxCardsPerLayer, 2),
-    layer3: generateOptimizedPositions(layer3Count, 3, maxCardsPerLayer, 3),
-  }), [layer1Count, layer2Count, layer3Count, maxCardsPerLayer]);
+  // UPDATED: Generate all positions together to prevent overlap
+  const cardPositions = useMemo(() => 
+    generateOptimizedPositions(layer1Count, layer2Count, layer3Count, maxCardsPerLayer, 1),
+    [layer1Count, layer2Count, layer3Count, maxCardsPerLayer]
+  );
 
   // Memoize optimized cards
   const optimizedCards = useMemo(() => 

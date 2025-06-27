@@ -50,8 +50,8 @@ export default function Home() {
             transition={{ duration: 0.6, delay: 0.2 }}
             className="mb-4 sm:mb-6"
           >
-            <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-primary md:text-3xl">
-              Scan. Sync. Sell.
+            <h2 className="text-xl sm:text-2xl font-bold tracking-tight md:text-3xl text-muted-foreground">
+              Scan - Sync - Sell
             </h2>
           </motion.div>
 
