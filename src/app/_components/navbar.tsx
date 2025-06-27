@@ -2,23 +2,100 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { UserButton, useAuth } from "@clerk/nextjs";
+import { useAuth, useUser, useClerk } from "@clerk/nextjs";
 import { Button } from "~/components/ui/button";
 import { Logo } from "~/components/ui/logo";
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "~/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuGroup,
 } from "~/components/ui/dropdown-menu";
-import { Menu } from "lucide-react";
+import { Menu, User, Settings, LogOut, CreditCard } from "lucide-react";
 import { ThemeToggle } from "./theme-toggle";
+import { useRouter } from "next/navigation";
 
 const navigation = [
   { name: "Features", href: "/features" },
   { name: "Pricing", href: "/pricing" },
   { name: "About", href: "/about" },
 ];
+
+function CustomUserMenu() {
+  const { user, isLoaded } = useUser();
+  const { signOut } = useClerk();
+  const router = useRouter();
+
+  if (!isLoaded || !user) {
+    return null;
+  }
+
+  const handleSignOut = async () => {
+    await signOut();
+    router.push("/");
+  };
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="sm" className="h-8 w-8 rounded-full p-0">
+          <Avatar className="h-8 w-8">
+            <AvatarImage src={user.imageUrl} alt={user.fullName ?? user.emailAddresses[0]?.emailAddress} />
+            <AvatarFallback>
+              {user.firstName?.[0]}{user.lastName?.[0] ?? user.emailAddresses[0]?.emailAddress?.[0]?.toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuLabel className="p-0 font-normal">
+          <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
+            <Avatar className="h-8 w-8">
+              <AvatarImage src={user.imageUrl} alt={user.fullName ?? user.emailAddresses[0]?.emailAddress} />
+              <AvatarFallback>
+                {user.firstName?.[0]}{user.lastName?.[0] ?? user.emailAddresses[0]?.emailAddress?.[0]?.toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <div className="grid flex-1 text-left text-sm leading-tight">
+              <span className="truncate font-medium">{user.fullName ?? user.emailAddresses[0]?.emailAddress}</span>
+              <span className="text-muted-foreground truncate text-xs">
+                {user.emailAddresses[0]?.emailAddress}
+              </span>
+            </div>
+          </div>
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuGroup>
+          <DropdownMenuItem onClick={() => router.push("/dashboard")}>
+            <User className="mr-2 h-4 w-4" />
+            Dashboard
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => router.push("/dashboard/settings")}>
+            <Settings className="mr-2 h-4 w-4" />
+            Settings
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => router.push("/dashboard/billing")}>
+            <CreditCard className="mr-2 h-4 w-4" />
+            Billing
+          </DropdownMenuItem>
+        </DropdownMenuGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={handleSignOut}>
+          <LogOut className="mr-2 h-4 w-4" />
+          Sign out
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
 
 export function Navbar() {
   const pathname = usePathname();
@@ -68,14 +145,7 @@ export function Navbar() {
                       Dashboard
                     </Button>
                   </Link>
-                  <UserButton
-                    afterSignOutUrl="/"
-                    appearance={{
-                      elements: {
-                        avatarBox: "h-8 w-8",
-                      },
-                    }}
-                  />
+                  <CustomUserMenu />
                 </div>
               ) : (
                 <div className="flex items-center space-x-4">

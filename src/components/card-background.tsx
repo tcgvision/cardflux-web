@@ -40,20 +40,20 @@ const cardImages = [
 // Layer configurations for better organization
 const LAYER_CONFIG = {
   1: {
-    baseSize: { width: 80, height: 112 },
-    className: "w-12 h-18 sm:w-16 sm:h-24 md:w-20 md:h-28",
+    baseSize: { width: 120, height: 168 },
+    className: "w-18 h-26 sm:w-22 sm:h-32 md:w-28 md:h-38",
     opacity: "opacity-40 dark:opacity-[0.25]",
     parallaxSpeed: 0.2,
   },
   2: {
-    baseSize: { width: 64, height: 96 },
-    className: "w-10 h-15 sm:w-12 sm:h-18 md:w-16 md:h-24",
+    baseSize: { width: 100, height: 150 },
+    className: "w-16 h-24 sm:w-18 sm:h-27 md:w-22 md:h-33",
     opacity: "opacity-40 dark:opacity-[0.25]",
     parallaxSpeed: 0.3,
   },
   3: {
-    baseSize: { width: 96, height: 144 },
-    className: "w-14 h-21 sm:w-18 sm:h-27 md:w-24 md:h-32",
+    baseSize: { width: 140, height: 210 },
+    className: "w-20 h-30 sm:w-24 sm:h-36 md:w-32 md:h-44",
     opacity: "opacity-40 dark:opacity-[0.25]",
     parallaxSpeed: 0.4,
   },
