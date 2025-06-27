@@ -126,7 +126,9 @@ const generateCardPositions = (count: number, layer: number, maxCards = 20, seed
         if (grid[gridY]?.[gridX]) {
           x = (gridX * cellSize) + (rng.next() * cellSize * 0.6) + (cellSize * 0.2);
           y = (gridY * cellSize) + (rng.next() * cellSize * 0.6) + (cellSize * 0.2);
-          grid[gridY]![gridX] = false;
+          if (grid[gridY]) {
+            grid[gridY]![gridX] = false;
+          }
           positionFound = true;
         }
         attempts++;
@@ -352,7 +354,7 @@ export function CardBackground({
                 alt=""
                 width={80}
                 height={112}
-                className="w-12 h-18 sm:w-16 sm:h-24 md:w-20 md:h-28 opacity-15 dark:opacity-[0.08] blur-[0.5px]"
+                className="w-12 h-18 sm:w-16 sm:h-24 md:w-20 md:h-28 opacity-20 dark:opacity-[0.15] blur-[0.5px] dark:drop-shadow-[0_0_8px_rgba(255,255,255,0.1)]"
                 style={{ 
                   willChange: 'transform',
                   transform: 'translateZ(0)',
@@ -397,7 +399,7 @@ export function CardBackground({
                 alt=""
                 width={64}
                 height={96}
-                className="w-10 h-15 sm:w-12 sm:h-18 md:w-16 md:h-24 opacity-15 dark:opacity-[0.08] blur-[0.5px]"
+                className="w-10 h-15 sm:w-12 sm:h-18 md:w-16 md:h-24 opacity-20 dark:opacity-[0.15] blur-[0.5px] dark:drop-shadow-[0_0_8px_rgba(255,255,255,0.1)]"
                 style={{ 
                   willChange: 'transform',
                   transform: 'translateZ(0)',
@@ -442,7 +444,7 @@ export function CardBackground({
                 alt=""
                 width={96}
                 height={144}
-                className="w-14 h-21 sm:w-18 sm:h-27 md:w-24 md:h-32 opacity-15 dark:opacity-[0.08] blur-[0.5px]"
+                className="w-14 h-21 sm:w-18 sm:h-27 md:w-24 md:h-32 opacity-20 dark:opacity-[0.15] blur-[0.5px] dark:drop-shadow-[0_0_8px_rgba(255,255,255,0.1)]"
                 style={{ 
                   willChange: 'transform',
                   transform: 'translateZ(0)',

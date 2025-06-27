@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import { Button } from "~/components/ui/button";
 import { CardBackground } from "~/components/card-background";
+import { LogoCarousel } from "~/components/logo-carousel";
 import { FeaturesSection } from "~/components/features-section";
 import { HowItWorksSection } from "~/components/how-it-works-section";
 import { PricingSection } from "~/components/pricing-section";
@@ -126,22 +127,39 @@ export default function Home() {
             </div>
           </motion.div>
         </div>
+      </section>
 
-        {/* Scroll Indicator */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.6, delay: 1.2 }}
-          className="absolute bottom-4 sm:bottom-8 left-1/2 transform -translate-x-1/2"
-        >
-          <div className="w-5 h-8 sm:w-6 sm:h-10 border-2 border-muted-foreground/30 rounded-full flex justify-center">
-            <motion.div
-              animate={{ y: [0, 10, 0] }}
-              transition={{ duration: 1.5, repeat: Infinity }}
-              className="w-1 h-2.5 sm:h-3 bg-muted-foreground/50 rounded-full mt-1.5 sm:mt-2"
+      {/* Logo Carousel Section */}
+      <section className="py-16 sm:py-20 bg-gradient-to-b from-background to-muted/20">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            viewport={{ once: true }}
+            className="text-center mb-8 sm:mb-12"
+          >
+            <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-4">
+              Trusted by TCG Enthusiasts Worldwide
+            </h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Join thousands of collectors and shop owners who trust Card Flux for their trading card game management needs.
+            </p>
+          </motion.div>
+          
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+            viewport={{ once: true }}
+          >
+            <LogoCarousel 
+              className="max-w-5xl mx-auto" 
+              speed={25} 
+              pauseOnHover={true}
             />
-          </div>
-        </motion.div>
+          </motion.div>
+        </div>
       </section>
 
       {/* Features Section */}
