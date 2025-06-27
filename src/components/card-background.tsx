@@ -2,41 +2,8 @@
 
 import { useParallax } from "~/hooks/use-parallax";
 import { motion } from "motion/react";
-import { useMemo, useEffect, useState } from "react";
+import { useMemo, useEffect, useState, useCallback, useRef, memo } from "react";
 import Image from "next/image";
-
-/**
- * CardBackground Component
- * 
- * A scalable parallax card background that works with any number of cards.
- * 
- * Usage examples:
- * 
- * // Default: 4, 6, 3 cards per layer
- * <CardBackground />
- * 
- * // Custom card counts
- * <CardBackground 
- *   layer1Count={8} 
- *   layer2Count={12} 
- *   layer3Count={6} 
- * />
- * 
- * // Limit maximum cards per layer for performance
- * <CardBackground 
- *   layer1Count={50} 
- *   layer2Count={30} 
- *   layer3Count={20}
- *   maxCardsPerLayer={15}
- * />
- * 
- * The component automatically:
- * - Uses different positioning strategies based on card count
- * - Prevents card overlap with distance-based algorithms
- * - Limits cards per layer to prevent performance issues
- * - Ensures unique card images are used across all layers
- * - Provides smooth parallax effects with hardware acceleration
- */
 
 interface CardBackgroundProps {
   className?: string;
@@ -52,10 +19,13 @@ interface CardPosition {
   rotation: number;
 }
 
-interface CardAssignment extends CardPosition {
+interface OptimizedCard extends CardPosition {
   layer: number;
   image: string;
   key: string;
+  size: { width: number; height: number };
+  className: string;
+  priority: boolean;
 }
 
 const cardImages = [
@@ -65,397 +35,361 @@ const cardImages = [
   "/hero-images/mtg_card_02.avif",
   "/hero-images/pikachu-base-set.avif",
   "/hero-images/poke_card_01.avif",
-];
+] as const;
 
-// Performance optimization: Preload images using native Image constructor
-const preloadImages = () => {
-  cardImages.forEach(src => {
-    const img = new window.Image();
-    img.src = src;
-  });
-};
+// Layer configurations for better organization
+const LAYER_CONFIG = {
+  1: {
+    baseSize: { width: 80, height: 112 },
+    className: "w-12 h-18 sm:w-16 sm:h-24 md:w-20 md:h-28",
+    opacity: "opacity-20 dark:opacity-[0.15]",
+    parallaxSpeed: 0.2,
+  },
+  2: {
+    baseSize: { width: 64, height: 96 },
+    className: "w-10 h-15 sm:w-12 sm:h-18 md:w-16 md:h-24",
+    opacity: "opacity-20 dark:opacity-[0.15]",
+    parallaxSpeed: 0.3,
+  },
+  3: {
+    baseSize: { width: 96, height: 144 },
+    className: "w-14 h-21 sm:w-18 sm:h-27 md:w-24 md:h-32",
+    opacity: "opacity-20 dark:opacity-[0.15]",
+    parallaxSpeed: 0.4,
+  },
+} as const;
 
-// Preload images when component is first imported
-if (typeof window !== 'undefined') {
-  preloadImages();
-}
-
-// Deterministic random number generator using a seed
+// Optimized seeded random with better distribution
 class SeededRandom {
   private seed: number;
 
   constructor(seed: number) {
-    this.seed = seed;
+    this.seed = seed % 2147483647;
+    if (this.seed <= 0) this.seed += 2147483646;
   }
 
   next(): number {
-    this.seed = (this.seed * 9301 + 49297) % 233280;
-    return this.seed / 233280;
+    this.seed = (this.seed * 16807) % 2147483647;
+    return (this.seed - 1) / 2147483646;
   }
 }
 
-// Generate non-overlapping card positions using a more robust approach
-const generateCardPositions = (count: number, layer: number, maxCards = 20, seed = 1): CardPosition[] => {
-  const positions: CardPosition[] = [];
-  const rng = new SeededRandom(seed + layer * 1000);
+// Memoized position generation with better algorithms
+const generateOptimizedPositions = (() => {
+  const cache = new Map<string, CardPosition[]>();
   
-  // Limit the number of cards to prevent performance issues
-  const actualCount = Math.min(count, maxCards);
-  
-  // Use different positioning strategies based on card count
-  if (actualCount <= 8) {
-    // For small numbers, use a simple grid approach
-    const gridSize = Math.ceil(Math.sqrt(actualCount * 1.5));
-    const cellSize = 100 / gridSize;
+  return (count: number, layer: number, maxCards = 20, seed = 1): CardPosition[] => {
+    const cacheKey = `${count}-${layer}-${maxCards}-${seed}`;
+    if (cache.has(cacheKey)) {
+      return cache.get(cacheKey)!;
+    }
+
+    const positions: CardPosition[] = [];
+    const rng = new SeededRandom(seed + layer * 1000);
+    const actualCount = Math.min(count, maxCards);
     
-    const grid: boolean[][] = [];
-    for (let i = 0; i < gridSize; i++) {
-      grid[i] = Array(gridSize).fill(true) as boolean[];
+    if (actualCount <= 8) {
+      // Optimized grid approach
+      const gridSize = Math.ceil(Math.sqrt(actualCount * 1.2));
+      const cellSize = 90 / gridSize; // Use 90% of space
+      const usedCells = new Set<string>();
+      
+      for (let i = 0; i < actualCount; i++) {
+        let gridX: number, gridY: number, cellKey: string;
+        let attempts = 0;
+        
+        do {
+          gridX = Math.floor(rng.next() * gridSize);
+          gridY = Math.floor(rng.next() * gridSize);
+          cellKey = `${gridX}-${gridY}`;
+          attempts++;
+        } while (usedCells.has(cellKey) && attempts < 50);
+        
+        usedCells.add(cellKey);
+        
+        const x = 5 + (gridX * cellSize) + (rng.next() * cellSize * 0.6) + (layer - 1) * 2;
+        const y = 5 + (gridY * cellSize) + (rng.next() * cellSize * 0.6) + (layer - 1) * 2;
+        
+        positions.push({
+          x: Math.max(5, Math.min(95, x)),
+          y: Math.max(5, Math.min(95, y)),
+          rotation: rng.next() * 360,
+        });
+      }
+    } else {
+      // Optimized Poisson disk sampling for larger counts
+      const minDistance = Math.max(12, 25 - actualCount * 0.5);
+      const maxAttempts = Math.min(30, actualCount * 2);
+      
+      // Start with a random point
+      positions.push({
+        x: 20 + rng.next() * 60,
+        y: 20 + rng.next() * 60,
+        rotation: rng.next() * 360,
+      });
+      
+      for (let i = 1; i < actualCount; i++) {
+        let bestPosition: CardPosition | null = null;
+        let maxMinDistance = 0;
+        
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+          const candidate = {
+            x: 5 + rng.next() * 90 + (layer - 1) * 2,
+            y: 5 + rng.next() * 90 + (layer - 1) * 2,
+            rotation: rng.next() * 360,
+          };
+          
+          const minDistanceToExisting = Math.min(
+            ...positions.map(pos => 
+              Math.sqrt((candidate.x - pos.x) ** 2 + (candidate.y - pos.y) ** 2)
+            )
+          );
+          
+          if (minDistanceToExisting > maxMinDistance) {
+            maxMinDistance = minDistanceToExisting;
+            bestPosition = candidate;
+          }
+          
+          if (minDistanceToExisting >= minDistance) break;
+        }
+        
+        if (bestPosition) {
+          positions.push(bestPosition);
+        }
+      }
     }
     
-    for (let i = 0; i < actualCount; i++) {
-      let attempts = 0;
-      let x = 0;
-      let y = 0;
-      let positionFound = false;
-      
-      while (attempts < 100 && !positionFound) {
-        const gridX = Math.floor(rng.next() * gridSize);
-        const gridY = Math.floor(rng.next() * gridSize);
-        
-        if (grid[gridY]?.[gridX]) {
-          x = (gridX * cellSize) + (rng.next() * cellSize * 0.6) + (cellSize * 0.2);
-          y = (gridY * cellSize) + (rng.next() * cellSize * 0.6) + (cellSize * 0.2);
-          if (grid[gridY]) {
-            grid[gridY]![gridX] = false;
-          }
-          positionFound = true;
-        }
-        attempts++;
-      }
-      
-      if (!positionFound) {
-        // Fallback positioning
-        x = 10 + (i * 20) + (rng.next() * 15);
-        y = 10 + (i * 15) + (rng.next() * 15);
-      }
-      
-      // Add layer-specific offset
-      const layerOffset = (layer - 1) * 3;
-      x += layerOffset;
-      y += layerOffset;
-      
-      // Ensure bounds
-      x = Math.max(5, Math.min(95, x));
-      y = Math.max(5, Math.min(95, y));
-      
-      positions.push({ 
-        x, 
-        y, 
-        rotation: rng.next() * 360 
-      });
-    }
-  } else {
-    // For larger numbers, use a more sophisticated approach
-    const minDistance = 15; // Minimum distance between cards
+    cache.set(cacheKey, positions);
+    return positions;
+  };
+})();
+
+// Optimized card assignment with pre-computed properties
+const createOptimizedCards = (
+  positions: Record<string, CardPosition[]>,
+  isMobile: boolean
+): OptimizedCard[] => {
+  const allCards: OptimizedCard[] = [];
+  const rng = new SeededRandom(42);
+  const shuffledImages = [...cardImages].sort(() => rng.next() - 0.5);
+  
+  const totalCards = Object.values(positions).reduce((sum, pos) => sum + pos.length, 0);
+  const mobileReduction = isMobile ? 0.6 : 1;
+  const effectiveTotal = Math.floor(totalCards * mobileReduction);
+  
+  // Create extended image array
+  const availableImages: string[] = [];
+  while (availableImages.length < effectiveTotal) {
+    availableImages.push(...shuffledImages);
+  }
+  
+  let imageIndex = 0;
+  let cardCount = 0;
+  
+  // Process each layer
+  for (const [layerKey, layerPositions] of Object.entries(positions)) {
+    const layer = parseInt(layerKey.replace('layer', '')) as 1 | 2 | 3;
+    const config = LAYER_CONFIG[layer];
     
-    for (let i = 0; i < actualCount; i++) {
-      let x = 0;
-      let y = 0;
-      let validPosition = false;
-      let attempts = 0;
+    for (let i = 0; i < layerPositions.length && cardCount < effectiveTotal; i++) {
+      const pos = layerPositions[i]!;
+      const image = availableImages[imageIndex]!;
       
-      while (!validPosition && attempts < 200) {
-        x = 5 + rng.next() * 90;
-        y = 5 + rng.next() * 90;
-        
-        // Check distance from existing cards
-        validPosition = true;
-        for (const pos of positions) {
-          const distance = Math.sqrt((x - pos.x) ** 2 + (y - pos.y) ** 2);
-          if (distance < minDistance) {
-            validPosition = false;
-            break;
-          }
-        }
-        attempts++;
-      }
-      
-      // Add layer-specific offset
-      const layerOffset = (layer - 1) * 2;
-      x += layerOffset;
-      y += layerOffset;
-      
-      // Ensure bounds
-      x = Math.max(5, Math.min(95, x));
-      y = Math.max(5, Math.min(95, y));
-      
-      positions.push({ 
-        x, 
-        y, 
-        rotation: rng.next() * 360 
+      allCards.push({
+        ...pos,
+        layer,
+        image,
+        key: `${layerKey}-${i}`,
+        size: config.baseSize,
+        className: `${config.className} ${config.opacity} blur-[0.5px] dark:drop-shadow-[0_0_8px_rgba(255,255,255,0.1)]`,
+        priority: cardCount < 6, // Prioritize first few cards
       });
+      
+      imageIndex++;
+      cardCount++;
     }
   }
   
-  return positions;
+  return allCards;
 };
 
+// Memoized card component to prevent unnecessary re-renders
+const MemoizedCard = memo(({ 
+  card, 
+  prefersReducedMotion, 
+  index 
+}: { 
+  card: OptimizedCard; 
+  prefersReducedMotion: boolean; 
+  index: number;
+}) => (
+  <motion.div
+    className="absolute"
+    style={{
+      left: `${card.x}%`,
+      top: `${card.y}%`,
+      transform: `translate(-50%, -50%) rotate(${card.rotation}deg)`,
+      willChange: 'transform',
+    }}
+    initial={{ opacity: 0, scale: 0.8 }}
+    animate={{ opacity: 1, scale: 1 }}
+    transition={{ 
+      delay: prefersReducedMotion ? 0 : index * 0.05, // Reduced delay
+      duration: prefersReducedMotion ? 0.2 : 0.6,
+      ease: "easeOut"
+    }}
+  >
+    <Image
+      src={card.image}
+      alt=""
+      width={card.size.width}
+      height={card.size.height}
+      className={card.className}
+      style={{ 
+        willChange: 'transform',
+        transform: 'translateZ(0)',
+      }}
+      priority={card.priority}
+      quality={60} // Reduced quality for background elements
+      sizes="(max-width: 640px) 48px, (max-width: 768px) 64px, 80px"
+      loading={card.priority ? "eager" : "lazy"}
+    />
+  </motion.div>
+));
+
+MemoizedCard.displayName = 'MemoizedCard';
+
+// Memoized layer component
+const ParallaxLayer = memo(({ 
+  cards, 
+  parallaxValue, 
+  prefersReducedMotion, 
+  isMobile 
+}: {
+  cards: OptimizedCard[];
+  parallaxValue: number;
+  prefersReducedMotion: boolean;
+  isMobile: boolean;
+}) => (
+  <div 
+    className="absolute inset-0"
+    style={{ 
+      transform: isMobile || prefersReducedMotion 
+        ? 'none' 
+        : `translate3d(0, ${parallaxValue}px, 0)`,
+      willChange: 'transform',
+    }}
+  >
+    {cards.map((card, index) => (
+      <MemoizedCard
+        key={card.key}
+        card={card}
+        prefersReducedMotion={prefersReducedMotion}
+        index={index}
+      />
+    ))}
+  </div>
+));
+
+ParallaxLayer.displayName = 'ParallaxLayer';
+
 export function CardBackground({ 
-  className, 
+  className = "", 
   layer1Count = 4, 
   layer2Count = 6, 
   layer3Count = 3,
   maxCardsPerLayer = 20 
 }: CardBackgroundProps) {
   const [isClient, setIsClient] = useState(false);
-  
-  // Ensure component only renders on client to prevent hydration mismatch
+  const [isMobile, setIsMobile] = useState(false);
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+  const mountedRef = useRef(true);
+
+  // Optimized media query handling
   useEffect(() => {
+    const handleResize = () => {
+      if (!mountedRef.current) return;
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    const handleMotionChange = (e: MediaQueryListEvent) => {
+      if (!mountedRef.current) return;
+      setPrefersReducedMotion(e.matches);
+    };
+
+    // Initial setup
     setIsClient(true);
+    setIsMobile(window.innerWidth < 768);
+    
+    const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    setPrefersReducedMotion(motionQuery.matches);
+
+    // Add listeners with passive option for better performance
+    window.addEventListener('resize', handleResize, { passive: true });
+    motionQuery.addEventListener('change', handleMotionChange);
+
+    // Preload images
+    cardImages.forEach(src => {
+      const img = new window.Image();
+      img.src = src;
+    });
+
+    return () => {
+      mountedRef.current = false;
+      window.removeEventListener('resize', handleResize);
+      motionQuery.removeEventListener('change', handleMotionChange);
+    };
   }, []);
 
-  const parallax1 = useParallax({ speed: 0.2 });
-  const parallax2 = useParallax({ speed: 0.3 });
-  const parallax3 = useParallax({ speed: 0.4 });
+  // Memoize parallax hooks
+  const parallax1 = useParallax({ speed: LAYER_CONFIG[1].parallaxSpeed });
+  const parallax2 = useParallax({ speed: LAYER_CONFIG[2].parallaxSpeed });
+  const parallax3 = useParallax({ speed: LAYER_CONFIG[3].parallaxSpeed });
 
-  // Performance optimization: Check for reduced motion preference
-  const prefersReducedMotion = useMemo(() => {
-    if (typeof window !== 'undefined') {
-      return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    }
-    return false;
-  }, []);
-
-  // Memoize card positions to prevent recalculation on every render
+  // Memoize card positions (only recalculate when counts change)
   const cardPositions = useMemo(() => ({
-    layer1: generateCardPositions(layer1Count, 1, maxCardsPerLayer, 1),
-    layer2: generateCardPositions(layer2Count, 2, maxCardsPerLayer, 2),
-    layer3: generateCardPositions(layer3Count, 3, maxCardsPerLayer, 3),
+    layer1: generateOptimizedPositions(layer1Count, 1, maxCardsPerLayer, 1),
+    layer2: generateOptimizedPositions(layer2Count, 2, maxCardsPerLayer, 2),
+    layer3: generateOptimizedPositions(layer3Count, 3, maxCardsPerLayer, 3),
   }), [layer1Count, layer2Count, layer3Count, maxCardsPerLayer]);
 
-  // Memoize card assignments to ensure unique images
-  const cardAssignments = useMemo((): CardAssignment[] => {
-    const allCards: CardAssignment[] = [];
-    
-    // Create a deterministic shuffled array of available images
-    const rng = new SeededRandom(42); // Fixed seed for consistent shuffling
-    const shuffledImages = [...cardImages].sort(() => rng.next() - 0.5);
-    
-    // Calculate total cards needed
-    const totalCards = cardPositions.layer1.length + cardPositions.layer2.length + cardPositions.layer3.length;
-    
-    // Ensure we have enough images, repeat if necessary
-    const availableImages: string[] = [];
-    while (availableImages.length < totalCards) {
-      availableImages.push(...shuffledImages);
-    }
-    
-    let imageIndex = 0;
-    
-    // Layer 1 cards
-    cardPositions.layer1.forEach((pos, index) => {
-      const image = availableImages[imageIndex];
-      if (image && image.trim() !== '') {
-        allCards.push({
-          ...pos,
-          layer: 1,
-          image,
-          key: `layer1-${index}`,
-        });
-        imageIndex++;
-      }
-    });
-    
-    // Layer 2 cards
-    cardPositions.layer2.forEach((pos, index) => {
-      const image = availableImages[imageIndex];
-      if (image && image.trim() !== '') {
-        allCards.push({
-          ...pos,
-          layer: 2,
-          image,
-          key: `layer2-${index}`,
-        });
-        imageIndex++;
-      }
-    });
-    
-    // Layer 3 cards
-    cardPositions.layer3.forEach((pos, index) => {
-      const image = availableImages[imageIndex];
-      if (image && image.trim() !== '') {
-        allCards.push({
-          ...pos,
-          layer: 3,
-          image,
-          key: `layer3-${index}`,
-        });
-        imageIndex++;
-      }
-    });
-    
-    return allCards;
-  }, [cardPositions]);
+  // Memoize optimized cards
+  const optimizedCards = useMemo(() => 
+    createOptimizedCards(cardPositions, isMobile),
+    [cardPositions, isMobile]
+  );
 
-  // Performance optimization: Reduce card count on mobile devices
-  const isMobile = useMemo(() => {
-    if (typeof window !== 'undefined') {
-      return window.innerWidth < 768;
-    }
-    return false;
-  }, []);
+  // Group cards by layer for efficient rendering
+  const cardsByLayer = useMemo(() => ({
+    1: optimizedCards.filter(card => card.layer === 1),
+    2: optimizedCards.filter(card => card.layer === 2),
+    3: optimizedCards.filter(card => card.layer === 3),
+  }), [optimizedCards]);
 
-  // Adjust card counts for mobile performance
-  const effectiveCardAssignments = useMemo(() => {
-    if (isMobile) {
-      // Reduce card count on mobile for better performance
-      return cardAssignments.slice(0, Math.floor(cardAssignments.length * 0.6));
-    }
-    return cardAssignments;
-  }, [cardAssignments, isMobile]);
-
-  // Don't render anything until client-side to prevent hydration mismatch
   if (!isClient) {
     return <div className={`absolute inset-0 overflow-hidden ${className}`} />;
   }
 
   return (
     <div className={`absolute inset-0 overflow-hidden ${className}`}>
-      {/* Layer 1 - Slowest parallax */}
-      <div 
-        className="absolute inset-0"
-        style={{ 
-          transform: isMobile || prefersReducedMotion 
-            ? 'none' 
-            : `translateY(${parallax1}px)` 
-        }}
-      >
-        {effectiveCardAssignments
-          .filter(card => card.layer === 1 && card.image && card.image.trim() !== '')
-          .map((card) => (
-            <motion.div
-              key={card.key}
-              className="absolute"
-              style={{
-                left: `${card.x}%`,
-                top: `${card.y}%`,
-                transform: `translate(-50%, -50%) rotate(${card.rotation}deg)`,
-              }}
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ 
-                delay: prefersReducedMotion ? 0 : (card.key.split('-')[1] ? parseInt(card.key.split('-')[1]!) * 0.1 : 0), 
-                duration: prefersReducedMotion ? 0.3 : 0.8 
-              }}
-            >
-              <Image
-                src={card.image}
-                alt=""
-                width={80}
-                height={112}
-                className="w-12 h-18 sm:w-16 sm:h-24 md:w-20 md:h-28 opacity-20 dark:opacity-[0.15] blur-[0.5px] dark:drop-shadow-[0_0_8px_rgba(255,255,255,0.1)]"
-                style={{ 
-                  willChange: 'transform',
-                  transform: 'translateZ(0)',
-                }}
-                priority={false}
-                quality={75}
-                sizes="(max-width: 640px) 48px, (max-width: 768px) 64px, 80px"
-              />
-            </motion.div>
-          ))}
-      </div>
-
-      {/* Layer 2 - Medium parallax */}
-      <div 
-        className="absolute inset-0"
-        style={{ 
-          transform: isMobile || prefersReducedMotion 
-            ? 'none' 
-            : `translateY(${parallax2}px)` 
-        }}
-      >
-        {effectiveCardAssignments
-          .filter(card => card.layer === 2 && card.image && card.image.trim() !== '')
-          .map((card) => (
-            <motion.div
-              key={card.key}
-              className="absolute"
-              style={{
-                left: `${card.x}%`,
-                top: `${card.y}%`,
-                transform: `translate(-50%, -50%) rotate(${card.rotation}deg)`,
-              }}
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ 
-                delay: prefersReducedMotion ? 0 : (card.key.split('-')[1] ? parseInt(card.key.split('-')[1]!) * 0.1 : 0), 
-                duration: prefersReducedMotion ? 0.3 : 0.8 
-              }}
-            >
-              <Image
-                src={card.image}
-                alt=""
-                width={64}
-                height={96}
-                className="w-10 h-15 sm:w-12 sm:h-18 md:w-16 md:h-24 opacity-20 dark:opacity-[0.15] blur-[0.5px] dark:drop-shadow-[0_0_8px_rgba(255,255,255,0.1)]"
-                style={{ 
-                  willChange: 'transform',
-                  transform: 'translateZ(0)',
-                }}
-                priority={false}
-                quality={75}
-                sizes="(max-width: 640px) 40px, (max-width: 768px) 48px, 64px"
-              />
-            </motion.div>
-          ))}
-      </div>
-
-      {/* Layer 3 - Fastest parallax */}
-      <div 
-        className="absolute inset-0"
-        style={{ 
-          transform: isMobile || prefersReducedMotion 
-            ? 'none' 
-            : `translateY(${parallax3}px)` 
-        }}
-      >
-        {effectiveCardAssignments
-          .filter(card => card.layer === 3 && card.image && card.image.trim() !== '')
-          .map((card) => (
-            <motion.div
-              key={card.key}
-              className="absolute"
-              style={{
-                left: `${card.x}%`,
-                top: `${card.y}%`,
-                transform: `translate(-50%, -50%) rotate(${card.rotation}deg)`,
-              }}
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ 
-                delay: prefersReducedMotion ? 0 : (card.key.split('-')[1] ? parseInt(card.key.split('-')[1]!) * 0.1 : 0), 
-                duration: prefersReducedMotion ? 0.3 : 0.8 
-              }}
-            >
-              <Image
-                src={card.image}
-                alt=""
-                width={96}
-                height={144}
-                className="w-14 h-21 sm:w-18 sm:h-27 md:w-24 md:h-32 opacity-20 dark:opacity-[0.15] blur-[0.5px] dark:drop-shadow-[0_0_8px_rgba(255,255,255,0.1)]"
-                style={{ 
-                  willChange: 'transform',
-                  transform: 'translateZ(0)',
-                }}
-                priority={false}
-                quality={75}
-                sizes="(max-width: 640px) 56px, (max-width: 768px) 72px, 96px"
-              />
-            </motion.div>
-          ))}
-      </div>
+      <ParallaxLayer
+        cards={cardsByLayer[1]}
+        parallaxValue={parallax1}
+        prefersReducedMotion={prefersReducedMotion}
+        isMobile={isMobile}
+      />
+      <ParallaxLayer
+        cards={cardsByLayer[2]}
+        parallaxValue={parallax2}
+        prefersReducedMotion={prefersReducedMotion}
+        isMobile={isMobile}
+      />
+      <ParallaxLayer
+        cards={cardsByLayer[3]}
+        parallaxValue={parallax3}
+        prefersReducedMotion={prefersReducedMotion}
+        isMobile={isMobile}
+      />
     </div>
   );
-} 
+}

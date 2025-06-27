@@ -42,7 +42,7 @@ export function LogoCarousel({
   
   // Duplicate logos for seamless infinite scroll
   const duplicatedLogos = useMemo(() => {
-    return [...logos, ...logos, ...logos]; // Triple the logos for smooth looping
+    return [...logos, ...logos, ...logos, ...logos, ...logos]; // Quintuple the logos for smooth infinite looping
   }, []);
 
   // Calculate animation duration based on speed
