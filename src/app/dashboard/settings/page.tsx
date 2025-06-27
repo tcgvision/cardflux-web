@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import { Switch } from "~/components/ui/switch";
 import { Textarea } from "~/components/ui/textarea";
+import { ThemeToggle } from "~/app/_components/theme-toggle";
 import { api } from "~/trpc/react";
 
 export default function SettingsPage() {
@@ -138,18 +139,14 @@ export default function SettingsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="theme">Theme</Label>
-                  <Select defaultValue="system">
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select theme" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="light">Light</SelectItem>
-                      <SelectItem value="dark">Dark</SelectItem>
-                      <SelectItem value="system">System</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>Theme</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Choose your preferred theme
+                    </p>
+                  </div>
+                  <ThemeToggle />
                 </div>
 
                 <div className="space-y-2">
@@ -198,7 +195,7 @@ export default function SettingsPage() {
                   <Label htmlFor="shopName">Shop Name</Label>
                   <Input 
                     id="shopName" 
-                    defaultValue={shopData?.name || "My TCG Shop"}
+                    defaultValue={shopData?.name ?? "My TCG Shop"}
                     placeholder="Enter shop name"
                   />
                 </div>
@@ -207,7 +204,7 @@ export default function SettingsPage() {
                   <Label htmlFor="description">Description</Label>
                   <Textarea 
                     id="description" 
-                    defaultValue={shopData?.description || ""}
+                    defaultValue={shopData?.description ?? ""}
                     placeholder="Brief description of your shop"
                     rows={3}
                   />
@@ -217,7 +214,7 @@ export default function SettingsPage() {
                   <Label htmlFor="location">Location</Label>
                   <Input 
                     id="location" 
-                    defaultValue={shopData?.location || ""}
+                    defaultValue={shopData?.location ?? ""}
                     placeholder="Shop address or location"
                   />
                 </div>

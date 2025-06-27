@@ -26,7 +26,6 @@ import { NavDocuments } from "~/components/nav-documents"
 import { NavMain } from "~/components/nav-main"
 import { NavSecondary } from "~/components/nav-secondary"
 import { NavUser } from "~/components/nav-user"
-import { ThemeToggle } from "~/app/_components/theme-toggle"
 import { Logo } from "~/components/ui/logo"
 import { useRolePermissions } from "~/hooks/use-role-permissions"
 import { useUnifiedShop } from "~/hooks/use-unified-shop"
@@ -172,21 +171,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarContent>
         <NavMain items={data.navMain} currentPath={pathname} />
         <NavDocuments items={data.documents} currentPath={pathname} />
-        
-        {/* Theme Toggle Section */}
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <div className="flex items-center justify-between w-full px-3 py-2 rounded-md transition-all duration-200 hover:bg-accent hover:text-accent-foreground">
-                  <span>Theme</span>
-                  <ThemeToggle />
-                </div>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-        
         <NavSecondary items={data.navSecondary} currentPath={pathname} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>

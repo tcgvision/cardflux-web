@@ -19,8 +19,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuGroup,
 } from "~/components/ui/dropdown-menu";
-import { Menu, User, Settings, LogOut, CreditCard } from "lucide-react";
-import { ThemeToggle } from "./theme-toggle";
+import { Switch } from "~/components/ui/switch";
+import { Menu, User, Settings, LogOut, CreditCard, Palette } from "lucide-react";
+import { useTheme } from "next-themes";
 import { useRouter } from "next/navigation";
 
 const navigation = [
@@ -32,6 +33,7 @@ const navigation = [
 function CustomUserMenu() {
   const { user, isLoaded } = useUser();
   const { signOut } = useClerk();
+  const { theme, setTheme } = useTheme();
   const router = useRouter();
 
   if (!isLoaded || !user) {
@@ -41,6 +43,10 @@ function CustomUserMenu() {
   const handleSignOut = async () => {
     await signOut();
     router.push("/");
+  };
+
+  const handleThemeToggle = () => {
+    setTheme(theme === "dark" ? "light" : "dark");
   };
 
   return (
@@ -88,6 +94,20 @@ function CustomUserMenu() {
           </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center">
+              <Palette className="mr-2 h-4 w-4" />
+              Dark Mode
+            </div>
+            <Switch 
+              checked={theme === "dark"}
+              onCheckedChange={handleThemeToggle}
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleSignOut}>
           <LogOut className="mr-2 h-4 w-4" />
           Sign out
@@ -131,7 +151,6 @@ export function Navbar() {
 
         {/* Auth Buttons & Mobile Menu */}
         <div className="flex items-center space-x-4">
-          <ThemeToggle />
           {isLoaded && (
             <>
               {isSignedIn ? (
