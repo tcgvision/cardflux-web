@@ -15,7 +15,7 @@ const logos = [
     srcDark: "/logos/op-white-logo.avif",
     alt: "One Piece TCG",
     width: 140,
-    height: 70,
+    height: 80,
   },
   {
     src: "/logos/mtg_logo.avif",

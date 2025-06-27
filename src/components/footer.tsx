@@ -42,17 +42,15 @@ const footerLinks = {
 
 const socialLinks = [
   { name: "Twitter", href: "#", icon: Twitter },
-  { name: "GitHub", href: "#", icon: Github },
-  { name: "LinkedIn", href: "#", icon: Linkedin },
   { name: "Email", href: "mailto:hello@cardflux.com", icon: Mail },
 ];
 
-const tcgLogos = [
-  { name: "One Piece TCG", logo: "🎴" },
-  { name: "Pokemon TCG", logo: "⚡" },
-  { name: "Magic: The Gathering", logo: "🔥" },
-  { name: "Yu-Gi-Oh!", logo: "🐉" },
-];
+// const tcgLogos = [
+//   { name: "One Piece TCG", logo: "🎴" },
+//   { name: "Pokemon TCG", logo: "⚡" },
+//   { name: "Magic: The Gathering", logo: "🔥" },
+//   { name: "Yu-Gi-Oh!", logo: "🐉" },
+// ];
 
 export function Footer() {
   return (
@@ -151,29 +149,6 @@ export function Footer() {
           </Card>
         </motion.div>
 
-        {/* TCG Support */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.3 }}
-          viewport={{ once: true }}
-          className="mb-8"
-        >
-          <div className="text-center">
-            <h4 className="font-semibold mb-4">Supported TCGs</h4>
-            <div className="flex flex-wrap justify-center gap-4 sm:gap-6">
-              {tcgLogos.map((tcg) => (
-                <div
-                  key={tcg.name}
-                  className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  <span className="text-xl sm:text-2xl">{tcg.logo}</span>
-                  <span className="text-xs sm:text-sm font-medium">{tcg.name}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </motion.div>
 
         {/* Bottom Bar */}
         <motion.div
@@ -185,7 +160,7 @@ export function Footer() {
         >
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4 text-center sm:text-left">
             <p className="text-sm text-muted-foreground">
-              © 2024 Card Flux. All rights reserved.
+              © 2025 Card Flux. All rights reserved.
             </p>
             <p className="text-sm text-muted-foreground flex items-center gap-1">
               Made with <Heart className="w-4 h-4 text-red-500" /> for the TCG community
