@@ -13,9 +13,9 @@ export function DashboardContent({ children }: DashboardContentProps) {
   // Update document title based on shop context
   useEffect(() => {
     if (isLoaded && hasShop && shopName) {
-      document.title = `${shopName} | TCG Vision`;
+      document.title = `${shopName} | Card Flux`;
     } else if (isLoaded) {
-      document.title = "TCG Vision Dashboard";
+      document.title = "Card Flux Dashboard";
     }
   }, [shopName, isLoaded, hasShop]);
 

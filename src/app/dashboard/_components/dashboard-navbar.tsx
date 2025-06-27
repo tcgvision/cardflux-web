@@ -32,7 +32,7 @@ export function DashboardNavbar() {
         {/* Logo and Organization Name */}
         <div className="flex items-center gap-4">
           <Link href="/dashboard" className="flex items-center space-x-2">
-            <span className="text-xl font-bold tracking-tight">TCG Vision</span>
+            <span className="text-xl font-bold tracking-tight">Card Flux</span>
           </Link>
           {organization && (
             <div className="hidden md:block">

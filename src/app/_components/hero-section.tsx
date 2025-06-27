@@ -43,9 +43,23 @@ export function HeroSection() {
           </div>
         </motion.div>
 
+        {/* Tagline */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.2, ease: "easeOut" }}
+          className="relative z-10 mb-6 flex justify-center"
+        >
+          <div className="text-center">
+            <h2 className="text-2xl font-bold tracking-tight text-primary md:text-3xl">
+              Scan. Sync. Sell.
+            </h2>
+          </div>
+        </motion.div>
+
         {/* Main heading with word animation */}
         <h1 className="relative z-10 mx-auto max-w-4xl text-center text-2xl font-bold text-slate-700 md:text-4xl lg:text-7xl dark:text-slate-300">
-          {"Revolutionize your TCG business with AI-powered inventory"
+          {"Streamline your TCG business with intelligent automation"
             .split(" ")
             .map((word, index) => (
               <motion.span
@@ -54,7 +68,7 @@ export function HeroSection() {
                 animate={{ opacity: 1, filter: "blur(0px)", y: 0 }}
                 transition={{
                   duration: 0.3,
-                  delay: index * 0.1,
+                  delay: index * 0.1 + 0.4,
                   ease: "easeInOut",
                 }}
                 className="mr-2 inline-block"
@@ -68,11 +82,11 @@ export function HeroSection() {
         <motion.p
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ duration: 0.3, delay: 1.2 }}
+          transition={{ duration: 0.3, delay: 1.6 }}
           className="relative z-10 mx-auto max-w-xl py-4 text-center text-lg font-normal text-neutral-600 dark:text-neutral-400"
         >
-          Scan cards instantly, track inventory in real-time, and maximize profits with 
-          intelligent pricing. Built for modern TCG shops and collectors.
+          From scanning cards to syncing inventory and maximizing sales - Card Flux handles everything. 
+          Built for modern TCG shops and collectors who want to scale efficiently.
         </motion.p>
 
         {/* CTA Buttons */}
@@ -132,7 +146,7 @@ export function HeroSection() {
             <div className="aspect-[16/9] h-auto w-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
               <div className="text-center">
                 <div className="text-6xl mb-4">🎴</div>
-                <h3 className="text-xl font-semibold text-foreground mb-2">TCG Vision Dashboard</h3>
+                <h3 className="text-xl font-semibold text-foreground mb-2">Card Flux Dashboard</h3>
                 <p className="text-muted-foreground">AI-powered card recognition and inventory management</p>
               </div>
             </div>

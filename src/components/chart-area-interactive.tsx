@@ -24,7 +24,7 @@ import {
   ToggleGroupItem,
 } from "~/components/ui/toggle-group"
 
-export const description = "An interactive area chart for TCG Vision"
+export const description = "An interactive area chart for Card Flux"
 
 interface ChartDataPoint {
   date: string;

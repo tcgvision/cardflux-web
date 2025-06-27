@@ -108,7 +108,7 @@ export default function SignInPage() {
         <CardHeader className="text-center space-y-2">
           <CardTitle className="text-2xl font-semibold text-foreground">Welcome back</CardTitle>
           <CardDescription className="text-muted-foreground">
-            Sign in to your TCG Vision account
+            Sign in to your Card Flux account
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">

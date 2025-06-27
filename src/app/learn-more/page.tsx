@@ -13,8 +13,8 @@ export default function LearnMore() {
       <section className="relative flex min-h-[60vh] items-center justify-center overflow-hidden bg-background">
         <div className="container relative z-10 mx-auto px-4">
           <div className="mx-auto max-w-4xl text-center">
-            <h1 className="mb-6 bg-gradient-to-b from-foreground to-foreground/70 bg-clip-text text-4xl font-bold tracking-tight sm:text-6xl">
-              Discover TCG Vision
+            <h1 className="text-4xl font-bold tracking-tight sm:text-5xl mb-6">
+              Discover Card Flux
             </h1>
             <p className="mx-auto mb-8 max-w-2xl text-lg leading-8 text-muted-foreground">
               The all-in-one solution for modern TCG businesses. Learn how we&apos;re revolutionizing card shop management.
@@ -141,7 +141,7 @@ export default function LearnMore() {
         <div className="rounded-lg border bg-card p-8 text-center">
           <h2 className="text-3xl font-bold">Ready to Transform Your TCG Business?</h2>
           <p className="mt-4 text-lg text-muted-foreground">
-            Join the growing community of TCG Vision users and take your business to the next level.
+            Join the growing community of Card Flux users and take your business to the next level.
           </p>
           <div className="mt-8 flex justify-center gap-4">
             <Button size="lg" className="group" onClick={() => router.push("/create-shop")}>

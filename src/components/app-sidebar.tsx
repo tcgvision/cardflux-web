@@ -156,7 +156,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               >
                 <IconInnerShadowTop className="!size-5" />
                 <span className="text-base font-semibold">
-                  {isLoaded && hasShop ? shopName : "TCG Vision"}
+                  {isLoaded && hasShop ? shopName : "Card Flux"}
                 </span>
                 {syncNeeded && syncReason && (
                   <span className="text-xs text-orange-500 ml-1">

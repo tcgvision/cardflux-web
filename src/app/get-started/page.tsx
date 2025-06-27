@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Check, ArrowRight, Sparkles, Users, Shield, Zap } from "lucide-react";
+import Link from "next/link";
 
 export default function GetStartedPage() {
   const router = useRouter();
@@ -24,7 +25,7 @@ export default function GetStartedPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <Sparkles className="h-6 w-6 text-primary" />
-              <span className="text-xl font-bold">TCG Vision</span>
+              <span className="text-xl font-bold">Card Flux</span>
             </div>
             <div className="flex items-center space-x-4">
               <Button variant="ghost" onClick={handleSignIn}>
@@ -42,7 +43,7 @@ export default function GetStartedPage() {
       <div className="container mx-auto px-4 py-16">
         <div className="text-center mb-16">
           <h1 className="text-4xl font-bold tracking-tight sm:text-5xl mb-6">
-            Get Started with TCG Vision
+            Get Started with Card Flux
           </h1>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
             Join thousands of TCG businesses using our platform to streamline their operations, 

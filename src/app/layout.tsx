@@ -1,25 +1,22 @@
 import { ClerkProvider } from "@clerk/nextjs";
-import { Inter } from "next/font/google";
+import { Montserrat } from "next/font/google";
 import "~/styles/globals.css";
 import { type Metadata } from "next";
-import { Geist } from "next/font/google";
 import { TRPCReactProvider } from "~/trpc/react";
 import { Toaster } from "sonner";
 import { NavbarWrapper } from "./_components/navbar-wrapper";
 import { ThemeProvider } from "~/components/themeprovider";
 
-const inter = Inter({ subsets: ["latin"] });
+const montserrat = Montserrat({ 
+  subsets: ["latin"],
+  variable: "--font-montserrat",
+});
 
 export const metadata: Metadata = {
-  title: "TCG Vision",
+  title: "Card Flux",
   description: "Modern TCG Inventory Management",
   icons: [{ rel: "icon", url: "/favicon.ico" }],
 };
-
-const geist = Geist({
-  subsets: ["latin"],
-  variable: "--font-geist-sans",
-});
 
 export default function RootLayout({
   children,
@@ -29,7 +26,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geist.variable} ${inter.className}`}
+      className={`${montserrat.variable} ${montserrat.className}`}
       suppressHydrationWarning
     >
       <body>

@@ -15,42 +15,10 @@ import { DashboardContent } from "~/components/dashboard-content";
 // const geist = Geist;
 
 // Generate dynamic metadata based on the current organization
-export async function generateMetadata(): Promise<Metadata> {
-  const { orgId } = await auth();
-  
-  if (!orgId) {
-    return {
-      title: "TCG Vision Dashboard",
-      description: "Manage your TCG business with TCG Vision",
-    };
-  }
-
-  try {
-    // Fetch shop details from database
-    const shop = await (db as PrismaClient).shop.findUnique({
-      where: { id: orgId },
-      select: { name: true },
-    });
-
-    if (!shop) {
-      return {
-        title: "TCG Vision Dashboard",
-        description: "Manage your TCG business with TCG Vision",
-      };
-    }
-
-    return {
-      title: `${shop.name} | TCG Vision`,
-      description: `Manage ${shop.name} with TCG Vision`,
-    };
-  } catch (error) {
-    console.error("Error fetching shop details:", error);
-    return {
-      title: "TCG Vision Dashboard",
-      description: "Manage your TCG business with TCG Vision",
-    };
-  }
-}
+export const metadata: Metadata = {
+  title: "Card Flux Dashboard",
+  description: "Manage your TCG business with Card Flux",
+};
 
 export default function DashboardLayout({
   children,
