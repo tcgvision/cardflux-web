@@ -62,7 +62,7 @@ const features = [
 
 export function FeaturesSection() {
   return (
-    <section className="py-16 sm:py-20 bg-gradient-to-b from-background to-muted/20">
+    <section className="py-16 sm:py-20 bg-gradient-to-b from-background to-slate-100/20 dark:to-slate-800/20">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -75,7 +75,7 @@ export function FeaturesSection() {
             Everything you need to manage your TCG collection
           </h2>
           <p className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto px-4 sm:px-0">
-            From scanning cards to tracking performance, Card Flux provides all the tools you need 
+            From scanning cards to tracking performance, CardFlux provides all the tools you need 
             to take your trading card game collection to the next level.
           </p>
         </motion.div>
@@ -115,19 +115,19 @@ const Feature = ({
       )}
     >
       {index < 4 && (
-        <div className="opacity-0 group-hover/feature:opacity-100 transition duration-200 absolute inset-0 h-full w-full bg-gradient-to-t from-neutral-100 dark:from-neutral-800 to-transparent pointer-events-none" />
+        <div className="opacity-0 group-hover/feature:opacity-100 transition duration-200 absolute inset-0 h-full w-full bg-gradient-to-t from-slate-100 dark:from-slate-800 to-transparent pointer-events-none" />
       )}
       {index >= 4 && index < 8 && (
-        <div className="opacity-0 group-hover/feature:opacity-100 transition duration-200 absolute inset-0 h-full w-full bg-gradient-to-b from-neutral-100 dark:from-neutral-800 to-transparent pointer-events-none" />
+        <div className="opacity-0 group-hover/feature:opacity-100 transition duration-200 absolute inset-0 h-full w-full bg-gradient-to-b from-slate-100 dark:from-slate-800 to-transparent pointer-events-none" />
       )}
       {index >= 8 && (
-        <div className="opacity-0 group-hover/feature:opacity-100 transition duration-200 absolute inset-0 h-full w-full bg-gradient-to-b from-neutral-100 dark:from-neutral-800 to-transparent pointer-events-none" />
+        <div className="opacity-0 group-hover/feature:opacity-100 transition duration-200 absolute inset-0 h-full w-full bg-gradient-to-b from-slate-100 dark:from-slate-800 to-transparent pointer-events-none" />
       )}
       <div className="mb-4 relative z-10 px-10 text-neutral-600 dark:text-neutral-400">
         {icon}
       </div>
       <div className="text-lg font-bold mb-2 relative z-10 px-10">
-        <div className="absolute left-0 inset-y-0 h-6 group-hover/feature:h-8 w-1 rounded-tr-full rounded-br-full bg-neutral-300 dark:bg-neutral-700 group-hover/feature:bg-blue-500 transition-all duration-200 origin-center" />
+        <div className="absolute left-0 inset-y-0 h-6 group-hover/feature:h-8 w-1 rounded-tr-full rounded-br-full bg-neutral-300 dark:bg-neutral-700 group-hover/feature:bg-slate-600 dark:group-hover/feature:bg-slate-400 transition-all duration-200 origin-center" />
         <span className="group-hover/feature:translate-x-2 transition duration-200 inline-block text-neutral-800 dark:text-neutral-100">
           {title}
         </span>

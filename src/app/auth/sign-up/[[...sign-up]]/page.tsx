@@ -589,7 +589,7 @@ export default function SignUpPage() {
         <CardHeader className="text-center space-y-2">
           <CardTitle className="text-2xl font-semibold text-foreground">Create your account</CardTitle>
           <CardDescription className="text-muted-foreground">
-            Get started with Card Flux and manage your card inventory
+            Get started with CardFlux and manage your card inventory
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">

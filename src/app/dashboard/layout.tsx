@@ -16,8 +16,8 @@ import { DashboardContent } from "~/components/dashboard-content";
 
 // Generate dynamic metadata based on the current organization
 export const metadata: Metadata = {
-  title: "Card Flux Dashboard",
-  description: "Manage your TCG business with Card Flux",
+  title: "CardFlux Dashboard",
+  description: "Manage your TCG business with CardFlux",
 };
 
 export default function DashboardLayout({

@@ -85,7 +85,7 @@ export function HeroSection() {
           transition={{ duration: 0.3, delay: 1.6 }}
           className="relative z-10 mx-auto max-w-xl py-4 text-center text-lg font-normal text-neutral-600 dark:text-neutral-400"
         >
-          From scanning cards to syncing inventory and maximizing sales - Card Flux handles everything. 
+          From scanning cards to syncing inventory and maximizing sales - CardFlux handles everything. 
           Built for modern TCG shops and collectors who want to scale efficiently.
         </motion.p>
 
@@ -146,7 +146,7 @@ export function HeroSection() {
             <div className="aspect-[16/9] h-auto w-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
               <div className="text-center">
                 <div className="text-6xl mb-4">🎴</div>
-                <h3 className="text-xl font-semibold text-foreground mb-2">Card Flux Dashboard</h3>
+                <h3 className="text-xl font-semibold text-foreground mb-2">CardFlux Dashboard</h3>
                 <p className="text-muted-foreground">AI-powered card recognition and inventory management</p>
               </div>
             </div>

@@ -26,11 +26,11 @@ const steps = [
 
 export function HowItWorksSection() {
   return (
-    <section className="py-16 sm:py-20 bg-gradient-to-b from-background via-muted/10 to-background relative overflow-hidden">
+    <section className="py-16 sm:py-20 bg-gradient-to-b from-background via-slate-100/10 dark:via-slate-800/10 to-background relative overflow-hidden">
       {/* Background decoration */}
       <div className="absolute inset-0 bg-grid-white/[0.02] bg-[size:50px_50px]" />
       <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
-      <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-500/5 rounded-full blur-3xl" />
+      <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-slate-500/5 dark:bg-slate-400/5 rounded-full blur-3xl" />
       
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative">
         <motion.div
@@ -45,7 +45,7 @@ export function HowItWorksSection() {
           </div>
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight md:text-4xl mb-4">
             From Scan to Sale in{" "}
-            <span className="bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-primary to-slate-600 dark:to-slate-400 bg-clip-text text-transparent">
               Three Steps
             </span>
           </h2>
@@ -58,7 +58,7 @@ export function HowItWorksSection() {
           {/* Animated connecting flow */}
           <div className="hidden lg:block absolute top-1/2 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent transform -translate-y-1/2 z-0">
             <motion.div
-              className="absolute inset-0 bg-gradient-to-r from-primary/50 to-purple-500/50 h-px"
+              className="absolute inset-0 bg-gradient-to-r from-primary/50 to-slate-500/50 dark:to-slate-400/50 h-px"
               initial={{ scaleX: 0 }}
               whileInView={{ scaleX: 1 }}
               transition={{ duration: 2, delay: 0.5 }}
@@ -100,7 +100,7 @@ export function HowItWorksSection() {
           viewport={{ once: true }}
           className="text-center mt-16 sm:mt-20"
         >
-          <div className="max-w-3xl mx-auto bg-gradient-to-br from-primary/10 via-primary/5 to-purple-500/10 border border-primary/20 rounded-xl p-8 sm:p-10 relative overflow-hidden">
+          <div className="max-w-3xl mx-auto bg-gradient-to-br from-primary/10 via-primary/5 to-slate-500/10 dark:to-slate-400/10 border border-primary/20 rounded-xl p-8 sm:p-10 relative overflow-hidden">
             <div className="absolute inset-0 bg-grid-white/[0.02] bg-[size:20px_20px]" />
             <div className="relative">
               <div className="inline-flex items-center px-4 py-2 rounded-full bg-primary/20 border border-primary/30 text-primary text-sm font-medium mb-4">
@@ -114,7 +114,7 @@ export function HowItWorksSection() {
               </p>
               <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center">
                 <motion.button 
-                  className="px-8 sm:px-10 py-3 sm:py-4 bg-gradient-to-r from-primary to-purple-500 text-white rounded-xl font-semibold hover:shadow-lg hover:scale-105 transition-all duration-300 text-base sm:text-lg"
+                  className="px-8 sm:px-10 py-3 sm:py-4 bg-gradient-to-r from-primary to-slate-600 dark:to-slate-400 text-white rounded-xl font-semibold hover:shadow-lg hover:scale-105 transition-all duration-300 text-base sm:text-lg"
                   whileHover={{ y: -2 }}
                   whileTap={{ scale: 0.98 }}
                 >

@@ -4,6 +4,7 @@ import { motion } from "motion/react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Card, CardContent } from "~/components/ui/card";
+import { Logo } from "~/components/ui/logo";
 import { 
   Twitter, 
   Github, 
@@ -54,7 +55,7 @@ const socialLinks = [
 
 export function Footer() {
   return (
-    <footer className="bg-gradient-to-b from-background to-muted/50 border-t border-border/50">
+    <footer className="bg-gradient-to-b from-background to-slate-100/50 dark:to-slate-800/50 border-t border-border/50">
       <div className="container mx-auto px-4 py-16">
         {/* Main Footer Content */}
         <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-5 mb-12">
@@ -66,7 +67,10 @@ export function Footer() {
               transition={{ duration: 0.6 }}
               viewport={{ once: true }}
             >
-              <h3 className="text-xl font-bold mb-4">Card Flux</h3>
+              <div className="flex items-center gap-3 mb-4">
+                <Logo width={32} height={32} />
+                <h3 className="text-xl font-bold">CardFlux</h3>
+              </div>
               <p className="text-muted-foreground mb-6 leading-relaxed max-w-md">
                 The ultimate platform for managing and analyzing your trading card game collection. 
                 Scan, sync, and sell with confidence.
@@ -126,7 +130,7 @@ export function Footer() {
           viewport={{ once: true }}
           className="mb-12"
         >
-          <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
+          <Card className="bg-gradient-to-br from-primary/5 to-slate-500/10 dark:to-slate-400/10 border-primary/20">
             <CardContent className="p-6">
               <div className="text-center">
                 <h3 className="text-xl font-semibold mb-2">Stay updated</h3>
@@ -160,7 +164,7 @@ export function Footer() {
         >
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4 text-center sm:text-left">
             <p className="text-sm text-muted-foreground">
-              © 2025 Card Flux. All rights reserved.
+              © 2025 CardFlux. All rights reserved.
             </p>
             <p className="text-sm text-muted-foreground flex items-center gap-1">
               Made with <Heart className="w-4 h-4 text-red-500" /> for the TCG community

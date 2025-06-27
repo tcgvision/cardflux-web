@@ -54,7 +54,7 @@ const plans = [
     ],
     popular: false,
     cta: "Contact Sales",
-    color: "border-purple-200"
+    color: "border-slate-200"
   }
 ];
 
@@ -62,7 +62,7 @@ export function PricingSection() {
   const [isAnnual, setIsAnnual] = useState(false);
 
   return (
-    <section className="py-16 sm:py-20 bg-gradient-to-b from-background to-muted/20">
+    <section className="py-16 sm:py-20 bg-gradient-to-b from-background to-slate-100/20 dark:to-slate-800/20">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -116,7 +116,7 @@ export function PricingSection() {
             >
               {plan.popular && (
                 <div className="absolute -top-3 sm:-top-4 left-1/2 transform -translate-x-1/2 z-10">
-                  <Badge className="bg-gradient-to-r from-primary to-purple-500 text-white border-0 text-xs">
+                  <Badge className="bg-gradient-to-r from-primary to-slate-600 dark:to-slate-400 text-white border-0 text-xs">
                     <Star className="w-3 h-3 mr-1" />
                     Most Popular
                   </Badge>

@@ -142,7 +142,7 @@ export default function DashboardPage() {
       <div className="container mx-auto px-4 py-8">
         <Card className="max-w-md mx-auto">
           <CardHeader>
-            <CardTitle>Welcome to Card Flux</CardTitle>
+            <CardTitle>Welcome to CardFlux</CardTitle>
             <CardDescription>
               You need to join a shop to get started
             </CardDescription>

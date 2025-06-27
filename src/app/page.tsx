@@ -25,7 +25,7 @@ export default function Home() {
   return (
     <div className="flex min-h-screen flex-col">
       {/* Hero Section */}
-      <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-gradient-to-br from-background via-background to-muted/20">
+      <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-gradient-to-br from-background via-background to-slate-100/20 dark:to-slate-800/20">
         {/* Card Background with Parallax */}
         <CardBackground className="absolute inset-0" />
         
@@ -63,7 +63,7 @@ export default function Home() {
             className="mx-auto max-w-4xl text-3xl sm:text-4xl font-bold tracking-tight text-foreground md:text-6xl lg:text-7xl mb-4 sm:mb-6 leading-tight"
           >
             Advanced analytics for your{" "}
-            <span className="bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-primary to-slate-600 dark:to-slate-400 bg-clip-text text-transparent">
               Trading Card Game
             </span>{" "}
             collection
@@ -76,7 +76,7 @@ export default function Home() {
             transition={{ duration: 0.6, delay: 0.6 }}
             className="mx-auto max-w-2xl text-base sm:text-lg text-muted-foreground mb-6 sm:mb-8 px-4 sm:px-0"
           >
-            From scanning cards to syncing inventory and maximizing sales - Card Flux handles everything. 
+            From scanning cards to syncing inventory and maximizing sales - CardFlux handles everything. 
             Built for modern TCG shops and collectors who want to scale efficiently.
           </motion.p>
 
@@ -130,7 +130,7 @@ export default function Home() {
       </section>
 
       {/* Logo Carousel Section */}
-      <section className="py-16 sm:py-20 bg-gradient-to-b from-background to-muted/20">
+      <section className="py-16 sm:py-20 bg-gradient-to-b from-background to-slate-100/20 dark:to-slate-800/20">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -143,7 +143,7 @@ export default function Home() {
               Trusted by TCG Enthusiasts Worldwide
             </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              Join thousands of collectors and shop owners who trust Card Flux for their trading card game management needs.
+              Join thousands of collectors and shop owners who trust CardFlux for their trading card game management needs.
             </p>
           </motion.div>
           

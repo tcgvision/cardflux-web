@@ -13,8 +13,8 @@ const montserrat = Montserrat({
 });
 
 export const metadata: Metadata = {
-  title: "Card Flux",
-  description: "Modern TCG Inventory Management",
+  title: "CardFlux",
+  description: "Advanced analytics for your Trading Card Game collection",
   icons: [{ rel: "icon", url: "/favicon.ico" }],
 };
 

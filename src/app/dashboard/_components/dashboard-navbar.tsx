@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { UserButton, useOrganization } from "@clerk/nextjs";
 import { Button } from "~/components/ui/button";
+import { Logo } from "~/components/ui/logo";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,8 +32,9 @@ export function DashboardNavbar() {
       <nav className="container mx-auto flex h-16 items-center justify-between px-4">
         {/* Logo and Organization Name */}
         <div className="flex items-center gap-4">
-          <Link href="/dashboard" className="flex items-center space-x-2">
-            <span className="text-xl font-bold tracking-tight">Card Flux</span>
+          <Link href="/dashboard" className="flex items-center space-x-3">
+            <Logo width={28} height={28} priority />
+            <span className="text-xl font-bold tracking-tight">CardFlux</span>
           </Link>
           {organization && (
             <div className="hidden md:block">

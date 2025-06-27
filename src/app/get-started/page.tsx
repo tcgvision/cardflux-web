@@ -25,7 +25,7 @@ export default function GetStartedPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <Sparkles className="h-6 w-6 text-primary" />
-              <span className="text-xl font-bold">Card Flux</span>
+              <span className="text-xl font-bold">CardFlux</span>
             </div>
             <div className="flex items-center space-x-4">
               <Button variant="ghost" onClick={handleSignIn}>
@@ -43,7 +43,7 @@ export default function GetStartedPage() {
       <div className="container mx-auto px-4 py-16">
         <div className="text-center mb-16">
           <h1 className="text-4xl font-bold tracking-tight sm:text-5xl mb-6">
-            Get Started with Card Flux
+            Get Started with CardFlux
           </h1>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
             Join thousands of TCG businesses using our platform to streamline their operations, 

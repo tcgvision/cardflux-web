@@ -27,6 +27,7 @@ import { NavMain } from "~/components/nav-main"
 import { NavSecondary } from "~/components/nav-secondary"
 import { NavUser } from "~/components/nav-user"
 import { ThemeToggle } from "~/app/_components/theme-toggle"
+import { Logo } from "~/components/ui/logo"
 import { useRolePermissions } from "~/hooks/use-role-permissions"
 import { useUnifiedShop } from "~/hooks/use-unified-shop"
 import { useSyncStatus } from "~/hooks/use-sync-status"
@@ -152,11 +153,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             >
               <button 
                 onClick={handleLogoClick}
-                className="flex items-center gap-2 w-full text-left"
+                className="flex items-center gap-3 w-full text-left"
               >
-                <IconInnerShadowTop className="!size-5" />
+                <Logo width={24} height={24} />
                 <span className="text-base font-semibold">
-                  {isLoaded && hasShop ? shopName : "Card Flux"}
+                  {isLoaded && hasShop ? shopName : "CardFlux"}
                 </span>
                 {syncNeeded && syncReason && (
                   <span className="text-xs text-orange-500 ml-1">
