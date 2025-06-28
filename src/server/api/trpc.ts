@@ -12,6 +12,7 @@ import { ZodError } from "zod";
 import { auth } from "@clerk/nextjs/server";
 
 import { db } from "~/server/db";
+import { ROLES, hasRolePermission, getNormalizedRole, type Role } from "~/lib/roles";
 
 /**
  * 1. CONTEXT
@@ -121,120 +122,39 @@ const isAuthed = t.middleware(({ next, ctx }) => {
 });
 
 /**
- * Shop context middleware
- * Ensures user has access to a shop and provides shop context
+ * Database-first shop context middleware
+ * Ensures user has access to a shop via database membership
+ * This is our PRIMARY source of truth - no dependency on Clerk org context
  */
 const isShopMember = t.middleware(async ({ next, ctx }) => {
   if (!ctx.auth.userId) {
     throw new TRPCError({ code: "UNAUTHORIZED" });
   }
 
-  if (!ctx.auth.orgId) {
-    throw new TRPCError({ 
-      code: "FORBIDDEN", 
-      message: "You must be a member of a shop to access this resource" 
-    });
-  }
-
-  // Get shop details - try with settings first, fallback without if it fails
-  let shop;
-  try {
-    shop = await ctx.db.shop.findUnique({
-      where: { id: ctx.auth.orgId },
-      include: {
-        settings: true,
+  // Get user details from database (our source of truth)
+  const user = await ctx.db.user.findUnique({
+    where: { clerkId: ctx.auth.userId },
+    select: {
+      id: true,
+      clerkId: true,
+      email: true,
+      name: true,
+      shopId: true,
+      role: true,
+      shop: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          description: true,
+          location: true,
+          type: true,
+          createdAt: true,
+          updatedAt: true,
+          settings: true,
+        },
       },
-    });
-  } catch (error) {
-    // If settings relation doesn't exist yet, try without it
-    console.warn('Settings relation not found, falling back to basic shop query:', error);
-    shop = await ctx.db.shop.findUnique({
-      where: { id: ctx.auth.orgId },
-    });
-  }
-
-  if (!shop) {
-    throw new TRPCError({ 
-      code: "NOT_FOUND", 
-      message: "Shop not found" 
-    });
-  }
-
-  // Get user details
-  const user = await ctx.db.user.findUnique({
-    where: { clerkId: ctx.auth.userId },
-  });
-
-  if (!user) {
-    throw new TRPCError({ 
-      code: "NOT_FOUND", 
-      message: "User not found in database" 
-    });
-  }
-
-  return next({
-    ctx: {
-      auth: ctx.auth,
-      shop,
-      user,
-      db: ctx.db,
     },
-  });
-});
-
-/**
- * Staff-only middleware
- * Ensures user has staff role in the shop
- */
-const isStaff = t.middleware(async ({ next, ctx }) => {
-  if (!ctx.auth.userId) {
-    throw new TRPCError({ code: "UNAUTHORIZED" });
-  }
-
-  if (!ctx.auth.orgId) {
-    throw new TRPCError({ 
-      code: "FORBIDDEN", 
-      message: "You must be a member of a shop to access this resource" 
-    });
-  }
-
-  // Check if user is staff (has transactions, buylists, or credit transactions)
-  const user = await ctx.db.user.findFirst({
-    where: { 
-      clerkId: ctx.auth.userId,
-      shopId: ctx.auth.orgId,
-    },
-  });
-
-  if (!user) {
-    throw new TRPCError({ 
-      code: "FORBIDDEN", 
-      message: "You must be a staff member to perform this action" 
-    });
-  }
-
-  return next({
-    ctx: {
-      auth: ctx.auth,
-      user,
-      db: ctx.db,
-    },
-  });
-});
-
-/**
- * Shop context middleware (database fallback)
- * Ensures user has access to a shop via database membership, even without Clerk org context
- */
-const isShopMemberDb = t.middleware(async ({ next, ctx }) => {
-  if (!ctx.auth.userId) {
-    throw new TRPCError({ code: "UNAUTHORIZED" });
-  }
-
-  // Get user details
-  const user = await ctx.db.user.findUnique({
-    where: { clerkId: ctx.auth.userId },
-    include: { shop: true },
   });
 
   if (!user) {
@@ -275,11 +195,113 @@ const isShopMemberDb = t.middleware(async ({ next, ctx }) => {
     });
   }
 
+  // Get user's role from database (our source of truth)
+  const userRole: Role = user.role ? getNormalizedRole(user.role) : ROLES.MEMBER;
+
   return next({
     ctx: {
       auth: ctx.auth,
       shop,
       user,
+      userRole, // Database role as source of truth
+      db: ctx.db,
+    },
+  });
+});
+
+/**
+ * Staff-only middleware
+ * Ensures user has staff role in the shop (database role)
+ */
+const isStaff = t.middleware(async ({ next, ctx }) => {
+  if (!ctx.auth.userId) {
+    throw new TRPCError({ code: "UNAUTHORIZED" });
+  }
+
+  // Get user details from database
+  const user = await ctx.db.user.findFirst({
+    where: { 
+      clerkId: ctx.auth.userId,
+      shopId: { not: null }, // Must be part of a shop
+    },
+    select: {
+      id: true,
+      clerkId: true,
+      email: true,
+      name: true,
+      shopId: true,
+      role: true,
+    },
+  });
+
+  if (!user) {
+    throw new TRPCError({ 
+      code: "FORBIDDEN", 
+      message: "You must be a staff member to perform this action" 
+    });
+  }
+
+  // Get user's role from database
+  const userRole: Role = user.role ? getNormalizedRole(user.role) : ROLES.MEMBER;
+
+  return next({
+    ctx: {
+      auth: ctx.auth,
+      user,
+      userRole, // Database role as source of truth
+      db: ctx.db,
+    },
+  });
+});
+
+/**
+ * Admin-only middleware
+ * Ensures user has admin role in the shop (database role)
+ */
+const isAdmin = t.middleware(async ({ next, ctx }) => {
+  if (!ctx.auth.userId) {
+    throw new TRPCError({ code: "UNAUTHORIZED" });
+  }
+
+  // Get user details from database
+  const user = await ctx.db.user.findFirst({
+    where: { 
+      clerkId: ctx.auth.userId,
+      shopId: { not: null },
+    },
+    select: {
+      id: true,
+      clerkId: true,
+      email: true,
+      name: true,
+      shopId: true,
+      role: true,
+    },
+  });
+
+  if (!user) {
+    throw new TRPCError({ 
+      code: "FORBIDDEN", 
+      message: "You must be a shop member to perform this action" 
+    });
+  }
+
+  // Get user's role from database
+  const userRole: Role = user.role ? getNormalizedRole(user.role) : ROLES.MEMBER;
+
+  // Check if user has admin permissions
+  if (!hasRolePermission(userRole, ROLES.ADMIN)) {
+    throw new TRPCError({ 
+      code: "FORBIDDEN", 
+      message: "Admin privileges required" 
+    });
+  }
+
+  return next({
+    ctx: {
+      auth: ctx.auth,
+      user,
+      userRole, // Database role as source of truth
       db: ctx.db,
     },
   });
@@ -287,17 +309,37 @@ const isShopMemberDb = t.middleware(async ({ next, ctx }) => {
 
 /**
  * Team management middleware
- * Ensures user has access to team management features via either Clerk org context or database membership
+ * Ensures user has access to team management features via database membership
  */
 const isTeamManager = t.middleware(async ({ next, ctx }) => {
   if (!ctx.auth.userId) {
     throw new TRPCError({ code: "UNAUTHORIZED" });
   }
 
-  // Get user details first
+  // Get user details from database
   const user = await ctx.db.user.findUnique({
     where: { clerkId: ctx.auth.userId },
-    include: { shop: true },
+    select: {
+      id: true,
+      clerkId: true,
+      email: true,
+      name: true,
+      shopId: true,
+      role: true,
+      shop: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          description: true,
+          location: true,
+          type: true,
+          createdAt: true,
+          updatedAt: true,
+          settings: true,
+        },
+      },
+    },
   });
 
   if (!user) {
@@ -338,22 +380,15 @@ const isTeamManager = t.middleware(async ({ next, ctx }) => {
     });
   }
 
-  // Check if user has Clerk organization context
-  const hasClerkOrgContext = !!ctx.auth.orgId && ctx.auth.orgId === user.shopId;
-  
-  // If no Clerk org context, we'll need to handle this in the procedure
-  const authContext = {
-    ...ctx.auth,
-    hasClerkOrgContext,
-    // If no Clerk org context, we'll need to determine role from database or other means
-    orgRole: hasClerkOrgContext ? ctx.auth.orgRole : null,
-  };
+  // Get user's role from database
+  const userRole: Role = user.role ? getNormalizedRole(user.role) : ROLES.MEMBER;
 
   return next({
     ctx: {
-      auth: authContext,
+      auth: ctx.auth,
       shop,
       user,
+      userRole, // Database role as source of truth
       db: ctx.db,
     },
   });
@@ -377,33 +412,47 @@ export const publicProcedure = t.procedure.use(timingMiddleware);
 export const protectedProcedure = t.procedure.use(timingMiddleware).use(isAuthed);
 
 /**
- * Shop member procedure
+ * Shop member procedure (PRIMARY - Database source of truth)
  *
  * This procedure ensures the user is a member of a shop and provides shop context.
+ * Uses database as the single source of truth for roles and membership.
  * Use this for most shop-related operations.
  */
 export const shopProcedure = t.procedure.use(timingMiddleware).use(isShopMember);
 
 /**
- * Staff procedure
+ * Staff procedure (Database source of truth)
  *
  * This procedure ensures the user is a staff member of the shop.
+ * Uses database role as source of truth.
  * Use this for operations that require staff privileges.
  */
 export const staffProcedure = t.procedure.use(timingMiddleware).use(isStaff);
 
 /**
- * Shop member procedure (database fallback)
+ * Admin procedure (Database source of truth)
  *
- * This procedure ensures the user is a member of a shop via database membership.
- * Use this for users who are linked to shops but don't have Clerk organization context.
+ * This procedure ensures the user has admin privileges in the shop.
+ * Uses database role as source of truth.
+ * Use this for admin-only operations.
  */
-export const shopProcedureDb = t.procedure.use(timingMiddleware).use(isShopMemberDb);
+export const adminProcedure = t.procedure.use(timingMiddleware).use(isAdmin);
 
 /**
- * Team management procedure
+ * Team management procedure (Database source of truth)
  *
  * This procedure ensures the user is a member of a shop and can access team management.
- * It works with both Clerk organization context and database membership.
+ * Uses database as the single source of truth.
  */
 export const teamProcedure = t.procedure.use(timingMiddleware).use(isTeamManager);
+
+// Legacy procedures for backward compatibility (deprecated)
+/**
+ * @deprecated Use shopProcedure instead - this relies on Clerk org context
+ */
+export const shopProcedureDb = shopProcedure;
+
+/**
+ * @deprecated Use shopProcedure instead - this relies on Clerk org context  
+ */
+export const isShopMemberDb = isShopMember;

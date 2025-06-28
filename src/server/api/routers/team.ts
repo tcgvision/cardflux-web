@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createTRPCRouter, shopProcedure, staffProcedure, shopProcedureDb, teamProcedure } from "~/server/api/trpc";
+import { createTRPCRouter, shopProcedure, teamProcedure } from "~/server/api/trpc";
 import { TRPCError } from "@trpc/server";
 import { Prisma } from "@prisma/client";
 import { ROLES, hasRolePermission, getNormalizedRole, type Role } from "~/lib/roles";
@@ -7,7 +7,7 @@ import { clerkClient } from "@clerk/nextjs/server";
 
 export const teamRouter = createTRPCRouter({
   // Get all team members
-  getMembers: teamProcedure
+  getMembers: shopProcedure
     .input(z.object({
       search: z.string().optional(),
       role: z.enum([ROLES.ADMIN, ROLES.MEMBER]).optional(),
@@ -16,20 +16,8 @@ export const teamRouter = createTRPCRouter({
     }))
     .query(async ({ ctx, input }) => {
       // Check if user has admin permissions
-      let userRole: Role;
+      const userRole = ctx.userRole;
       
-      if (ctx.auth.hasClerkOrgContext && ctx.auth.orgRole) {
-        // Use Clerk role if available
-        userRole = getNormalizedRole(ctx.auth.orgRole);
-      } else {
-        // Fallback: check database role
-        const currentUser = await ctx.db.user.findUnique({
-          where: { clerkId: ctx.auth.userId },
-          select: { role: true },
-        });
-        userRole = currentUser?.role ? getNormalizedRole(currentUser.role) : ROLES.MEMBER;
-      }
-
       if (!hasRolePermission(userRole, ROLES.ADMIN)) {
         throw new TRPCError({
           code: "FORBIDDEN",
@@ -37,7 +25,7 @@ export const teamRouter = createTRPCRouter({
         });
       }
 
-      // Get users from our database
+      // Get users from our database (single source of truth)
       const where: Prisma.UserWhereInput = {
         shopId: ctx.shop.id,
         ...(input.search && {
@@ -61,41 +49,16 @@ export const teamRouter = createTRPCRouter({
             name: true,
             email: true,
             shopId: true,
-            role: true, // Include role from database
+            role: true,
           },
         }),
         ctx.db.user.count({ where }),
       ]);
 
-      // Map users to team members with roles from database (primary) and Clerk (fallback)
+      // Map users to team members with roles from database
       const members = users.map(user => {
-        // Use database role as primary source of truth
-        let role: Role = ROLES.MEMBER; // Default fallback
-        
-        if (user.role) {
-          // Use database role if available
-          role = getNormalizedRole(user.role);
-        } else if (ctx.auth.hasClerkOrgContext) {
-          // Fallback to Clerk role if no database role
-          try {
-            // This would require additional Clerk API call, but for now we'll use the current user's context
-            // In a production environment, you might want to cache Clerk roles or fetch them in batch
-            role = getNormalizedRole(ctx.auth.orgRole);
-          } catch (error) {
-            console.warn(`Failed to get Clerk role for user ${user.email}:`, error);
-            role = ROLES.MEMBER;
-          }
-        }
-        
-        // Enhanced logging for debugging
-        console.log(`Role mapping for ${user.email} (clerkId: ${user.clerkId}):`, {
-          databaseRole: user.role,
-          normalizedRole: role,
-          hasDatabaseRole: !!user.role,
-          isCurrentUser: user.clerkId === ctx.auth.userId,
-          userEmail: user.email,
-          userClerkId: user.clerkId
-        });
+        // Use database role as source of truth
+        const role: Role = user.role ? getNormalizedRole(user.role) : ROLES.MEMBER;
         
         return {
           id: user.clerkId,
@@ -103,9 +66,8 @@ export const teamRouter = createTRPCRouter({
           email: user.email,
           role,
           databaseId: user.id,
-          joinedAt: new Date(), // Use current date as fallback
+          joinedAt: new Date(), // TODO: Add joinedAt field to User model if needed
           membershipId: null, // We're not using Clerk membership ID anymore
-          // Add avatar and user info from Clerk if available (would need additional API call)
           avatarUrl: null,
           firstName: null,
           lastName: null,
@@ -122,19 +84,8 @@ export const teamRouter = createTRPCRouter({
 
   // Get current user's role and permissions
   getCurrentUserRole: teamProcedure.query(async ({ ctx }) => {
-    let role: Role;
-    
-    if (ctx.auth.hasClerkOrgContext && ctx.auth.orgRole) {
-      // Use Clerk role if available
-      role = getNormalizedRole(ctx.auth.orgRole);
-    } else {
-      // Fallback: check database role
-      const currentUser = await ctx.db.user.findUnique({
-        where: { clerkId: ctx.auth.userId },
-        select: { role: true },
-      });
-      role = currentUser?.role ? getNormalizedRole(currentUser.role) : ROLES.MEMBER;
-    }
+    // User role is already available from middleware
+    const role = ctx.userRole;
     
     return {
       role,
@@ -159,9 +110,9 @@ export const teamRouter = createTRPCRouter({
       name: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      const userRole = getNormalizedRole(ctx.auth.orgRole);
-
-      // Check if user has permission to invite
+      // Check if user has admin permissions
+      const userRole = ctx.userRole;
+      
       if (!hasRolePermission(userRole, ROLES.ADMIN)) {
         throw new TRPCError({
           code: "FORBIDDEN",
@@ -249,9 +200,9 @@ export const teamRouter = createTRPCRouter({
       role: z.enum([ROLES.ADMIN, ROLES.MEMBER]),
     }))
     .mutation(async ({ ctx, input }) => {
-      const userRole = getNormalizedRole(ctx.auth.orgRole);
-
-      // Check if user is admin
+      // Check if user has admin permissions
+      const userRole = ctx.userRole;
+      
       if (!hasRolePermission(userRole, ROLES.ADMIN)) {
         throw new TRPCError({
           code: "FORBIDDEN",
@@ -275,6 +226,15 @@ export const teamRouter = createTRPCRouter({
           role: input.role,
         });
 
+        // Update role in our database (webhook will also handle this, but we do it here for immediate consistency)
+        await ctx.db.user.updateMany({
+          where: { 
+            clerkId: input.userId,
+            shopId: ctx.shop.id,
+          },
+          data: { role: input.role },
+        });
+
         return { 
           success: true,
           message: "Role updated successfully",
@@ -294,9 +254,9 @@ export const teamRouter = createTRPCRouter({
       userId: z.string(),
     }))
     .mutation(async ({ ctx, input }) => {
-      const userRole = getNormalizedRole(ctx.auth.orgRole);
-
-      // Check if user is admin
+      // Check if user has admin permissions
+      const userRole = ctx.userRole;
+      
       if (!hasRolePermission(userRole, ROLES.ADMIN)) {
         throw new TRPCError({
           code: "FORBIDDEN",
@@ -319,13 +279,16 @@ export const teamRouter = createTRPCRouter({
           userId: input.userId,
         });
 
-        // Remove user from shop in our database
+        // Remove user from shop in our database (webhook will also handle this, but we do it here for immediate consistency)
         await ctx.db.user.updateMany({
           where: { 
             clerkId: input.userId,
             shopId: ctx.shop.id,
           },
-          data: { shopId: null },
+          data: { 
+            shopId: null,
+            role: null, // Clear role when removed from org
+          },
         });
 
         return { 
@@ -343,9 +306,9 @@ export const teamRouter = createTRPCRouter({
 
   // Get pending invitations
   getPendingInvitations: shopProcedure.query(async ({ ctx }) => {
-    const userRole = getNormalizedRole(ctx.auth.orgRole);
-
-    // Check if user has permission
+    // Check if user has admin permissions
+    const userRole = ctx.userRole;
+    
     if (!hasRolePermission(userRole, ROLES.ADMIN)) {
       throw new TRPCError({
         code: "FORBIDDEN",
@@ -383,9 +346,9 @@ export const teamRouter = createTRPCRouter({
       invitationId: z.string(),
     }))
     .mutation(async ({ ctx, input }) => {
-      const userRole = getNormalizedRole(ctx.auth.orgRole);
-
-      // Check if user has permission
+      // Check if user has admin permissions
+      const userRole = ctx.userRole;
+      
       if (!hasRolePermission(userRole, ROLES.ADMIN)) {
         throw new TRPCError({
           code: "FORBIDDEN",
@@ -419,9 +382,9 @@ export const teamRouter = createTRPCRouter({
       invitationId: z.string(),
     }))
     .mutation(async ({ ctx, input }) => {
-      const userRole = getNormalizedRole(ctx.auth.orgRole);
-
-      // Check if user has permission
+      // Check if user has admin permissions
+      const userRole = ctx.userRole;
+      
       if (!hasRolePermission(userRole, ROLES.ADMIN)) {
         throw new TRPCError({
           code: "FORBIDDEN",

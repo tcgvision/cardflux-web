@@ -80,14 +80,19 @@ async function testWebhookFlow() {
     for (const user of currentUsers) {
       if (user.shopId) {
         try {
-          const clerkUser = await clerk.users.getUser(user.clerkId || '');
-          const userOrgMemberships = (clerkUser as any)?.organizationMemberships ?? [];
-          const shopMembership = userOrgMemberships.find((membership: any) => 
-            membership.organization?.id === user.shopId
+          // Get organization memberships directly from the organization
+          const membershipsResponse = await clerk.organizations.getOrganizationMembershipList({
+            organizationId: user.shopId,
+          });
+          const memberships = membershipsResponse.data;
+          
+          // Find the user's membership in this organization
+          const userMembership = memberships.find(membership => 
+            membership.publicUserData?.identifier === user.email
           );
           
-          if (shopMembership) {
-            const clerkRole = shopMembership.role as string;
+          if (userMembership) {
+            const clerkRole = userMembership.role;
             console.log(`User ${user.email}: DB Role: ${user.role ?? 'none'} | Clerk Role: ${clerkRole}`);
             
             if (user.role !== clerkRole) {
