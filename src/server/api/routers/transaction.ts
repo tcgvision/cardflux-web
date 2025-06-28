@@ -1,26 +1,28 @@
 import { z } from "zod";
-import { createTRPCRouter, shopProcedure, staffProcedure, shopProcedureDb } from "~/server/api/trpc";
+import { createTRPCRouter, shopProcedure, staffProcedure } from "~/server/api/trpc";
 import { TRPCError } from "@trpc/server";
+import { ROLES, hasRolePermission } from "~/lib/roles";
+import { Prisma } from "@prisma/client";
 
 export const transactionRouter = createTRPCRouter({
   // Get all transactions for the shop
-  getAll: shopProcedureDb
+  getAll: shopProcedure
     .input(z.object({
       search: z.string().optional(),
-      status: z.enum(["COMPLETED", "PENDING", "CANCELLED", "REFUNDED"]).optional(),
-      type: z.enum(["CHECKOUT", "REFUND", "STORE_CREDIT"]).optional(),
+      status: z.enum(["COMPLETED", "PENDING", "VOIDED", "REFUNDED"]).optional(),
+      type: z.enum(["BUYIN", "CHECKOUT"]).optional(),
       limit: z.number().int().min(1).max(100).default(50),
       offset: z.number().int().min(0).default(0),
     }))
     .query(async ({ ctx, input }) => {
-      const where = {
+      const where: Prisma.TransactionWhereInput = {
         shopId: ctx.shop.id,
         ...(input.status && { status: input.status }),
         ...(input.type && { type: input.type }),
         ...(input.search && {
           OR: [
-            { id: { contains: input.search, mode: "insensitive" } },
-            { customer: { name: { contains: input.search, mode: "insensitive" } } },
+            { id: { contains: input.search, mode: "insensitive" as Prisma.QueryMode } },
+            { customer: { name: { contains: input.search, mode: "insensitive" as Prisma.QueryMode } } },
           ],
         }),
       };
@@ -64,7 +66,7 @@ export const transactionRouter = createTRPCRouter({
     }),
 
   // Get transaction by ID
-  getById: shopProcedureDb
+  getById: shopProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
       const transaction = await ctx.db.transaction.findFirst({
@@ -110,17 +112,28 @@ export const transactionRouter = createTRPCRouter({
   create: staffProcedure
     .input(z.object({
       customerId: z.string().optional(),
-      type: z.enum(["CHECKOUT", "REFUND", "STORE_CREDIT"]),
-      paymentMethod: z.enum(["CASH", "CARD", "STORE_CREDIT", "MIXED"]),
+      type: z.enum(["BUYIN", "CHECKOUT"]),
+      paymentMethod: z.enum(["CASH", "CREDIT_CARD", "DEBIT_CARD", "STORE_CREDIT", "MIXED"]),
       items: z.array(z.object({
         productId: z.string(),
         quantity: z.number().int().min(1),
         unitPrice: z.number().min(0),
-        condition: z.enum(["NM", "LP", "MP", "HP"]).optional(),
+        condition: z.enum(["NM", "LP", "MP", "HP", "DMG"]).optional(),
       })),
       notes: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      // User role is already validated by staffProcedure middleware
+      // Check if user has permission to create transactions
+      const userRole = ctx.userRole;
+      
+      if (!hasRolePermission(userRole, ROLES.MEMBER)) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You must be a staff member to create transactions",
+        });
+      }
+
       if (!ctx.user.shopId) {
         throw new TRPCError({
           code: "FORBIDDEN",
@@ -130,6 +143,8 @@ export const transactionRouter = createTRPCRouter({
 
       // Calculate total amount
       const totalAmount = input.items.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
+      const subtotal = totalAmount; // For now, no tax/discount calculation
+      const amountPaid = totalAmount; // For now, assume full payment
 
       // Create transaction
       const transaction = await ctx.db.transaction.create({
@@ -138,7 +153,9 @@ export const transactionRouter = createTRPCRouter({
           customerId: input.customerId,
           type: input.type,
           paymentMethod: input.paymentMethod,
+          subtotal,
           totalAmount,
+          amountPaid,
           status: "COMPLETED",
           notes: input.notes,
           staffId: ctx.user.id,
@@ -146,7 +163,7 @@ export const transactionRouter = createTRPCRouter({
             create: input.items.map(item => ({
               productId: item.productId,
               quantity: item.quantity,
-              unitPrice: item.unitPrice,
+              pricePerUnit: item.unitPrice,
               condition: item.condition || "NM",
             })),
           },
@@ -168,10 +185,21 @@ export const transactionRouter = createTRPCRouter({
   updateStatus: staffProcedure
     .input(z.object({
       id: z.string(),
-      status: z.enum(["COMPLETED", "PENDING", "CANCELLED", "REFUNDED"]),
+      status: z.enum(["COMPLETED", "PENDING", "VOIDED", "REFUNDED"]),
       notes: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      // User role is already validated by staffProcedure middleware
+      // Check if user has permission to update transactions
+      const userRole = ctx.userRole;
+      
+      if (!hasRolePermission(userRole, ROLES.MEMBER)) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You must be a staff member to update transactions",
+        });
+      }
+
       if (!ctx.user.shopId) {
         throw new TRPCError({
           code: "FORBIDDEN",
@@ -194,7 +222,7 @@ export const transactionRouter = createTRPCRouter({
     }),
 
   // Get transaction statistics
-  getStats: shopProcedureDb
+  getStats: shopProcedure
     .input(z.object({
       period: z.enum(["today", "week", "month", "quarter", "year"]).default("month"),
     }))

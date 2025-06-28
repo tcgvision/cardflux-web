@@ -1,7 +1,7 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { ROLES, hasRolePermission } from "~/lib/roles";
+import { ROLES, hasRolePermission, getNormalizedRole } from "~/lib/roles";
 
 // Define route matchers
 const isPublicRoute = createRouteMatcher([
@@ -97,8 +97,9 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
       return NextResponse.redirect(new URL("/dashboard/create-shop", req.url));
     }
     
-    // Check if user has admin role using the new normalized role system
-    if (!hasRolePermission(orgRole, ROLES.ADMIN)) {
+    // Check if user has admin role using the normalized role system
+    const normalizedRole = getNormalizedRole(orgRole);
+    if (!hasRolePermission(normalizedRole, ROLES.ADMIN)) {
       // Redirect to dashboard with access denied message
       const dashboardUrl = new URL("/dashboard", req.url);
       dashboardUrl.searchParams.set("error", "access_denied");

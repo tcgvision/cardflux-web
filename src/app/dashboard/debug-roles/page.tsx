@@ -45,7 +45,7 @@ export default function DebugRolesPage() {
         <CardHeader>
           <CardTitle>Role Detection Debug</CardTitle>
           <CardDescription>
-            Testing role detection and permissions
+            Testing role detection and permissions with Clerk "org:" prefix handling
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -58,17 +58,22 @@ export default function DebugRolesPage() {
               <div className="space-y-2 text-sm">
                 <p><strong>User ID:</strong> {roleInfo.userId}</p>
                 <p><strong>Org ID:</strong> {roleInfo.orgId}</p>
-                <p><strong>Org Role (from Clerk):</strong> 
-                  <Badge className="ml-2" variant={roleInfo.orgRole === ROLES.ADMIN ? "destructive" : "secondary"}>
-                    {roleInfo.orgRole ?? "null/undefined"}
+                <p><strong>Clerk Role (raw):</strong> 
+                  <Badge className="ml-2" variant={roleInfo.clerkRole === "org:admin" ? "destructive" : "secondary"}>
+                    {roleInfo.clerkRole ?? "null/undefined"}
                   </Badge>
                 </p>
-                <p><strong>Normalized Role:</strong> 
-                  <Badge className="ml-2" variant={roleInfo.normalizedRole === ROLES.ADMIN ? "destructive" : "secondary"}>
-                    {roleInfo.normalizedRole ?? "null"}
+                <p><strong>Normalized Clerk Role:</strong> 
+                  <Badge className="ml-2" variant={roleInfo.normalizedClerkRole === ROLES.ADMIN ? "destructive" : "secondary"}>
+                    {roleInfo.normalizedClerkRole ?? "null"}
                   </Badge>
                 </p>
-                <p><strong>Effective Role (with fallback):</strong> 
+                <p><strong>Database Role:</strong> 
+                  <Badge className="ml-2" variant={roleInfo.databaseRole === ROLES.ADMIN ? "destructive" : "secondary"}>
+                    {roleInfo.databaseRole ?? "not_available"}
+                  </Badge>
+                </p>
+                <p><strong>Effective Role (final):</strong> 
                   <Badge className="ml-2" variant={roleInfo.effectiveRole === ROLES.ADMIN ? "destructive" : "secondary"}>
                     {roleInfo.effectiveRole}
                   </Badge>
@@ -81,9 +86,10 @@ export default function DebugRolesPage() {
                 {/* Debug Information */}
                 <div className="mt-4 p-3 bg-muted rounded">
                   <h4 className="font-medium mb-2">Debug Details:</h4>
-                  <p><strong>Org Role Type:</strong> {roleInfo.debug.orgRoleType}</p>
-                  <p><strong>Org Role Value:</strong> {JSON.stringify(roleInfo.debug.orgRoleValue)}</p>
-                  <p><strong>Normalized Role Value:</strong> {JSON.stringify(roleInfo.debug.normalizedRoleValue)}</p>
+                  <p><strong>Clerk Role Type:</strong> {roleInfo.debug.clerkRoleType}</p>
+                  <p><strong>Clerk Role Value:</strong> {JSON.stringify(roleInfo.debug.clerkRoleValue)}</p>
+                  <p><strong>Normalized Clerk Role Value:</strong> {JSON.stringify(roleInfo.debug.normalizedClerkRoleValue)}</p>
+                  <p><strong>Database Role Value:</strong> {JSON.stringify(roleInfo.debug.databaseRoleValue)}</p>
                   <p><strong>User Level:</strong> {roleInfo.debug.userLevel}</p>
                   <p><strong>Required Admin Level:</strong> {roleInfo.debug.requiredAdminLevel}</p>
                   <p><strong>Required Member Level:</strong> {roleInfo.debug.requiredMemberLevel}</p>
@@ -96,7 +102,7 @@ export default function DebugRolesPage() {
 
           {/* Shop Role Info */}
           <div>
-            <h3 className="font-semibold mb-2">Shop Role Information</h3>
+            <h3 className="font-semibold mb-2">Shop Role Information (Database Source of Truth)</h3>
             {shopRoleError ? (
               <Badge variant="destructive">Error: {shopRoleError.message}</Badge>
             ) : shopRoleInfo ? (
@@ -104,12 +110,22 @@ export default function DebugRolesPage() {
                 <p><strong>Shop ID:</strong> {shopRoleInfo.shopId}</p>
                 <p><strong>Shop Name:</strong> {shopRoleInfo.shopName}</p>
                 <p><strong>User Shop ID:</strong> {shopRoleInfo.userShopId}</p>
-                <p><strong>Org Role (from Clerk):</strong> 
-                  <Badge className="ml-2" variant={shopRoleInfo.orgRole === ROLES.ADMIN ? "destructive" : "secondary"}>
-                    {shopRoleInfo.orgRole ?? "null/undefined"}
+                <p><strong>Clerk Role (raw):</strong> 
+                  <Badge className="ml-2" variant={shopRoleInfo.clerkRole === "org:admin" ? "destructive" : "secondary"}>
+                    {shopRoleInfo.clerkRole ?? "null/undefined"}
                   </Badge>
                 </p>
-                <p><strong>Effective Role (with fallback):</strong> 
+                <p><strong>Normalized Clerk Role:</strong> 
+                  <Badge className="ml-2" variant={shopRoleInfo.normalizedClerkRole === ROLES.ADMIN ? "destructive" : "secondary"}>
+                    {shopRoleInfo.normalizedClerkRole ?? "null"}
+                  </Badge>
+                </p>
+                <p><strong>Database Role (source of truth):</strong> 
+                  <Badge className="ml-2" variant={shopRoleInfo.databaseRole === ROLES.ADMIN ? "destructive" : "secondary"}>
+                    {shopRoleInfo.databaseRole ?? "null"}
+                  </Badge>
+                </p>
+                <p><strong>Effective Role (database):</strong> 
                   <Badge className="ml-2" variant={shopRoleInfo.effectiveRole === ROLES.ADMIN ? "destructive" : "secondary"}>
                     {shopRoleInfo.effectiveRole}
                   </Badge>

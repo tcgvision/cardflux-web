@@ -1,16 +1,16 @@
 import { z } from "zod";
-import { createTRPCRouter, shopProcedure, staffProcedure, protectedProcedure, shopProcedureDb } from "~/server/api/trpc";
+import { createTRPCRouter, shopProcedure, staffProcedure, protectedProcedure, adminProcedure } from "~/server/api/trpc";
 import { TRPCError } from "@trpc/server";
 import { ROLES, hasRolePermission, getNormalizedRole } from "~/lib/roles";
 
 export const shopRouter = createTRPCRouter({
   // Get current shop details
-  getCurrent: shopProcedureDb.query(async ({ ctx }) => {
+  getCurrent: shopProcedure.query(async ({ ctx }) => {
     return ctx.shop;
   }),
 
   // Get current shop details (database fallback)
-  getCurrentDb: shopProcedureDb.query(async ({ ctx }) => {
+  getCurrentDb: shopProcedure.query(async ({ ctx }) => {
     return ctx.shop;
   }),
 
@@ -96,8 +96,9 @@ export const shopRouter = createTRPCRouter({
       type: z.enum(["local", "online", "both"]).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      // Check if user has permission to update shop details
-      const userRole = getNormalizedRole(ctx.auth.orgRole);
+      // Check if user has admin permissions
+      const userRole = ctx.userRole;
+      
       if (!hasRolePermission(userRole, ROLES.ADMIN)) {
         throw new TRPCError({
           code: "FORBIDDEN",
@@ -106,7 +107,7 @@ export const shopRouter = createTRPCRouter({
       }
 
       const shop = await ctx.db.shop.update({
-        where: { id: ctx.auth.orgId! },
+        where: { id: ctx.shop.id },
         data: input,
         include: {
           settings: true,
@@ -117,7 +118,7 @@ export const shopRouter = createTRPCRouter({
     }),
 
   // Get shop settings
-  getSettings: shopProcedureDb.query(async ({ ctx }) => {
+  getSettings: shopProcedure.query(async ({ ctx }) => {
     const settings = await ctx.db.shopSettings.findUnique({
       where: { shopId: ctx.shop.id },
     });
@@ -137,8 +138,9 @@ export const shopRouter = createTRPCRouter({
       maxCreditAmount: z.number().min(0).nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      // Check if user has permission to update settings
-      const userRole = getNormalizedRole(ctx.auth.orgRole);
+      // Check if user has admin permissions
+      const userRole = ctx.userRole;
+      
       if (!hasRolePermission(userRole, ROLES.ADMIN)) {
         throw new TRPCError({
           code: "FORBIDDEN",
@@ -147,10 +149,10 @@ export const shopRouter = createTRPCRouter({
       }
 
       const settings = await ctx.db.shopSettings.upsert({
-        where: { shopId: ctx.auth.orgId! },
+        where: { shopId: ctx.shop.id },
         update: input,
         create: {
-          shopId: ctx.auth.orgId!,
+          shopId: ctx.shop.id,
           ...input,
         },
       });
@@ -158,8 +160,8 @@ export const shopRouter = createTRPCRouter({
       return settings;
     }),
 
-  // Get shop statistics (database fallback)
-  getStats: shopProcedureDb.query(async ({ ctx }) => {
+  // Get shop statistics
+  getStats: shopProcedure.query(async ({ ctx }) => {
     const [
       customerCount,
       productCount,
@@ -211,9 +213,10 @@ export const shopRouter = createTRPCRouter({
   }),
 
   // Get shop members (Admin only)
-  getMembers: shopProcedureDb.query(async ({ ctx }) => {
-    // Check if user has permission to view members
-    const userRole = getNormalizedRole(ctx.auth.orgRole);
+  getMembers: shopProcedure.query(async ({ ctx }) => {
+    // Check if user has admin permissions
+    const userRole = ctx.userRole;
+    
     if (!hasRolePermission(userRole, ROLES.ADMIN)) {
       throw new TRPCError({
         code: "FORBIDDEN",
@@ -228,6 +231,7 @@ export const shopRouter = createTRPCRouter({
         clerkId: true,
         email: true,
         name: true,
+        role: true,
       },
       orderBy: { id: "asc" },
     });

@@ -1,11 +1,12 @@
 import { z } from "zod";
-import { createTRPCRouter, shopProcedure, staffProcedure, shopProcedureDb } from "~/server/api/trpc";
+import { createTRPCRouter, shopProcedure, staffProcedure } from "~/server/api/trpc";
 import { TRPCError } from "@trpc/server";
 import { Prisma } from "@prisma/client";
+import { ROLES, hasRolePermission } from "~/lib/roles";
 
 export const customerRouter = createTRPCRouter({
   // Get all customers for the shop
-  getAll: shopProcedureDb
+  getAll: shopProcedure
     .input(z.object({
       search: z.string().optional(),
       isActive: z.boolean().optional(),
@@ -13,7 +14,7 @@ export const customerRouter = createTRPCRouter({
       offset: z.number().int().min(0).default(0),
     }))
     .query(async ({ ctx, input }) => {
-      const where = {
+      const where: Prisma.CustomerWhereInput = {
         shopId: ctx.shop.id,
         ...(input.isActive !== undefined && { isActive: input.isActive }),
         ...(input.search && {
@@ -50,7 +51,7 @@ export const customerRouter = createTRPCRouter({
     }),
 
   // Get customer by ID
-  getById: shopProcedureDb
+  getById: shopProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
       const customer = await ctx.db.customer.findFirst({
@@ -99,6 +100,17 @@ export const customerRouter = createTRPCRouter({
       notes: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      // User role is already validated by staffProcedure middleware
+      // Check if user has permission to create customers
+      const userRole = ctx.userRole;
+      
+      if (!hasRolePermission(userRole, ROLES.MEMBER)) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You must be a staff member to create customers",
+        });
+      }
+
       if (!ctx.user.shopId) {
         throw new TRPCError({
           code: "FORBIDDEN",
@@ -145,6 +157,17 @@ export const customerRouter = createTRPCRouter({
       isActive: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      // User role is already validated by staffProcedure middleware
+      // Check if user has permission to update customers
+      const userRole = ctx.userRole;
+      
+      if (!hasRolePermission(userRole, ROLES.MEMBER)) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You must be a staff member to update customers",
+        });
+      }
+
       if (!ctx.user.shopId) {
         throw new TRPCError({
           code: "FORBIDDEN",
@@ -185,7 +208,7 @@ export const customerRouter = createTRPCRouter({
     }),
 
   // Get customer store credit balance
-  getCreditBalance: shopProcedureDb
+  getCreditBalance: shopProcedure
     .input(z.object({ customerId: z.string() }))
     .query(async ({ ctx, input }) => {
       const customer = await ctx.db.customer.findFirst({
@@ -212,7 +235,7 @@ export const customerRouter = createTRPCRouter({
     }),
 
   // Get customer credit history
-  getCreditHistory: shopProcedureDb
+  getCreditHistory: shopProcedure
     .input(z.object({
       customerId: z.string(),
       limit: z.number().int().min(1).max(100).default(50),
@@ -263,6 +286,17 @@ export const customerRouter = createTRPCRouter({
       referenceType: z.enum(["TRANSACTION", "BUYLIST", "MANUAL", "REFUND"]).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      // User role is already validated by staffProcedure middleware
+      // Check if user has permission to adjust credit
+      const userRole = ctx.userRole;
+      
+      if (!hasRolePermission(userRole, ROLES.MEMBER)) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You must be a staff member to adjust credit",
+        });
+      }
+
       if (!ctx.user.shopId) {
         throw new TRPCError({
           code: "FORBIDDEN",
@@ -353,7 +387,7 @@ export const customerRouter = createTRPCRouter({
     }),
 
   // Search customers by phone or name
-  search: shopProcedureDb
+  search: shopProcedure
     .input(z.object({
       query: z.string().min(1),
       limit: z.number().int().min(1).max(20).default(10),

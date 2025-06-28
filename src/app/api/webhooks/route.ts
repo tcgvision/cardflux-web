@@ -58,9 +58,21 @@ export async function POST(req: Request) {
         console.log('🔄 Processing user.updated event')
         await handleUserUpdated(evt.data as UserUpdatedData)
         break
+      case 'user.deleted':
+        console.log('🔄 Processing user.deleted event')
+        await handleUserDeleted(evt.data as unknown as UserDeletedData)
+        break
       case 'organization.created':
         console.log('🔄 Processing organization.created event')
         await handleOrganizationCreated(evt.data as OrganizationCreatedData)
+        break
+      case 'organization.updated':
+        console.log('🔄 Processing organization.updated event')
+        await handleOrganizationUpdated(evt.data as OrganizationUpdatedData)
+        break
+      case 'organization.deleted':
+        console.log('🔄 Processing organization.deleted event')
+        await handleOrganizationDeleted(evt.data as OrganizationDeletedData)
         break
       case 'organizationMembership.created':
         console.log('🔄 Processing organizationMembership.created event')
@@ -112,10 +124,21 @@ type UserCreatedData = {
 
 type UserUpdatedData = UserCreatedData
 
+type UserDeletedData = {
+  id: string
+  email_addresses: Array<{ email_address: string }>
+}
+
 type OrganizationCreatedData = {
   id: string
   name: string
   slug: string
+}
+
+type OrganizationUpdatedData = OrganizationCreatedData
+
+type OrganizationDeletedData = {
+  id: string
 }
 
 type MembershipCreatedData = {
@@ -397,5 +420,79 @@ async function handleShopOwnershipConflict(
     })
 
     return { action: 'left_shop', remainingMembers: currentShopMembers - 1 }
+  }
+}
+
+// Handle user deletion
+async function handleUserDeleted(userData: UserDeletedData) {
+  const { id } = userData
+
+  console.log('Deleting user:', { id })
+
+  try {
+    // Remove user from database
+    await db.user.deleteMany({
+      where: { clerkId: id },
+    })
+
+    console.log(`✅ Deleted user with clerkId: ${id}`)
+  } catch (error) {
+    console.error('❌ Error deleting user:', error)
+    throw error
+  }
+}
+
+// Handle organization updates
+async function handleOrganizationUpdated(orgData: OrganizationUpdatedData) {
+  const { id, name, slug } = orgData
+
+  console.log('Updating organization:', { id, name, slug })
+
+  try {
+    const updatedShop = await db.shop.update({
+      where: { id },
+      data: {
+        name,
+        slug,
+        updatedAt: new Date(),
+      },
+    })
+
+    console.log('✅ Organization updated:', updatedShop)
+    return updatedShop
+  } catch (error) {
+    console.error('❌ Error updating organization:', error)
+    throw error
+  }
+}
+
+// Handle organization deletion
+async function handleOrganizationDeleted(orgData: OrganizationDeletedData) {
+  const { id } = orgData
+
+  console.log('Deleting organization:', { id })
+
+  try {
+    // Use transaction to ensure data consistency
+    await db.$transaction(async (tx) => {
+      // Remove all users from this organization
+      await tx.user.updateMany({
+        where: { shopId: id },
+        data: {
+          shopId: null,
+          role: null,
+        },
+      })
+
+      // Delete the shop and all related data
+      await tx.shop.delete({
+        where: { id },
+      })
+
+      console.log(`✅ Deleted organization and removed all members: ${id}`)
+    })
+  } catch (error) {
+    console.error('❌ Error deleting organization:', error)
+    throw error
   }
 }
