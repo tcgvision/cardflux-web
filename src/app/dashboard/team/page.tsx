@@ -110,6 +110,8 @@ export default function TeamPage() {
   const router = useRouter()
   const { user: currentUser } = useUser()
   const { hasShop, shopName, isLoaded: shopLoaded } = useUnifiedShop()
+  
+  // Call all hooks first - they must be called in the same order every time
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedRole, setSelectedRole] = useState<Role | "all">("all")
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false)
@@ -175,6 +177,35 @@ export default function TeamPage() {
     },
   })
 
+  // Filtered and sorted members
+  const filteredMembers = useMemo(() => {
+    if (!teamData?.members) return []
+    
+    let members = teamData.members as TeamMember[]
+    
+    // Filter by search query
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase()
+      members = members.filter(member => 
+        member.name?.toLowerCase().includes(query) ??
+        member.email.toLowerCase().includes(query)
+      )
+    }
+    
+    // Filter by role
+    if (selectedRole !== "all") {
+      members = members.filter(member => member.role === selectedRole)
+    }
+    
+    // Sort: admins first, then by name
+    return members.sort((a, b) => {
+      if (a.role === ROLES.ADMIN && b.role !== ROLES.ADMIN) return -1
+      if (a.role !== ROLES.ADMIN && b.role === ROLES.ADMIN) return 1
+      return (a.name ?? a.email).localeCompare(b.name ?? b.email)
+    })
+  }, [teamData?.members, searchQuery, selectedRole])
+
+  // Now handle conditional rendering after all hooks are called
   // Show loading while shop membership is being determined
   if (!shopLoaded) {
     return (
@@ -213,34 +244,6 @@ export default function TeamPage() {
       </div>
     );
   }
-
-  // Filtered and sorted members
-  const filteredMembers = useMemo(() => {
-    if (!teamData?.members) return []
-    
-    let members = teamData.members as TeamMember[]
-    
-    // Filter by search query
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase()
-      members = members.filter(member => 
-        member.name?.toLowerCase().includes(query) ??
-        member.email.toLowerCase().includes(query)
-      )
-    }
-    
-    // Filter by role
-    if (selectedRole !== "all") {
-      members = members.filter(member => member.role === selectedRole)
-    }
-    
-    // Sort: admins first, then by name
-    return members.sort((a, b) => {
-      if (a.role === ROLES.ADMIN && b.role !== ROLES.ADMIN) return -1
-      if (a.role !== ROLES.ADMIN && b.role === ROLES.ADMIN) return 1
-      return (a.name || a.email).localeCompare(b.name ?? b.email)
-    })
-  }, [teamData?.members, searchQuery, selectedRole])
 
   // Handlers
   const handleInvite = async (e: React.FormEvent) => {
@@ -312,7 +315,7 @@ export default function TeamPage() {
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Team Management</h1>
             <p className="text-muted-foreground">
-              Admin privileges required to manage team members.
+              Team management requires admin privileges. Please contact your shop administrator if you need access.
             </p>
           </div>
         </div>
@@ -323,7 +326,7 @@ export default function TeamPage() {
               Access Denied
             </CardTitle>
             <CardDescription>
-              You don't have permission to view or manage team members.
+              You don&apos;t have permission to view or manage team members.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -362,7 +365,7 @@ export default function TeamPage() {
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground mb-4">
-              {roleError?.message || teamError?.message || "An unexpected error occurred."}
+              {roleError?.message ?? teamError?.message ?? "An unexpected error occurred."}
             </p>
             <div className="flex gap-2">
               <Button 
@@ -406,7 +409,7 @@ export default function TeamPage() {
               <DialogHeader>
                 <DialogTitle>Invite Team Member</DialogTitle>
                 <DialogDescription>
-                  Send an invitation to join your team. They'll receive an email with a link to accept.
+                  Send an invitation to join your team. They&apos;ll receive an email with a link to accept.
                 </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleInvite} className="space-y-4">
@@ -567,7 +570,7 @@ export default function TeamPage() {
                   >
                     <div className="flex items-center gap-4">
                       <Avatar className="h-12 w-12">
-                        <AvatarImage src={member.avatarUrl || undefined} alt={getDisplayName(member)} />
+                        <AvatarImage src={member.avatarUrl ?? undefined} alt={getDisplayName(member)} />
                         <AvatarFallback className={`${roleInfo.bgColor}`}>
                           {getInitials(member)}
                         </AvatarFallback>
@@ -665,7 +668,7 @@ export default function TeamPage() {
             <AlertDialogDescription>
               {selectedMember && (
                 <>
-                  Are you sure you want to change <strong>{getDisplayName(selectedMember)}</strong>'s role from{' '}
+                  Are you sure you want to change <strong>{getDisplayName(selectedMember)}</strong>&apos;s role from{' '}
                   <strong>{roleConfig[selectedMember.role].label}</strong> to{' '}
                   <strong>{roleConfig[selectedMember.role === ROLES.ADMIN ? ROLES.MEMBER : ROLES.ADMIN].label}</strong>?
                 </>
@@ -781,7 +784,7 @@ export default function TeamPage() {
             <h4 className="font-semibold">Important Notes:</h4>
             <ul className="text-sm text-muted-foreground space-y-1">
               <li>• Users can only be in one shop at a time</li>
-              <li>• If user is in another shop, they'll be moved automatically</li>
+              <li>• If user is in another shop, they&apos;ll be moved automatically</li>
               <li>• Invitations expire after 7 days</li>
               <li>• Users must use the same email address that was invited</li>
             </ul>
