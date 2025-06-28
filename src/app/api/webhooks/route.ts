@@ -365,19 +365,42 @@ async function handleMembershipDeleted(membershipData: MembershipDeletedData) {
   const email = membershipData.public_user_data?.identifier
   const organizationId = membershipData.organization?.id
 
-  console.log('Removing user from organization:', { email, organizationId })
+  console.log('👤 Removing user from organization:', { email, organizationId })
 
-  await db.user.updateMany({
-    where: {
-      email,
-      shopId: organizationId,
-    },
-    data: {
-      shopId: null,
-      // role: null, // Clear role when removed from org - handled by syncRoleToDatabase
-    },
-  })
-  console.log(`Removed ${email} from shop ${organizationId}`)
+  try {
+    // Use transaction for data consistency
+    await db.$transaction(async (tx) => {
+      // Find the user
+      const user = await tx.user.findUnique({
+        where: { email },
+      })
+
+      if (!user) {
+        console.log(`⚠️ User not found in database: ${email}`)
+        return
+      }
+
+      // Check if user is being removed from their current shop
+      if (user.shopId === organizationId) {
+        // Remove user from shop and clear their role
+        const updatedUser = await tx.user.update({
+          where: { email },
+          data: {
+            shopId: null,
+            role: null, // Clear role when removed from organization
+          },
+        })
+
+        console.log(`✅ Removed ${email} from shop ${organizationId} and cleared role`)
+        console.log(`📊 User status: shopId=${updatedUser.shopId}, role=${updatedUser.role}`)
+      } else {
+        console.log(`⚠️ User ${email} is not a member of shop ${organizationId} (current shop: ${user.shopId})`)
+      }
+    })
+  } catch (error) {
+    console.error(`❌ Error removing user ${email} from organization ${organizationId}:`, error)
+    throw error
+  }
 }
 
 // Enhanced shop ownership conflict handler
@@ -470,29 +493,107 @@ async function handleOrganizationUpdated(orgData: OrganizationUpdatedData) {
 async function handleOrganizationDeleted(orgData: OrganizationDeletedData) {
   const { id } = orgData
 
-  console.log('Deleting organization:', { id })
+  console.log('🗑️ Deleting organization:', { id })
 
   try {
-    // Use transaction to ensure data consistency
+    // Use transaction to ensure data consistency and proper cleanup order
     await db.$transaction(async (tx) => {
-      // Remove all users from this organization
-      await tx.user.updateMany({
+      console.log(`🔄 Starting cleanup for organization: ${id}`)
+
+      // 1. First, remove all users from this organization (clear shopId and role)
+      const usersRemoved = await tx.user.updateMany({
         where: { shopId: id },
         data: {
           shopId: null,
           role: null,
         },
       })
+      console.log(`✅ Removed ${usersRemoved.count} users from organization ${id}`)
 
-      // Delete the shop and all related data
-      await tx.shop.delete({
+      // 2. Delete all store credit transactions for this shop
+      const creditTransactionsDeleted = await tx.storeCreditTransaction.deleteMany({
+        where: { shopId: id },
+      })
+      console.log(`✅ Deleted ${creditTransactionsDeleted.count} store credit transactions`)
+
+      // 3. Delete all transaction items (must be done before transactions)
+      const transactionItemsDeleted = await tx.transactionItem.deleteMany({
+        where: {
+          transaction: {
+            shopId: id,
+          },
+        },
+      })
+      console.log(`✅ Deleted ${transactionItemsDeleted.count} transaction items`)
+
+      // 4. Delete all transactions
+      const transactionsDeleted = await tx.transaction.deleteMany({
+        where: { shopId: id },
+      })
+      console.log(`✅ Deleted ${transactionsDeleted.count} transactions`)
+
+      // 5. Delete all buylist items (must be done before buylists)
+      const buylistItemsDeleted = await tx.buylistItem.deleteMany({
+        where: {
+          buylist: {
+            shopId: id,
+          },
+        },
+      })
+      console.log(`✅ Deleted ${buylistItemsDeleted.count} buylist items`)
+
+      // 6. Delete all buylists
+      const buylistsDeleted = await tx.buylist.deleteMany({
+        where: { shopId: id },
+      })
+      console.log(`✅ Deleted ${buylistsDeleted.count} buylists`)
+
+      // 7. Delete all inventory items
+      const inventoryItemsDeleted = await tx.inventoryItem.deleteMany({
+        where: { shopId: id },
+      })
+      console.log(`✅ Deleted ${inventoryItemsDeleted.count} inventory items`)
+
+      // 8. Delete all products
+      const productsDeleted = await tx.product.deleteMany({
+        where: { shopId: id },
+      })
+      console.log(`✅ Deleted ${productsDeleted.count} products`)
+
+      // 9. Delete all customers
+      const customersDeleted = await tx.customer.deleteMany({
+        where: { shopId: id },
+      })
+      console.log(`✅ Deleted ${customersDeleted.count} customers`)
+
+      // 10. Delete shop settings
+      const settingsDeleted = await tx.shopSettings.deleteMany({
+        where: { shopId: id },
+      })
+      console.log(`✅ Deleted shop settings`)
+
+      // 11. Finally, delete the shop itself
+      const shopDeleted = await tx.shop.delete({
         where: { id },
       })
 
-      console.log(`✅ Deleted organization and removed all members: ${id}`)
+      console.log(`✅ Successfully deleted shop: ${shopDeleted.name} (${shopDeleted.slug})`)
+      console.log(`🎉 Complete cleanup finished for organization: ${id}`)
     })
+
+    console.log(`✅ Organization deletion completed successfully: ${id}`)
   } catch (error) {
-    console.error('❌ Error deleting organization:', error)
+    console.error(`❌ Error deleting organization ${id}:`, error)
+    
+    // Log more specific error details
+    if (error instanceof Error) {
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        organizationId: id,
+      })
+    }
+    
     throw error
   }
 }

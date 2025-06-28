@@ -27,7 +27,10 @@
     "sync-roles": "tsx scripts/sync-roles.ts",
     "fix-shop-settings": "tsx scripts/fix-shop-settings.ts",
     "fix-role-sync": "tsx scripts/fix-role-sync.ts",
-    "cleanup-orphaned-shops": "tsx scripts/cleanup-orphaned-shops.ts"
+    "cleanup-orphaned-shops": "tsx scripts/cleanup-orphaned-shops.ts",
+    "sync-organizations": "tsx scripts/sync-organizations.ts",
+    "diagnose-user-sync": "tsx scripts/diagnose-user-sync.ts",
+    "fix-orphaned-users": "tsx scripts/fix-orphaned-users.ts"
   },
   "dependencies": {
     "@clerk/elements": "^0.23.33",
