@@ -9,7 +9,6 @@ import { SidebarInset, SidebarProvider } from "~/components/ui/sidebar";
 import { AppSidebar } from "~/components/app-sidebar";
 import { SiteHeader } from "~/components/site-header";
 import { LoadingProvider } from "~/components/loading-provider";
-import { LoadingOverlay } from "~/components/loading-overlay";
 import { DashboardContent } from "~/components/dashboard-content";
 
 // const geist = Geist;

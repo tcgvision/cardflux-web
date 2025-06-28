@@ -20,7 +20,12 @@
     "lint:fix": "next lint --fix",
     "preview": "next build && next start",
     "start": "next start",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "verify-webhook": "tsx scripts/verify-webhook.ts",
+    "verify-roles": "tsx scripts/verify-roles.ts",
+    "test-webhook-flow": "tsx scripts/test-webhook-flow.ts",
+    "sync-roles": "tsx scripts/sync-roles.ts",
+    "fix-shop-settings": "tsx scripts/fix-shop-settings.ts"
   },
   "dependencies": {
     "@clerk/elements": "^0.23.33",

@@ -41,7 +41,6 @@ import {
   SidebarGroup,
   SidebarGroupContent,
 } from "~/components/ui/sidebar"
-import { useLoading } from "~/components/loading-provider"
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { shopName, isLoaded, hasShop, source, needsSync } = useUnifiedShop()
@@ -49,16 +48,19 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { isAdmin } = useRolePermissions()
   const pathname = usePathname()
   const router = useRouter()
-  const { startLoading } = useLoading()
 
   const handleLogoClick = () => {
-    // Start loading immediately for instant feedback
-    startLoading()
-    
-    // Use setTimeout to ensure the loading state is set before navigation
+    // Use setTimeout to ensure the loading state is visible
     setTimeout(() => {
       router.push("/dashboard")
-    }, 0)
+    }, 100)
+  }
+
+  const handleNavigation = (url: string) => {
+    // Use setTimeout to ensure the loading state is visible
+    setTimeout(() => {
+      router.push(url)
+    }, 100)
   }
 
   const data = {
@@ -169,9 +171,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} currentPath={pathname} />
-        <NavDocuments items={data.documents} currentPath={pathname} />
-        <NavSecondary items={data.navSecondary} currentPath={pathname} className="mt-auto" />
+        <NavMain items={data.navMain} currentPath={pathname} onNavigate={handleNavigation} />
+        <NavDocuments items={data.documents} currentPath={pathname} onNavigate={handleNavigation} />
+        <NavSecondary items={data.navSecondary} currentPath={pathname} className="mt-auto" onNavigate={handleNavigation} />
       </SidebarContent>
       <SidebarFooter>
         <NavUser />

@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
+import { Loader2 } from "lucide-react"
 import { type Icon } from "@tabler/icons-react"
 
 import {
@@ -11,11 +12,12 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "~/components/ui/sidebar"
-import { useLoading } from "~/components/loading-provider"
+import { useNavigationLoading } from "~/hooks/use-navigation-loading"
 
 export function NavSecondary({
   items,
   currentPath,
+  onNavigate,
   ...props
 }: {
   items: {
@@ -24,23 +26,27 @@ export function NavSecondary({
     icon: Icon
   }[]
   currentPath: string
+  onNavigate?: (url: string) => void
 } & React.ComponentPropsWithoutRef<typeof SidebarGroup>) {
   const router = useRouter()
-  const { startLoading } = useLoading()
+  const { loadingItem, startLoading } = useNavigationLoading()
 
-  const handleNavigation = (url: string) => {
+  const handleNavigation = async (url: string) => {
     if (url === "#") {
       // Handle search functionality
       return
     }
     
-    // Start loading immediately for instant feedback
-    startLoading()
+    startLoading(url)
     
-    // Use setTimeout to ensure the loading state is set before navigation
-    setTimeout(() => {
-      router.push(url)
-    }, 0)
+    if (onNavigate) {
+      onNavigate(url)
+    } else {
+      // Use setTimeout to ensure the loading state is visible
+      setTimeout(() => {
+        router.push(url)
+      }, 100)
+    }
   }
 
   const isActive = (url: string) => {
@@ -57,10 +63,13 @@ export function NavSecondary({
         <SidebarMenu>
           {items.map((item) => {
             const active = isActive(item.url)
+            const isLoading = loadingItem === item.url
+            
             return (
               <SidebarMenuItem key={item.title}>
                 <SidebarMenuButton 
                   onClick={() => handleNavigation(item.url)}
+                  disabled={isLoading}
                   className={`
                     transition-all duration-200 ease-in-out
                     hover:bg-accent hover:text-accent-foreground 
@@ -70,9 +79,14 @@ export function NavSecondary({
                       : 'hover:border-l-2 hover:border-primary/50'
                     }
                     ${active ? 'font-medium' : 'font-normal'}
+                    ${isLoading ? 'opacity-70 cursor-not-allowed' : ''}
                   `}
                 >
-                  <item.icon className={`transition-all duration-200 ${active ? 'text-primary' : ''}`} />
+                  {isLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <item.icon className={`transition-all duration-200 ${active ? 'text-primary' : ''}`} />
+                  )}
                   <span className={active ? 'text-primary' : ''}>{item.title}</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>

@@ -54,4 +54,55 @@ export function getDefaultRole(): Role {
 export function getNormalizedRole(role: string | null | undefined): Role {
   const normalizedRole = normalizeRole(role);
   return normalizedRole ?? getDefaultRole();
+}
+
+// Helper function to sync role from Clerk to database
+export async function syncRoleToDatabase(
+  db: any, // Prisma client
+  email: string,
+  role: string,
+  shopId: string
+): Promise<void> {
+  try {
+    const normalizedRole = normalizeRole(role);
+    if (!normalizedRole) {
+      console.warn(`Invalid role received from Clerk: ${role}`);
+      return;
+    }
+
+    await db.user.update({
+      where: { email },
+      data: { role: normalizedRole },
+    });
+    
+    console.log(`Synced role for ${email}: ${role} -> ${normalizedRole}`);
+  } catch (error) {
+    console.error(`Failed to sync role for ${email}:`, error);
+    throw error;
+  }
+}
+
+// Helper function to get effective role (database first, then Clerk)
+export function getEffectiveRole(
+  databaseRole: string | null | undefined,
+  clerkRole: string | null | undefined
+): Role {
+  // Prefer database role as source of truth
+  if (databaseRole) {
+    const normalizedDbRole = normalizeRole(databaseRole);
+    if (normalizedDbRole) {
+      return normalizedDbRole;
+    }
+  }
+  
+  // Fallback to Clerk role
+  if (clerkRole) {
+    const normalizedClerkRole = normalizeRole(clerkRole);
+    if (normalizedClerkRole) {
+      return normalizedClerkRole;
+    }
+  }
+  
+  // Default fallback
+  return getDefaultRole();
 } 

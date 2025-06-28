@@ -39,6 +39,7 @@ model User {
   email    String  @unique
   name     String?
   shopId   String?               // FK to Shop (nullable for now)
+  role     String?               // Store user role (admin, member) - synced from Clerk
   shop     Shop?   @relation("ShopUsers", fields: [shopId], references: [id])
   
   // Relations for staff actions

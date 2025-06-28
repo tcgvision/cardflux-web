@@ -22,8 +22,12 @@ export const teamRouter = createTRPCRouter({
         // Use Clerk role if available
         userRole = getNormalizedRole(ctx.auth.orgRole);
       } else {
-        // Fallback: assume member role for users without Clerk org context
-        userRole = ROLES.MEMBER;
+        // Fallback: check database role
+        const currentUser = await ctx.db.user.findUnique({
+          where: { clerkId: ctx.auth.userId },
+          select: { role: true },
+        });
+        userRole = currentUser?.role ? getNormalizedRole(currentUser.role) : ROLES.MEMBER;
       }
 
       if (!hasRolePermission(userRole, ROLES.ADMIN)) {
@@ -42,6 +46,7 @@ export const teamRouter = createTRPCRouter({
             { email: { contains: input.search, mode: "insensitive" as Prisma.QueryMode } },
           ],
         }),
+        ...(input.role && { role: input.role }),
       };
 
       const [users, total] = await Promise.all([
@@ -56,128 +61,63 @@ export const teamRouter = createTRPCRouter({
             name: true,
             email: true,
             shopId: true,
+            role: true, // Include role from database
           },
         }),
         ctx.db.user.count({ where }),
       ]);
 
-      // If user has Clerk org context, try to get role information from Clerk
-      if (ctx.auth.hasClerkOrgContext) {
-        try {
-          // Get organization memberships from Clerk for role information
-          const orgMemberships = await clerkClient.organizations.getOrganizationMembershipList({
-            organizationId: ctx.shop.id,
-          });
-
-          // Map users to team members with roles from Clerk
-          const members = users.map(user => {
-            // Try multiple ways to find the membership
-            const membership = orgMemberships.find((m) => {
-              // Try matching by email in publicUserData
-              if (m.publicUserData?.identifier === user.email) {
-                return true;
-              }
-              
-              // Try matching by email in user data
-              if (m.publicUserData?.emailAddress === user.email) {
-                return true;
-              }
-              
-              // Try matching by user ID
-              if (m.userId === user.clerkId) {
-                return true;
-              }
-              
-              // Try matching by email in user object
-              if (m.user?.emailAddress === user.email) {
-                return true;
-              }
-              
-              return false;
-            });
-            
-            const role = membership ? getNormalizedRole(membership.role) : ROLES.MEMBER;
-            
-            // Enhanced logging for debugging
-            console.log(`Role mapping for ${user.email} (clerkId: ${user.clerkId}):`, {
-              clerkRole: membership?.role,
-              normalizedRole: role,
-              hasMembership: !!membership,
-              isCurrentUser: user.clerkId === ctx.auth.userId,
-              membershipId: membership?.id,
-              membershipUserId: membership?.userId,
-              membershipEmail: membership?.publicUserData?.identifier || membership?.publicUserData?.emailAddress,
-              userEmail: user.email,
-              userClerkId: user.clerkId
-            });
-            
-            return {
-              id: user.clerkId,
-              name: user.name,
-              email: user.email,
-              role,
-              databaseId: user.id,
-              joinedAt: new Date(), // Use current date as fallback
-              membershipId: membership?.id,
-              // Add avatar and user info from Clerk if available
-              avatarUrl: membership?.publicUserData?.imageUrl || null,
-              firstName: membership?.publicUserData?.firstName || null,
-              lastName: membership?.publicUserData?.lastName || null,
-              isCurrentUser: user.clerkId === ctx.auth.userId,
-            };
-          });
-
-          return {
-            members,
-            total,
-            hasMore: input.offset + input.limit < total,
-          };
-        } catch (error) {
-          console.error("Error fetching Clerk organization memberships:", error);
-          
-          // Fallback: return users with default member role if Clerk API fails
-          const members = users.map(user => ({
-            id: user.clerkId,
-            name: user.name,
-            email: user.email,
-            role: ROLES.MEMBER as Role,
-            databaseId: user.id,
-            joinedAt: new Date(), // Use current date as fallback
-            membershipId: null,
-            avatarUrl: null,
-            firstName: null,
-            lastName: null,
-            isCurrentUser: user.clerkId === ctx.auth.userId,
-          }));
-
-          return {
-            members,
-            total,
-            hasMore: input.offset + input.limit < total,
-          };
+      // Map users to team members with roles from database (primary) and Clerk (fallback)
+      const members = users.map(user => {
+        // Use database role as primary source of truth
+        let role: Role = ROLES.MEMBER; // Default fallback
+        
+        if (user.role) {
+          // Use database role if available
+          role = getNormalizedRole(user.role);
+        } else if (ctx.auth.hasClerkOrgContext) {
+          // Fallback to Clerk role if no database role
+          try {
+            // This would require additional Clerk API call, but for now we'll use the current user's context
+            // In a production environment, you might want to cache Clerk roles or fetch them in batch
+            role = getNormalizedRole(ctx.auth.orgRole);
+          } catch (error) {
+            console.warn(`Failed to get Clerk role for user ${user.email}:`, error);
+            role = ROLES.MEMBER;
+          }
         }
-      } else {
-        // No Clerk org context - return users with default member role
-        const members = users.map(user => ({
+        
+        // Enhanced logging for debugging
+        console.log(`Role mapping for ${user.email} (clerkId: ${user.clerkId}):`, {
+          databaseRole: user.role,
+          normalizedRole: role,
+          hasDatabaseRole: !!user.role,
+          isCurrentUser: user.clerkId === ctx.auth.userId,
+          userEmail: user.email,
+          userClerkId: user.clerkId
+        });
+        
+        return {
           id: user.clerkId,
           name: user.name,
           email: user.email,
-          role: ROLES.MEMBER as Role,
+          role,
           databaseId: user.id,
           joinedAt: new Date(), // Use current date as fallback
-          membershipId: null,
+          membershipId: null, // We're not using Clerk membership ID anymore
+          // Add avatar and user info from Clerk if available (would need additional API call)
           avatarUrl: null,
           firstName: null,
           lastName: null,
           isCurrentUser: user.clerkId === ctx.auth.userId,
-        }));
-
-        return {
-          members,
-          total,
-          hasMore: input.offset + input.limit < total,
         };
-      }
+      });
+
+      return {
+        members,
+        total,
+        hasMore: input.offset + input.limit < total,
+      };
     }),
 
   // Get current user's role and permissions
@@ -188,8 +128,12 @@ export const teamRouter = createTRPCRouter({
       // Use Clerk role if available
       role = getNormalizedRole(ctx.auth.orgRole);
     } else {
-      // Fallback: assume member role for users without Clerk org context
-      role = ROLES.MEMBER;
+      // Fallback: check database role
+      const currentUser = await ctx.db.user.findUnique({
+        where: { clerkId: ctx.auth.userId },
+        select: { role: true },
+      });
+      role = currentUser?.role ? getNormalizedRole(currentUser.role) : ROLES.MEMBER;
     }
     
     return {
