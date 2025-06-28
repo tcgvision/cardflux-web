@@ -70,7 +70,8 @@ export function useUnifiedShop(): UnifiedShopContext {
       }
     }
 
-    // If we have database membership but no Clerk org, this might need sync
+    // If we have database membership but no Clerk org, this is still valid
+    // The user has shop membership in our database, so they should have access
     if (hasDbMembership && membershipData?.shop) {
       return {
         shopId: membershipData.shop.id,
@@ -78,12 +79,25 @@ export function useUnifiedShop(): UnifiedShopContext {
         isLoaded: clerkLoaded && !isChecking,
         hasShop: true,
         source: "database",
-        needsSync,
+        needsSync: needsSync,
         isVerified: false,
       };
     }
 
-    // No shop found
+    // If we're still checking database membership, don't make a decision yet
+    if (isChecking) {
+      return {
+        shopId: null,
+        shopName: null,
+        isLoaded: false,
+        hasShop: false,
+        source: null,
+        needsSync: false,
+        isVerified: false,
+      };
+    }
+
+    // No shop found and we're done checking
     return {
       shopId: null,
       shopName: null,

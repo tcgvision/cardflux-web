@@ -87,38 +87,23 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
       return NextResponse.redirect(new URL("/dashboard", req.url));
     }
     // Allow access to create-shop if user has no organization
+    // Note: The dashboard will check database membership and redirect if user already has a shop
     return NextResponse.next();
   }
 
-  // Handle team management route - only allow admins
+  // Handle team management route - allow users with database membership
   if (isTeamManagementRoute(req)) {
-    // If user has no organization, redirect to create-shop
-    if (!orgId) {
-      return NextResponse.redirect(new URL("/dashboard/create-shop", req.url));
-    }
-    
-    // Check if user has admin role using the normalized role system
-    const normalizedRole = getNormalizedRole(orgRole);
-    if (!hasRolePermission(normalizedRole, ROLES.ADMIN)) {
-      // Redirect to dashboard with access denied message
-      const dashboardUrl = new URL("/dashboard", req.url);
-      dashboardUrl.searchParams.set("error", "access_denied");
-      dashboardUrl.searchParams.set("message", "You need admin privileges to access team management.");
-      return NextResponse.redirect(dashboardUrl);
-    }
-    
+    // Allow access to team management routes
+    // The team page will handle checking for shop membership and admin privileges via TRPC
+    // This allows users with database membership but no active Clerk org context to access team management
     return NextResponse.next();
   }
 
   // Handle dashboard routes
   if (isDashboardRoute(req)) {
-    // If user has no organization and isn't on create-shop, let dashboard handle routing
-    // The dashboard will check for shop membership and redirect appropriately
-    if (!orgId && !isCreateShopRoute(req)) {
-      // Don't redirect here - let the dashboard page handle it
-      return NextResponse.next();
-    }
-    // Allow access to dashboard if user has an organization
+    // Always allow access to dashboard routes
+    // The dashboard page will handle checking for shop membership and redirecting appropriately
+    // This allows users with database membership but no active Clerk org context to access the dashboard
     return NextResponse.next();
   }
 

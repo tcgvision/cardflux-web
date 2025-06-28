@@ -1,28 +1,23 @@
 import { useUser } from "@clerk/nextjs";
 import { ROLES, hasRolePermission, getNormalizedRole, type Role } from "~/lib/roles";
-import { api } from "~/trpc/react";
+import { useUnifiedShop } from "./use-unified-shop";
 
 export function useRolePermissions() {
   const { user } = useUser();
+  const { hasShop } = useUnifiedShop();
   
   // Get the organization membership role from the user's organization memberships
   const orgRole = user?.organizationMemberships?.[0]?.role ?? null;
   const normalizedRole = getNormalizedRole(orgRole);
   
-  // Get database role as fallback
-  const { data: userRoleData } = api.team.getCurrentUserRole.useQuery(undefined, {
-    enabled: !!user,
-    retry: false,
-  });
-  
-  // Use database role as primary source of truth, fallback to Clerk role
-  const effectiveRole = userRoleData?.role ?? normalizedRole ?? ROLES.MEMBER;
+  // For now, use the Clerk role as the primary source
+  // In the future, we could add a separate hook to get database role without TRPC
+  const effectiveRole = normalizedRole;
   
   return {
     // Current role information
     orgRole,
     normalizedRole,
-    databaseRole: userRoleData?.role,
     effectiveRole,
     
     // Permission checks

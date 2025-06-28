@@ -136,6 +136,18 @@ export default function DashboardPage() {
     return null;
   }
 
+  // Show loading while checking shop membership
+  if (!shopLoaded || isChecking) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
+          <p>Checking shop membership...</p>
+        </div>
+      </div>
+    );
+  }
+
   // Show create shop if no organization and no database membership
   if (!hasShop && !isChecking && shopLoaded) {
     return (

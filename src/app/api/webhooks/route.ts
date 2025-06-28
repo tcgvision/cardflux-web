@@ -4,7 +4,7 @@ import { headers } from 'next/headers'
 import type { WebhookEvent } from '@clerk/nextjs/server'
 import { db } from '~/server/db'
 import { env } from '~/env'
-import { syncRoleToDatabase } from '~/lib/roles'
+import { syncRoleToDatabase, normalizeRole } from '~/lib/roles'
 import type { PrismaClient } from '@prisma/client'
 
 export async function POST(req: Request) {
@@ -345,8 +345,15 @@ async function handleMembershipCreated(membershipData: MembershipCreatedData) {
     }
 
     // Sync role to database
-    await syncRoleToDatabase(tx, email, role, organizationId)
-    console.log(`Synced role for ${email}: ${role}`)
+    if (role === "org:admin" || role === "org:member") {
+      await tx.user.update({
+        where: { email },
+        data: { role: role },
+      });
+      console.log(`Synced role for ${email}: ${role}`);
+    } else {
+      console.warn(`Invalid role received from Clerk: ${role}`);
+    }
   })
 }
 
@@ -357,8 +364,15 @@ async function handleMembershipUpdated(membershipData: MembershipUpdatedData) {
 
   console.log('Updating membership role:', { email, organizationId, role })
 
-  await syncRoleToDatabase(db, email, role, organizationId)
-  console.log(`Updated role for ${email}: ${role}`)
+  if (role === "org:admin" || role === "org:member") {
+    await db.user.update({
+      where: { email },
+      data: { role: role },
+    });
+    console.log(`Updated role for ${email}: ${role}`);
+  } else {
+    console.warn(`Invalid role received from Clerk: ${role}`);
+  }
 }
 
 async function handleMembershipDeleted(membershipData: MembershipDeletedData) {

@@ -4,7 +4,8 @@ import * as React from "react"
 import { useState, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { useOrganization, useUser } from "@clerk/nextjs"
+import { useUser } from "@clerk/nextjs"
+import { useUnifiedShop } from "~/hooks/use-unified-shop"
 import { Button } from "~/components/ui/button"
 import { Input } from "~/components/ui/input"
 import { Badge } from "~/components/ui/badge"
@@ -107,8 +108,8 @@ interface TeamMember {
 
 export default function TeamPage() {
   const router = useRouter()
-  const { organization } = useOrganization()
   const { user: currentUser } = useUser()
+  const { hasShop, shopName, isLoaded: shopLoaded } = useUnifiedShop()
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedRole, setSelectedRole] = useState<Role | "all">("all")
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false)
@@ -122,18 +123,18 @@ export default function TeamPage() {
   const [roleUpdateDialogOpen, setRoleUpdateDialogOpen] = useState(false)
   const [removeDialogOpen, setRemoveDialogOpen] = useState(false)
 
-  // Fetch team data
+  // Fetch team data - enable when user has shop membership (database or Clerk)
   const { data: teamData, refetch: refetchTeam, error: teamError, isLoading: teamLoading } = api.team.getMembers.useQuery({
     search: searchQuery || undefined,
     role: selectedRole !== "all" ? selectedRole : undefined,
   }, {
-    enabled: !!organization,
+    enabled: hasShop, // Enable when user has shop membership
     retry: false,
   })
 
-  // Fetch current user's role and permissions
+  // Fetch current user's role and permissions - enable when user has shop membership
   const { data: userRoleData, error: roleError } = api.team.getCurrentUserRole.useQuery(undefined, {
-    enabled: !!organization,
+    enabled: hasShop, // Enable when user has shop membership
     retry: false,
   })
 
@@ -174,6 +175,45 @@ export default function TeamPage() {
     },
   })
 
+  // Show loading while shop membership is being determined
+  if (!shopLoaded) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
+          <p>Loading team management...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error if user has no shop membership
+  if (!hasShop) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <Card className="max-w-md mx-auto">
+          <CardHeader>
+            <CardTitle>Access Denied</CardTitle>
+            <CardDescription>
+              You need to be a member of a shop to access team management
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              You don&apos;t have access to any shops. Please contact your shop administrator for access.
+            </p>
+            <Button 
+              onClick={() => router.push("/dashboard")}
+              className="w-full"
+            >
+              Back to Dashboard
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   // Filtered and sorted members
   const filteredMembers = useMemo(() => {
     if (!teamData?.members) return []
@@ -184,7 +224,7 @@ export default function TeamPage() {
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
       members = members.filter(member => 
-        member.name?.toLowerCase().includes(query) ||
+        member.name?.toLowerCase().includes(query) ??
         member.email.toLowerCase().includes(query)
       )
     }
@@ -198,7 +238,7 @@ export default function TeamPage() {
     return members.sort((a, b) => {
       if (a.role === ROLES.ADMIN && b.role !== ROLES.ADMIN) return -1
       if (a.role !== ROLES.ADMIN && b.role === ROLES.ADMIN) return 1
-      return (a.name || a.email).localeCompare(b.name || b.email)
+      return (a.name || a.email).localeCompare(b.name ?? b.email)
     })
   }, [teamData?.members, searchQuery, selectedRole])
 
@@ -249,14 +289,14 @@ export default function TeamPage() {
     if (member.name) {
       return member.name.split(' ').map(n => n[0]).join('').slice(0, 2)
     }
-    return member.email[0].toUpperCase()
+    return member.email?.[0]?.toUpperCase() ?? ''
   }
 
   const getDisplayName = (member: TeamMember) => {
     if (member.firstName && member.lastName) {
       return `${member.firstName} ${member.lastName}`
     }
-    return member.name || member.email
+    return member.name ?? member.email
   }
 
   // Permissions
@@ -265,21 +305,6 @@ export default function TeamPage() {
   const canRemoveMembers = userRoleData?.permissions.canRemoveMembers
 
   // Error states
-  if (!organization) {
-    return (
-      <div className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Team Management</h1>
-            <p className="text-muted-foreground">
-              You need to be part of an organization to manage team members.
-            </p>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
   if (roleError?.data?.code === "FORBIDDEN" || teamError?.data?.code === "FORBIDDEN") {
     return (
       <div className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6">

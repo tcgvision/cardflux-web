@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { UserButton, useOrganization } from "@clerk/nextjs";
+import { UserButton } from "@clerk/nextjs";
 import { Button } from "~/components/ui/button";
 import { Logo } from "~/components/ui/logo";
 import {
@@ -13,10 +13,11 @@ import {
 } from "~/components/ui/dropdown-menu";
 import { Menu, Settings, Store, BarChart3, Users } from "lucide-react";
 import { useRolePermissions } from "~/hooks/use-role-permissions";
+import { useUnifiedShop } from "~/hooks/use-unified-shop";
 
 export function DashboardNavbar() {
   const pathname = usePathname();
-  const { organization } = useOrganization();
+  const { shopName } = useUnifiedShop();
   const { isAdmin } = useRolePermissions();
 
   const navigation = [
@@ -36,10 +37,10 @@ export function DashboardNavbar() {
             <Logo width={28} height={28} priority />
             <span className="text-xl font-bold tracking-tight">CardFlux</span>
           </Link>
-          {organization && (
+          {shopName && (
             <div className="hidden md:block">
               <span className="text-sm text-muted-foreground">/</span>
-              <span className="ml-2 text-sm font-medium">{organization.name}</span>
+              <span className="ml-2 text-sm font-medium">{shopName}</span>
             </div>
           )}
         </div>

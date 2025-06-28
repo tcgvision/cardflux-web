@@ -30,7 +30,11 @@
     "cleanup-orphaned-shops": "tsx scripts/cleanup-orphaned-shops.ts",
     "sync-organizations": "tsx scripts/sync-organizations.ts",
     "diagnose-user-sync": "tsx scripts/diagnose-user-sync.ts",
-    "fix-orphaned-users": "tsx scripts/fix-orphaned-users.ts"
+    "fix-orphaned-users": "tsx scripts/fix-orphaned-users.ts",
+    "sync-users-and-organizations": "tsx scripts/sync-users-and-organizations.ts",
+    "check-user-status": "tsx scripts/check-user-status.ts",
+    "fix-user-role": "tsx scripts/fix-user-role.ts",
+    "fix-user-role-correct": "tsx scripts/fix-user-role-correct.ts"
   },
   "dependencies": {
     "@clerk/elements": "^0.23.33",
@@ -70,6 +74,7 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "cobe": "^0.6.4",
+    "dotenv": "^17.0.0",
     "input-otp": "^1.4.2",
     "lucide-react": "^0.514.0",
     "micro": "^10.0.1",

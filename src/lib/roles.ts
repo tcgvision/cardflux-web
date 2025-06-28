@@ -1,7 +1,7 @@
 // Centralized role definitions to match Clerk dashboard
 export const ROLES = {
-  ADMIN: "admin",
-  MEMBER: "member",
+  ADMIN: "org:admin",
+  MEMBER: "org:member",
 } as const;
 
 export type Role = typeof ROLES[keyof typeof ROLES];
@@ -13,15 +13,15 @@ export const ROLE_HIERARCHY: Record<Role, number> = {
 };
 
 // Helper function to normalize Clerk role by removing organization prefix
-export function normalizeRole(role: string | null | undefined): Role | null {
+export function normalizeRole(role: string | null | undefined): string | null {
   if (!role) return null;
   
   // Remove organization prefix (e.g., "org:admin" -> "admin")
   const normalizedRole = role.replace(/^org:/, "");
   
   // Check if the normalized role is valid
-  if (normalizedRole === ROLES.ADMIN || normalizedRole === ROLES.MEMBER) {
-    return normalizedRole as Role;
+  if (normalizedRole === "admin" || normalizedRole === "member") {
+    return normalizedRole;
   }
   
   return null;
@@ -32,17 +32,18 @@ export function hasRolePermission(userRole: string | null | undefined, requiredR
   if (!userRole) return false;
   
   const normalizedUserRole = normalizeRole(userRole);
-  if (!normalizedUserRole) return false;
+  const normalizedRequiredRole = normalizeRole(requiredRole);
   
-  const userLevel = ROLE_HIERARCHY[normalizedUserRole];
-  const requiredLevel = ROLE_HIERARCHY[requiredRole];
+  if (!normalizedUserRole || !normalizedRequiredRole) return false;
+  
+  const userLevel = normalizedUserRole === "admin" ? 2 : 1;
+  const requiredLevel = normalizedRequiredRole === "admin" ? 2 : 1;
   return userLevel >= requiredLevel;
 }
 
 // Helper function to validate if a role is valid
 export function isValidRole(role: string | null | undefined): role is Role {
-  const normalizedRole = normalizeRole(role);
-  return normalizedRole !== null;
+  return role === ROLES.ADMIN || role === ROLES.MEMBER;
 }
 
 // Helper function to get default role
@@ -52,30 +53,44 @@ export function getDefaultRole(): Role {
 
 // Helper function to get normalized role with fallback
 export function getNormalizedRole(role: string | null | undefined): Role {
-  const normalizedRole = normalizeRole(role);
-  return normalizedRole ?? getDefaultRole();
+  if (!role) return ROLES.MEMBER;
+  
+  // If role is already in the correct format, return it
+  if (role === ROLES.ADMIN || role === ROLES.MEMBER) {
+    return role;
+  }
+  
+  // If role has org: prefix, return it as is (this is our expected format)
+  if (role.startsWith('org:')) {
+    const normalizedRole = role as Role;
+    if (isValidRole(normalizedRole)) {
+      return normalizedRole;
+    }
+  }
+  
+  // Fallback to member role
+  return ROLES.MEMBER;
 }
 
 // Helper function to sync role from Clerk to database
 export async function syncRoleToDatabase(
-  db: any, // Prisma client
+  db: { user: { update: (args: { where: { email: string }; data: { role: string } }) => Promise<unknown> } },
   email: string,
   role: string,
   shopId: string
 ): Promise<void> {
   try {
-    const normalizedRole = normalizeRole(role);
-    if (!normalizedRole) {
+    // Store the full role format from Clerk (e.g., "org:admin")
+    if (role === "org:admin" || role === "org:member") {
+      await db.user.update({
+        where: { email },
+        data: { role: role },
+      });
+      
+      console.log(`Synced role for ${email}: ${role}`);
+    } else {
       console.warn(`Invalid role received from Clerk: ${role}`);
-      return;
     }
-
-    await db.user.update({
-      where: { email },
-      data: { role: normalizedRole },
-    });
-    
-    console.log(`Synced role for ${email}: ${role} -> ${normalizedRole}`);
   } catch (error) {
     console.error(`Failed to sync role for ${email}:`, error);
     throw error;
@@ -88,19 +103,13 @@ export function getEffectiveRole(
   clerkRole: string | null | undefined
 ): Role {
   // Prefer database role as source of truth
-  if (databaseRole) {
-    const normalizedDbRole = normalizeRole(databaseRole);
-    if (normalizedDbRole) {
-      return normalizedDbRole;
-    }
+  if (databaseRole && isValidRole(databaseRole)) {
+    return databaseRole;
   }
   
   // Fallback to Clerk role
-  if (clerkRole) {
-    const normalizedClerkRole = normalizeRole(clerkRole);
-    if (normalizedClerkRole) {
-      return normalizedClerkRole;
-    }
+  if (clerkRole && isValidRole(clerkRole)) {
+    return clerkRole;
   }
   
   // Default fallback

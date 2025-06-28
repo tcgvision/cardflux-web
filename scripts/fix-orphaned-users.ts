@@ -1,8 +1,28 @@
 #!/usr/bin/env tsx
 
+// Load environment variables from .env files
+import 'dotenv/config';
+
 import { clerkClient } from '@clerk/nextjs/server';
 import { db } from '../src/server/db';
 import { env } from '../src/env';
+
+// Type definitions for Clerk user data
+interface ClerkOrganizationMembership {
+  organization?: {
+    id: string;
+    name?: string;
+  };
+  role: string;
+}
+
+interface ClerkUser {
+  id: string;
+  emailAddresses: Array<{
+    emailAddress: string;
+  }>;
+  organizationMemberships?: ClerkOrganizationMembership[];
+}
 
 async function fixOrphanedUsers() {
   console.log('🔧 Fixing orphaned users...');
@@ -10,6 +30,8 @@ async function fixOrphanedUsers() {
   if (!env.CLERK_SECRET_KEY) {
     throw new Error('CLERK_SECRET_KEY is not set in the environment!');
   }
+
+  console.log('✅ CLERK_SECRET_KEY found in environment');
 
   try {
     const clerk = await clerkClient();
@@ -56,16 +78,16 @@ async function fixOrphanedUsers() {
         }
 
         // Get user's organization memberships from Clerk
-        let clerkUser;
+        let clerkUser: ClerkUser;
         try {
-          clerkUser = await clerk.users.getUser(user.clerkId);
+          clerkUser = await clerk.users.getUser(user.clerkId) as ClerkUser;
         } catch (error) {
           console.log(`❌ Could not fetch Clerk user data for ${user.email}:`, error);
           continue;
         }
 
         // Get user's organization memberships
-        const userOrgMemberships = (clerkUser as any)?.organizationMemberships ?? [];
+        const userOrgMemberships = clerkUser?.organizationMemberships ?? [];
         
         if (userOrgMemberships.length === 0) {
           console.log(`ℹ️ User ${user.email} has no organization memberships`);
@@ -74,6 +96,10 @@ async function fixOrphanedUsers() {
 
         // Find the first organization membership
         const membership = userOrgMemberships[0];
+        if (!membership) {
+          console.log(`⚠️ User ${user.email} has empty organization memberships array`);
+          continue;
+        }
         const organizationId = membership.organization?.id;
         const role = membership.role;
 
