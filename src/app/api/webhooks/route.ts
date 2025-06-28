@@ -86,8 +86,31 @@ export async function POST(req: Request) {
         console.log('🔄 Processing organizationMembership.deleted event')
         await handleMembershipDeleted(evt.data as MembershipDeletedData)
         break
+      // Future-proofing: Add handlers for potential future events
+      case 'organizationInvitation.created':
+        console.log('🔄 Processing organizationInvitation.created event')
+        // TODO: Handle invitation creation if needed
+        break
+      case 'organizationInvitation.accepted':
+        console.log('🔄 Processing organizationInvitation.accepted event')
+        // TODO: Handle invitation acceptance if needed
+        break
+      case 'organizationInvitation.revoked':
+        console.log('🔄 Processing organizationInvitation.revoked event')
+        // TODO: Handle invitation revocation if needed
+        break
+      case 'session.created':
+        console.log('🔄 Processing session.created event')
+        // TODO: Handle session creation if needed
+        break
+      case 'session.revoked':
+        console.log('🔄 Processing session.revoked event')
+        // TODO: Handle session revocation if needed
+        break
       default:
         console.log(`⚠️ Unhandled webhook event: ${evt.type}`)
+        // Log the event data for debugging future events
+        console.log(`📊 Event data:`, JSON.stringify(evt.data, null, 2))
     }
 
     console.log('✅ Webhook processed successfully')
