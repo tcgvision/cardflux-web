@@ -17,10 +17,21 @@ model Shop {
   name        String
   slug        String   @unique
   description String?
-  location    String?
   type        String   // "local", "online", or "both"
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  
+  // Enhanced address structure
+  address     ShopAddress?
+  
+  // Business details
+  contactInfo ShopContactInfo?
+  
+  // POS and scanner settings
+  posSettings POSSettings?
+  
+  // Supported franchises
+  supportedFranchises ShopFranchise[]
   
   // Relations
   users       User[]   @relation("ShopUsers")
@@ -31,6 +42,93 @@ model Shop {
   buylists    Buylist[]
   storeCreditTransactions StoreCreditTransaction[]
   settings    ShopSettings?
+}
+
+// Enhanced address model
+model ShopAddress {
+  id          String   @id @default(cuid())
+  shopId      String   @unique
+  street      String
+  city        String
+  state       String
+  zipCode     String
+  country     String   @default("US")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  shop        Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+}
+
+// Business contact information
+model ShopContactInfo {
+  id          String   @id @default(cuid())
+  shopId      String   @unique
+  phone       String?
+  email       String?
+  website     String?
+  taxId       String?  // Business tax ID
+  businessHours BusinessHours[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  shop        Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+}
+
+// Business hours
+model BusinessHours {
+  id              String   @id @default(cuid())
+  contactInfoId   String
+  dayOfWeek       Int      // 0 = Sunday, 1 = Monday, etc.
+  openTime        String?  // "09:00"
+  closeTime       String?  // "17:00"
+  isClosed        Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  contactInfo     ShopContactInfo @relation(fields: [contactInfoId], references: [id], onDelete: Cascade)
+  
+  @@unique([contactInfoId, dayOfWeek])
+}
+
+// POS configuration settings
+model POSSettings {
+  id                    String @id @default(cuid())
+  shopId                String @unique
+  enableScanner         Boolean @default(true)
+  scannerDeviceType     String? // "camera", "barcode", "nfc"
+  enableReceipts        Boolean @default(true)
+  receiptTemplate       String? // Custom receipt template
+  enableCustomerDisplay Boolean @default(false)
+  defaultPaymentMethod  PaymentMethod @default(CASH)
+  taxRate               Float @default(0.0) // Default tax rate
+  enableDiscounts       Boolean @default(true)
+  maxDiscountPercent    Float @default(20.0)
+  enableReturns         Boolean @default(true)
+  returnWindowDays      Int @default(30)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  // Relations
+  shop                  Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+}
+
+// Supported franchises for each shop
+model ShopFranchise {
+  id          String   @id @default(cuid())
+  shopId      String
+  franchise   String   // "One Piece TCG", "Magic The Gathering", "Pokemon TCG"
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  shop        Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  
+  @@unique([shopId, franchise])
+  @@index([shopId, isActive])
 }
 
 model User {
@@ -122,6 +220,10 @@ model Product {
   tcgplayerId   String?   // for sync reference
   marketPrice   Float?    // Add for price tracking
   lastPriceUpdate DateTime? // Add for price freshness
+  
+  // Franchise-specific attributes
+  franchiseAttributes ProductFranchiseAttributes?
+  
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   
@@ -134,6 +236,48 @@ model Product {
   
   @@unique([shopId, tcgLine, setCode, cardNumber]) // Prevent duplicates
   @@index([tcgplayerId]) // For price sync performance
+  @@index([shopId, tcgLine]) // For franchise filtering
+}
+
+// Franchise-specific product attributes
+model ProductFranchiseAttributes {
+  id          String   @id @default(cuid())
+  productId   String   @unique
+  
+  // One Piece TCG specific
+  character   String?  // Character name
+  cardType    String?  // Leader, Character, Event, Stage
+  cost        Int?     // Card cost
+  power       Int?     // Card power
+  counter     Int?     // Counter power
+  effect      String?  // Card effect text
+  
+  // Magic The Gathering specific
+  manaCost    String?  // Mana cost
+  manaValue   Int?     // Converted mana cost
+  mtgCardType String?  // Creature, Instant, Sorcery, etc.
+  subtypes    String[] // Card subtypes
+  mtgFlavorText String?  // Flavor text
+  
+  // Pokemon TCG specific
+  pokemonType String?  // Fire, Water, etc.
+  hp          Int?     // Hit points
+  attack1     String?  // First attack
+  attack2     String?  // Second attack
+  weakness    String?  // Weakness type
+  resistance  String?  // Resistance type
+  retreatCost Int?     // Retreat cost
+  
+  // Common attributes
+  artist      String?  // Card artist
+  cardText    String?  // Card rules text
+  flavorText  String?  // Flavor text
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 }
 
 model InventoryItem {
@@ -152,6 +296,7 @@ model InventoryItem {
   shop          Shop     @relation(fields: [shopId], references: [id])
   
   @@unique([shopId, productId, condition]) // Prevent duplicate entries
+  @@index([shopId, quantity]) // For low stock queries
 }
 
 enum Condition {
@@ -191,6 +336,7 @@ model Transaction {
 
   @@index([shopId, createdAt])
   @@index([customerId, createdAt])
+  @@index([shopId, type, status])
 }
 
 model TransactionItem {
@@ -204,6 +350,8 @@ model TransactionItem {
   // Relations
   transaction    Transaction @relation(fields: [transactionId], references: [id])
   product        Product     @relation(fields: [productId], references: [id])
+  
+  @@index([transactionId])
 }
 
 enum TransactionType {

@@ -89,6 +89,9 @@ export default function SignInPage() {
 
       if (result.status === "complete") {
         await setActive({ session: result.createdSessionId });
+        
+        // Check if user has an organization, if not redirect to create-shop
+        // The middleware will handle this, but we can also check here for better UX
         router.push("/dashboard");
       } else {
         console.log(JSON.stringify(result, null, 2));

@@ -5,7 +5,7 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Starting database seed...');
 
-  // Create a sample shop
+  // Create a sample shop with enhanced details
   const shop = await prisma.shop.upsert({
     where: { id: 'org_2yepdd2yQRhWmhsBKyztGPhjcAs' },
     update: {},
@@ -14,8 +14,56 @@ async function main() {
       name: 'TCG Haven',
       slug: 'tcg-haven',
       description: 'Your premier destination for trading card games',
-      location: 'New York, NY',
       type: 'local',
+      address: {
+        create: {
+          street: '123 Card Street',
+          city: 'New York',
+          state: 'NY',
+          zipCode: '10001',
+          country: 'US',
+        },
+      },
+      contactInfo: {
+        create: {
+          phone: '+1-555-0123',
+          email: 'info@tcghaven.com',
+          website: 'https://tcghaven.com',
+          taxId: '12-3456789',
+          businessHours: {
+            create: [
+              { dayOfWeek: 1, openTime: '09:00', closeTime: '18:00' }, // Monday
+              { dayOfWeek: 2, openTime: '09:00', closeTime: '18:00' }, // Tuesday
+              { dayOfWeek: 3, openTime: '09:00', closeTime: '18:00' }, // Wednesday
+              { dayOfWeek: 4, openTime: '09:00', closeTime: '18:00' }, // Thursday
+              { dayOfWeek: 5, openTime: '09:00', closeTime: '18:00' }, // Friday
+              { dayOfWeek: 6, openTime: '10:00', closeTime: '17:00' }, // Saturday
+              { dayOfWeek: 0, isClosed: true }, // Sunday
+            ],
+          },
+        },
+      },
+      posSettings: {
+        create: {
+          enableScanner: true,
+          scannerDeviceType: 'camera',
+          enableReceipts: true,
+          enableCustomerDisplay: false,
+          defaultPaymentMethod: 'CASH',
+          taxRate: 8.875, // NY state tax
+          enableDiscounts: true,
+          maxDiscountPercent: 15.0,
+          enableReturns: true,
+          returnWindowDays: 30,
+        },
+      },
+      supportedFranchises: {
+        create: [
+          { franchise: 'One Piece TCG', isActive: true },
+          { franchise: 'Magic The Gathering', isActive: true },
+          { franchise: 'Pokemon TCG', isActive: true },
+        ],
+      },
       settings: {
         create: {
           defaultCurrency: 'USD',
@@ -57,7 +105,7 @@ async function main() {
         phone: '555-0101',
         currentCredit: 25.50,
         totalEarned: 150.00,
-        lastVisit: new Date(),
+        lastVisit: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
         notes: 'Regular customer, prefers One Piece cards',
       },
     }),
@@ -70,8 +118,8 @@ async function main() {
         phone: '555-0102',
         currentCredit: 0,
         totalEarned: 75.00,
-        lastVisit: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 7 days ago
-        notes: 'New customer, interested in competitive play',
+        lastVisit: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000), // 5 days ago
+        notes: 'MTG player, buys booster boxes',
       },
     }),
     prisma.customer.upsert({
@@ -82,9 +130,9 @@ async function main() {
         name: 'Carol Davis',
         phone: '555-0103',
         currentCredit: 100.00,
-        totalEarned: 300.00,
-        lastVisit: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
-        notes: 'High-value customer, collects rare cards',
+        totalEarned: 200.00,
+        lastVisit: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // 1 day ago
+        notes: 'Pokemon collector, trades frequently',
       },
     }),
     prisma.customer.upsert({
@@ -94,10 +142,10 @@ async function main() {
         shopId: shop.id,
         name: 'David Wilson',
         phone: '555-0104',
-        currentCredit: 45.75,
-        totalEarned: 200.00,
-        lastVisit: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // 1 day ago
-        notes: 'Competitive player, buys singles frequently',
+        currentCredit: 13.25,
+        totalEarned: 45.00,
+        lastVisit: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 1 week ago
+        notes: 'Casual player, likes sealed products',
       },
     }),
     prisma.customer.upsert({
@@ -117,8 +165,9 @@ async function main() {
 
   console.log('✅ Customers created:', customers.length);
 
-  // Create sample products (One Piece TCG cards)
+  // Create sample products with franchise-specific attributes
   const products = await Promise.all([
+    // One Piece TCG cards
     prisma.product.upsert({
       where: { 
         shopId_tcgLine_setCode_cardNumber: {
@@ -140,6 +189,16 @@ async function main() {
         imageUrl: 'https://example.com/luffy.jpg',
         marketPrice: 15.99,
         lastPriceUpdate: new Date(),
+        franchiseAttributes: {
+          create: {
+            character: 'Monkey D. Luffy',
+            cardType: 'Leader',
+            cost: 5,
+            power: 5000,
+            counter: 2000,
+            effect: 'This Leader can attack twice per turn.',
+          },
+        },
       },
     }),
     prisma.product.upsert({
@@ -163,105 +222,95 @@ async function main() {
         imageUrl: 'https://example.com/zoro.jpg',
         marketPrice: 8.50,
         lastPriceUpdate: new Date(),
+        franchiseAttributes: {
+          create: {
+            character: 'Roronoa Zoro',
+            cardType: 'Character',
+            cost: 4,
+            power: 4000,
+            counter: 1000,
+            effect: 'When this card attacks, draw 1 card.',
+          },
+        },
       },
     }),
+    // Magic The Gathering cards
     prisma.product.upsert({
       where: { 
         shopId_tcgLine_setCode_cardNumber: {
           shopId: shop.id,
-          tcgLine: 'One Piece TCG',
-          setCode: 'OP05',
-          cardNumber: 'OP05-001',
+          tcgLine: 'Magic The Gathering',
+          setCode: 'MKM',
+          cardNumber: 'MKM-001',
         }
       },
       update: {},
       create: {
         shopId: shop.id,
-        name: 'Trafalgar Law',
-        setCode: 'OP05',
-        setName: 'Awakening of the New Era',
-        tcgLine: 'One Piece TCG',
-        rarity: 'Leader',
-        cardNumber: 'OP05-001',
-        imageUrl: 'https://example.com/law.jpg',
-        marketPrice: 12.99,
+        name: 'Sol Ring',
+        setCode: 'MKM',
+        setName: 'Murders at Karlov Manor',
+        tcgLine: 'Magic The Gathering',
+        rarity: 'Uncommon',
+        cardNumber: 'MKM-001',
+        imageUrl: 'https://example.com/sol-ring.jpg',
+        marketPrice: 2.50,
         lastPriceUpdate: new Date(),
+        franchiseAttributes: {
+          create: {
+            manaCost: '{1}',
+            manaValue: 1,
+            mtgCardType: 'Artifact',
+            subtypes: ['Equipment'],
+            mtgFlavorText: 'The ring grants its bearer great power.',
+            artist: 'John Doe',
+            cardText: '{T}: Add {C}{C}.',
+          },
+        },
       },
     }),
+    // Pokemon TCG cards
     prisma.product.upsert({
       where: { 
         shopId_tcgLine_setCode_cardNumber: {
           shopId: shop.id,
-          tcgLine: 'One Piece TCG',
-          setCode: 'OP06',
-          cardNumber: 'OP06-003',
+          tcgLine: 'Pokemon TCG',
+          setCode: 'SV151',
+          cardNumber: 'SV151-004',
         }
       },
       update: {},
       create: {
         shopId: shop.id,
-        name: 'Nami',
-        setCode: 'OP06',
-        setName: 'Awakening of the New Era',
-        tcgLine: 'One Piece TCG',
-        rarity: 'UC',
-        cardNumber: 'OP06-003',
-        imageUrl: 'https://example.com/nami.jpg',
-        marketPrice: 2.99,
+        name: 'Pikachu',
+        setCode: 'SV151',
+        setName: 'Scarlet & Violet—151',
+        tcgLine: 'Pokemon TCG',
+        rarity: 'Common',
+        cardNumber: 'SV151-004',
+        imageUrl: 'https://example.com/pikachu.jpg',
+        marketPrice: 0.50,
         lastPriceUpdate: new Date(),
-      },
-    }),
-    prisma.product.upsert({
-      where: { 
-        shopId_tcgLine_setCode_cardNumber: {
-          shopId: shop.id,
-          tcgLine: 'One Piece TCG',
-          setCode: 'OP06',
-          cardNumber: 'OP06-004',
-        }
-      },
-      update: {},
-      create: {
-        shopId: shop.id,
-        name: 'Usopp',
-        setCode: 'OP06',
-        setName: 'Awakening of the New Era',
-        tcgLine: 'One Piece TCG',
-        rarity: 'UC',
-        cardNumber: 'OP06-004',
-        imageUrl: 'https://example.com/usopp.jpg',
-        marketPrice: 1.99,
-        lastPriceUpdate: new Date(),
-      },
-    }),
-    prisma.product.upsert({
-      where: { 
-        shopId_tcgLine_setCode_cardNumber: {
-          shopId: shop.id,
-          tcgLine: 'One Piece TCG',
-          setCode: 'OP06',
-          cardNumber: 'OP06-005',
-        }
-      },
-      update: {},
-      create: {
-        shopId: shop.id,
-        name: 'Sanji',
-        setCode: 'OP06',
-        setName: 'Awakening of the New Era',
-        tcgLine: 'One Piece TCG',
-        rarity: 'SR',
-        cardNumber: 'OP06-005',
-        imageUrl: 'https://example.com/sanji.jpg',
-        marketPrice: 6.50,
-        lastPriceUpdate: new Date(),
+        franchiseAttributes: {
+          create: {
+            pokemonType: 'Lightning',
+            hp: 60,
+            attack1: 'Thunder Shock',
+            attack2: 'Quick Attack',
+            weakness: 'Fighting',
+            resistance: 'Metal',
+            retreatCost: 1,
+            artist: 'Jane Smith',
+            cardText: 'This Pokemon can use Thunder Shock for 20 damage.',
+          },
+        },
       },
     }),
   ]);
 
   console.log('✅ Products created:', products.length);
 
-  // Create inventory items with different conditions and quantities
+  // Create inventory items
   const inventoryItems = await Promise.all([
     prisma.inventoryItem.upsert({
       where: { 
@@ -275,28 +324,10 @@ async function main() {
       create: {
         shopId: shop.id,
         productId: products[0].id,
-        quantity: 5,
+        quantity: 8,
         price: 15.99,
         condition: 'NM',
-        notes: 'Fresh from booster box',
-      },
-    }),
-    prisma.inventoryItem.upsert({
-      where: { 
-        shopId_productId_condition: {
-          shopId: shop.id,
-          productId: products[0].id,
-          condition: 'LP',
-        }
-      },
-      update: {},
-      create: {
-        shopId: shop.id,
-        productId: products[0].id,
-        quantity: 2,
-        price: 12.99,
-        condition: 'LP',
-        notes: 'Light edge wear',
+        notes: 'Leader card, high demand',
       },
     }),
     prisma.inventoryItem.upsert({
@@ -311,10 +342,10 @@ async function main() {
       create: {
         shopId: shop.id,
         productId: products[1].id,
-        quantity: 3,
+        quantity: 12,
         price: 8.50,
         condition: 'NM',
-        notes: 'Popular card, restock soon',
+        notes: 'SR card, moderate demand',
       },
     }),
     prisma.inventoryItem.upsert({
@@ -329,10 +360,10 @@ async function main() {
       create: {
         shopId: shop.id,
         productId: products[2].id,
-        quantity: 2,
-        price: 12.99,
+        quantity: 25,
+        price: 2.50,
         condition: 'NM',
-        notes: 'Limited stock',
+        notes: 'MTG staple, always in demand',
       },
     }),
     prisma.inventoryItem.upsert({
@@ -347,46 +378,10 @@ async function main() {
       create: {
         shopId: shop.id,
         productId: products[3].id,
-        quantity: 15,
-        price: 2.99,
+        quantity: 50,
+        price: 0.50,
         condition: 'NM',
-        notes: 'Common card, good stock',
-      },
-    }),
-    prisma.inventoryItem.upsert({
-      where: { 
-        shopId_productId_condition: {
-          shopId: shop.id,
-          productId: products[4].id,
-          condition: 'NM',
-        }
-      },
-      update: {},
-      create: {
-        shopId: shop.id,
-        productId: products[4].id,
-        quantity: 8,
-        price: 1.99,
-        condition: 'NM',
-        notes: 'Common card',
-      },
-    }),
-    prisma.inventoryItem.upsert({
-      where: { 
-        shopId_productId_condition: {
-          shopId: shop.id,
-          productId: products[5].id,
-          condition: 'NM',
-        }
-      },
-      update: {},
-      create: {
-        shopId: shop.id,
-        productId: products[5].id,
-        quantity: 4,
-        price: 6.50,
-        condition: 'NM',
-        notes: 'SR card, moderate demand',
+        notes: 'Common Pokemon card',
       },
     }),
   ]);
@@ -417,7 +412,7 @@ async function main() {
       const quantity = Math.floor(Math.random() * 3) + 1;
       const pricePerUnit = product.marketPrice ?? 10;
       const subtotal = quantity * pricePerUnit;
-      const tax = subtotal * 0.08; // 8% tax
+      const tax = subtotal * 0.08875; // 8.875% tax (NY)
       const totalAmount = subtotal + tax;
       
       const transaction = await prisma.transaction.create({
@@ -506,7 +501,7 @@ async function main() {
               condition: 'NM',
             },
             {
-              productId: products[5].id,
+              productId: products[3].id,
               quantity: 2,
               offerPrice: 4.00,
               condition: 'LP',
@@ -535,7 +530,7 @@ async function main() {
               condition: 'NM',
             },
             {
-              productId: products[4].id,
+              productId: products[2].id,
               quantity: 3,
               offerPrice: 1.00,
               condition: 'NM',
@@ -620,6 +615,8 @@ async function main() {
   console.log('🎉 Database seeding completed successfully!');
   console.log('\n📊 Dashboard Data Summary:');
   console.log(`  • Shop: ${shop.name}`);
+  console.log(`  • Address: ${shop.address?.street}, ${shop.address?.city}, ${shop.address?.state}`);
+  console.log(`  • Supported Franchises: ${shop.supportedFranchises?.length ?? 0}`);
   console.log(`  • Customers: ${customers.length}`);
   console.log(`  • Products: ${products.length}`);
   console.log(`  • Inventory Items: ${inventoryItems.length}`);
@@ -630,10 +627,11 @@ async function main() {
 }
 
 main()
-  .catch((e) => {
-    console.error('❌ Error seeding database:', e);
-    process.exit(1);
+  .then(async () => {
+    await prisma.$disconnect();
   })
-  .finally(() => {
-    void prisma.$disconnect();
+  .catch(async (e) => {
+    console.error(e);
+    await prisma.$disconnect();
+    process.exit(1);
   }); 

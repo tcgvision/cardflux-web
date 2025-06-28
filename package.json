@@ -34,7 +34,8 @@
     "sync-users-and-organizations": "tsx scripts/sync-users-and-organizations.ts",
     "check-user-status": "tsx scripts/check-user-status.ts",
     "fix-user-role": "tsx scripts/fix-user-role.ts",
-    "fix-user-role-correct": "tsx scripts/fix-user-role-correct.ts"
+    "fix-user-role-correct": "tsx scripts/fix-user-role-correct.ts",
+    "test-auth-flow": "tsx scripts/test-auth-flow.ts"
   },
   "dependencies": {
     "@clerk/elements": "^0.23.33",

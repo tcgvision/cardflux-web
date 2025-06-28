@@ -114,34 +114,30 @@ export default function SignUpPage() {
       console.log("Routing after verification...");
       
       // Give webhook time to process organization membership
-      setTimeout(async () => {
-        try {
-          // Check if user is already linked to a shop via invitation
-          const membershipResponse = await fetch('/api/check-shop-membership');
-          const membershipData = await membershipResponse.json();
-          
-          if (membershipData.hasShop) {
-            console.log("User is linked to shop via invitation, redirecting to dashboard");
-            router.push("/dashboard");
-          } else if (organization) {
-            console.log("User is in organization, redirecting to dashboard");
-            router.push("/dashboard");
-          } else {
-            console.log("User not in organization, redirecting to create-shop");
+      setTimeout(() => {
+        void (async () => {
+          try {
+            // Check if user is already linked to a shop via invitation
+            const membershipResponse = await fetch('/api/check-shop-membership');
+            const membershipData = await membershipResponse.json() as { hasShop: boolean; shop?: unknown; message?: string };
+            
+            if (membershipData.hasShop) {
+              console.log("User is linked to shop via invitation, redirecting to dashboard");
+              router.push("/dashboard");
+            } else {
+              console.log("User not linked to shop, redirecting to create-shop");
+              router.push("/dashboard/create-shop");
+            }
+          } catch (error) {
+            console.error("Error checking shop membership:", error);
+            // Fallback to create-shop
+            console.log("Error checking membership, redirecting to create-shop");
             router.push("/dashboard/create-shop");
           }
-        } catch (error) {
-          console.error("Error checking shop membership:", error);
-          // Fallback to organization check
-          if (organization) {
-            router.push("/dashboard");
-          } else {
-            router.push("/dashboard/create-shop");
-          }
-        }
+        })();
       }, 2000);
     }
-  }, [isVerified, isRedirecting, organization, router]);
+  }, [isVerified, isRedirecting, router]);
 
   // Check for existing organization membership on component load
   useEffect(() => {
@@ -311,33 +307,35 @@ export default function SignUpPage() {
         setVerificationCode("");
         
         // Give webhook time to process user creation before redirecting
-        setTimeout(async () => {
-          if (!isRedirecting) {
-            console.log("Fallback routing triggered");
-            
-            try {
-              // Check if user is already linked to a shop via invitation
-              const membershipResponse = await fetch('/api/check-shop-membership');
-              const membershipData = await membershipResponse.json();
+        setTimeout(() => {
+          void (async () => {
+            if (!isRedirecting) {
+              console.log("Fallback routing triggered");
               
-              if (membershipData.hasShop) {
-                console.log("User is linked to shop via invitation, redirecting to dashboard");
-                router.push("/dashboard");
-                return;
+              try {
+                // Check if user is already linked to a shop via invitation
+                const membershipResponse = await fetch('/api/check-shop-membership');
+                const membershipData = await membershipResponse.json() as { hasShop: boolean; shop?: unknown; message?: string };
+                
+                if (membershipData.hasShop) {
+                  console.log("User is linked to shop via invitation, redirecting to dashboard");
+                  router.push("/dashboard");
+                  return;
+                }
+              } catch (error) {
+                console.error("Error checking shop membership:", error);
               }
-            } catch (error) {
-              console.error("Error checking shop membership:", error);
+              
+              // Fallback to organization check
+              if (organization) {
+                console.log("User is in organization, redirecting to dashboard");
+                router.push("/dashboard");
+              } else {
+                console.log("User not in organization, redirecting to create-shop");
+                router.push("/dashboard/create-shop");
+              }
             }
-            
-            // Fallback to organization check
-            if (organization) {
-              console.log("User is in organization, redirecting to dashboard");
-              router.push("/dashboard");
-            } else {
-              console.log("User not in organization, redirecting to create-shop");
-              router.push("/dashboard/create-shop");
-            }
-          }
+          })();
         }, 5000);
       } else {
         // Handle incomplete verification
@@ -386,7 +384,7 @@ export default function SignUpPage() {
     try {
       // Check if user is already linked to a shop via invitation
       const membershipResponse = await fetch('/api/check-shop-membership');
-      const membershipData = await membershipResponse.json();
+      const membershipData = await membershipResponse.json() as { hasShop: boolean; shop?: unknown; message?: string };
       
       if (membershipData.hasShop) {
         console.log("User is linked to shop via invitation, redirecting to dashboard");

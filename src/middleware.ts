@@ -15,6 +15,9 @@ const isPublicRoute = createRouteMatcher([
   "/api/webhooks(.*)", // Fixed: removed the slash before (.*) for better matching
   "/api/reset-signup(.*)",
   "/api/sync-user(.*)",
+  "/api/debug-clerk(.*)",
+  "/api/check-shop-membership(.*)",
+  "/api/sync-organization(.*)",
 ]);
 
 const isAuthRoute = createRouteMatcher([
@@ -62,19 +65,20 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
   if (isAuthRoute(req)) {
     // If user is already signed in and has an organization, redirect to dashboard
     if (userId && orgId) {
+      console.log(`🔄 Auth route: User ${userId} has org ${orgId}, redirecting to dashboard`);
       return NextResponse.redirect(new URL("/dashboard", req.url));
     }
-    // If user is signed in but has no organization, check database for shop membership
+    // If user is signed in but has no organization, redirect to create-shop
     if (userId && !orgId) {
-      // Note: We can't make database calls from middleware, so we'll let the dashboard handle this
-      // The dashboard will check for shop membership and reload if needed
-      return NextResponse.redirect(new URL("/dashboard", req.url));
+      console.log(`🔄 Auth route: User ${userId} has no org, redirecting to create-shop`);
+      return NextResponse.redirect(new URL("/dashboard/create-shop", req.url));
     }
     return NextResponse.next();
   }
 
   // Handle unauthenticated users
   if (!userId) {
+    console.log(`🔄 Unauthenticated user accessing ${url.pathname}, redirecting to sign-in`);
     const signInUrl = new URL("/auth/sign-in", req.url);
     signInUrl.searchParams.set("redirect_url", url.pathname);
     return NextResponse.redirect(signInUrl);
@@ -84,10 +88,11 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
   if (isCreateShopRoute(req)) {
     // If user already has an organization, redirect to dashboard
     if (orgId && orgRole) {
+      console.log(`🔄 Create-shop route: User ${userId} already has org ${orgId}, redirecting to dashboard`);
       return NextResponse.redirect(new URL("/dashboard", req.url));
     }
     // Allow access to create-shop if user has no organization
-    // Note: The dashboard will check database membership and redirect if user already has a shop
+    console.log(`🔄 Create-shop route: User ${userId} has no org, allowing access`);
     return NextResponse.next();
   }
 
@@ -96,14 +101,19 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
     // Allow access to team management routes
     // The team page will handle checking for shop membership and admin privileges via TRPC
     // This allows users with database membership but no active Clerk org context to access team management
+    console.log(`🔄 Team route: User ${userId} accessing team management`);
     return NextResponse.next();
   }
 
   // Handle dashboard routes
   if (isDashboardRoute(req)) {
-    // Always allow access to dashboard routes
-    // The dashboard page will handle checking for shop membership and redirecting appropriately
-    // This allows users with database membership but no active Clerk org context to access the dashboard
+    // If user has no organization, redirect to create-shop
+    if (!orgId) {
+      console.log(`🔄 Dashboard route: User ${userId} has no org, redirecting to create-shop`);
+      return NextResponse.redirect(new URL("/dashboard/create-shop", req.url));
+    }
+    // Allow access to dashboard routes if user has organization
+    console.log(`🔄 Dashboard route: User ${userId} has org ${orgId}, allowing access`);
     return NextResponse.next();
   }
 
