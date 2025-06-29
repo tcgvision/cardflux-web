@@ -365,6 +365,19 @@ async function handleMembershipCreated(membershipData: MembershipCreatedData) {
     role,
   })
 
+  // First check if the shop exists in our database
+  const existingShop = await db.shop.findUnique({
+    where: { id: organizationId },
+    select: { id: true, name: true, slug: true },
+  })
+
+  if (!existingShop) {
+    console.log(`⚠️ Shop ${organizationId} not found in database, skipping membership creation (shop may have been deleted or never created)`)
+    return
+  }
+
+  console.log(`🔄 Found shop for membership: ${existingShop.name} (${existingShop.slug})`)
+
   // Use transaction for data consistency
   await db.$transaction(async (tx) => {
     // Find or create user
@@ -418,6 +431,19 @@ async function handleMembershipUpdated(membershipData: MembershipUpdatedData) {
 
   console.log('Updating membership role:', { email, organizationId, role })
 
+  // First check if the shop exists in our database
+  const existingShop = await db.shop.findUnique({
+    where: { id: organizationId },
+    select: { id: true, name: true, slug: true },
+  })
+
+  if (!existingShop) {
+    console.log(`⚠️ Shop ${organizationId} not found in database, skipping membership update (shop may have been deleted or never created)`)
+    return
+  }
+
+  console.log(`🔄 Found shop for membership update: ${existingShop.name} (${existingShop.slug})`)
+
   if (role === "org:admin" || role === "org:member") {
     await db.user.update({
       where: { email },
@@ -434,6 +460,19 @@ async function handleMembershipDeleted(membershipData: MembershipDeletedData) {
   const organizationId = membershipData.organization?.id
 
   console.log('👤 Removing user from organization:', { email, organizationId })
+
+  // First check if the shop exists in our database
+  const existingShop = await db.shop.findUnique({
+    where: { id: organizationId },
+    select: { id: true, name: true, slug: true },
+  })
+
+  if (!existingShop) {
+    console.log(`⚠️ Shop ${organizationId} not found in database, skipping membership deletion (shop may have been deleted or never created)`)
+    return
+  }
+
+  console.log(`🔄 Found shop for membership deletion: ${existingShop.name} (${existingShop.slug})`)
 
   try {
     // Use transaction for data consistency
@@ -540,6 +579,17 @@ async function handleOrganizationUpdated(orgData: OrganizationUpdatedData) {
   console.log('Updating organization:', { id, name, slug })
 
   try {
+    // First check if the shop exists in our database
+    const existingShop = await db.shop.findUnique({
+      where: { id },
+      select: { id: true, name: true, slug: true },
+    })
+
+    if (!existingShop) {
+      console.log(`⚠️ Shop ${id} not found in database, skipping update (may have been deleted or never created)`)
+      return
+    }
+
     const updatedShop = await db.shop.update({
       where: { id },
       data: {
@@ -564,6 +614,19 @@ async function handleOrganizationDeleted(orgData: OrganizationDeletedData) {
   console.log('🗑️ Deleting organization:', { id })
 
   try {
+    // First check if the shop exists in our database
+    const existingShop = await db.shop.findUnique({
+      where: { id },
+      select: { id: true, name: true, slug: true },
+    })
+
+    if (!existingShop) {
+      console.log(`⚠️ Shop ${id} not found in database, skipping deletion (may have been deleted already or never created)`)
+      return
+    }
+
+    console.log(`🔄 Found shop to delete: ${existingShop.name} (${existingShop.slug})`)
+
     // Use transaction to ensure data consistency and proper cleanup order
     await db.$transaction(async (tx) => {
       console.log(`🔄 Starting cleanup for organization: ${id}`)

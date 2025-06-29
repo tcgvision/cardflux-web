@@ -1,68 +1,71 @@
 #!/usr/bin/env tsx
 
-import { Webhook } from 'svix'
-import { headers } from 'next/headers'
+import { env } from '../src/env'
 
-console.log('🔍 Testing Webhook Configuration...\n')
+async function testWebhookConfig() {
+  console.log('🔍 Testing Webhook Configuration...\n')
 
-// Check environment variables
-console.log('📋 Environment Variables:')
-console.log('SIGNING_SECRET length:', process.env.SIGNING_SECRET?.length ?? 0)
-console.log('WEBHOOK_SECRET length:', process.env.WEBHOOK_SECRET?.length ?? 0)
-console.log('CLERK_SECRET_KEY length:', process.env.CLERK_SECRET_KEY?.length ?? 0)
-console.log('NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY length:', process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.length ?? 0)
+  try {
+    // Check environment variables
+    console.log('📋 Environment Variables:')
+    console.log(`   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ? 'Set' : 'Not set'}`)
+    console.log(`   CLERK_SECRET_KEY: ${process.env.CLERK_SECRET_KEY ? 'Set' : 'Not set'}`)
+    console.log(`   SIGNING_SECRET: ${process.env.SIGNING_SECRET ? 'Set' : 'Not set'}`)
 
-// Check if webhook secret is available
-const SIGNING_SECRET = process.env.SIGNING_SECRET ?? process.env.WEBHOOK_SECRET
-if (!SIGNING_SECRET) {
-  console.error('\n❌ ERROR: No webhook signing secret found!')
-  console.error('Please set either SIGNING_SECRET or WEBHOOK_SECRET in your .env.local file')
-  console.error('\nTo get your webhook secret:')
-  console.error('1. Go to Clerk Dashboard')
-  console.error('2. Navigate to Webhooks')
-  console.error('3. Create or edit your webhook')
-  console.error('4. Copy the signing secret')
-  process.exit(1)
+    // Check app environment variables
+    console.log('\n📋 App Environment Variables:')
+    console.log(`   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ? 'Set' : 'Not set'}`)
+    console.log(`   CLERK_SECRET_KEY: ${env.CLERK_SECRET_KEY ? 'Set' : 'Not set'}`)
+    console.log(`   SIGNING_SECRET: ${env.SIGNING_SECRET ? 'Set' : 'Not set'}`)
+
+    // Determine webhook URL
+    const isLocalhost = process.env.NODE_ENV === 'development' || process.env.VERCEL_ENV !== 'production'
+    const baseUrl = isLocalhost ? 'http://localhost:3001' : 'https://your-production-domain.com'
+    const webhookUrl = `${baseUrl}/api/webhooks`
+
+    console.log('\n🌐 Webhook Configuration:')
+    console.log(`   Environment: ${isLocalhost ? 'Development' : 'Production'}`)
+    console.log(`   Base URL: ${baseUrl}`)
+    console.log(`   Webhook URL: ${webhookUrl}`)
+
+    console.log('\n📋 Clerk Dashboard Configuration:')
+    console.log('1. Go to Clerk Dashboard > Webhooks')
+    console.log(`2. Set webhook endpoint to: ${webhookUrl}`)
+    console.log('3. Enable these events:')
+    console.log('   • user.created')
+    console.log('   • user.updated')
+    console.log('   • user.deleted')
+    console.log('   • organization.created')
+    console.log('   • organization.updated')
+    console.log('   • organization.deleted')
+    console.log('   • organizationMembership.created')
+    console.log('   • organizationMembership.updated')
+    console.log('   • organizationMembership.deleted')
+    console.log('   • session.created')
+    console.log('   • session.revoked')
+
+    console.log('\n🔧 Webhook Testing:')
+    console.log('1. Use ngrok to expose localhost: npx ngrok http 3001')
+    console.log('2. Update Clerk webhook URL with ngrok URL')
+    console.log('3. Test OAuth sign-up')
+    console.log('4. Check ngrok logs for webhook requests')
+
+    console.log('\n📋 Common Issues:')
+    console.log('• Webhook URL not set in Clerk dashboard')
+    console.log('• Wrong webhook URL (should be /api/webhooks)')
+    console.log('• Webhook events not enabled')
+    console.log('• Network issues (firewall, etc.)')
+    console.log('• Invalid signing secret')
+
+    console.log('\n🚀 Next Steps:')
+    console.log('1. Verify webhook URL in Clerk dashboard')
+    console.log('2. Enable all required webhook events')
+    console.log('3. Test OAuth sign-up with ngrok')
+    console.log('4. Monitor webhook delivery logs')
+
+  } catch (error) {
+    console.error('❌ Webhook config test failed:', error)
+  }
 }
 
-console.log('\n✅ Webhook signing secret found')
-
-// Test webhook verification
-try {
-  const wh = new Webhook(SIGNING_SECRET)
-  console.log('✅ Webhook instance created successfully')
-} catch (error) {
-  console.error('❌ Error creating webhook instance:', error)
-  process.exit(1)
-}
-
-console.log('\n📋 Next Steps to Debug:')
-console.log('1. Check your Clerk Dashboard webhook configuration:')
-console.log('   - Go to https://dashboard.clerk.com')
-console.log('   - Navigate to Webhooks')
-console.log('   - Verify your webhook URL is correct')
-console.log('   - Make sure the webhook is enabled')
-console.log('   - Check that all required events are selected')
-
-console.log('\n2. Verify your webhook URL:')
-console.log('   - If using ngrok: https://your-ngrok-url.ngrok.io/api/webhooks')
-console.log('   - If deployed: https://your-domain.com/api/webhooks')
-
-console.log('\n3. Test webhook delivery:')
-console.log('   - In Clerk Dashboard, click "Send Test Event"')
-console.log('   - Check your server logs for webhook receipt')
-console.log('   - Check ngrok logs if using ngrok')
-
-console.log('\n4. Check webhook delivery logs:')
-console.log('   - In Clerk Dashboard, go to Webhooks > [Your Webhook] > Delivery Logs')
-console.log('   - Look for failed deliveries and error messages')
-
-console.log('\n5. Verify your server is accessible:')
-console.log('   - Make sure your server is running')
-console.log('   - Test with: curl -X POST http://localhost:3001/api/webhooks')
-
-console.log('\n6. Check system clock:')
-console.log('   - Run: date')
-console.log('   - If clock is off, sync it: sudo sntp -sS time.apple.com')
-
-console.log('\n🔍 Current time:', new Date().toISOString()) 
+testWebhookConfig().catch(console.error) 

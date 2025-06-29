@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useSignUp, useOrganization, useUser } from "@clerk/nextjs";
+import { useSignUp, useSignIn, useOrganization, useUser } from "@clerk/nextjs";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -35,7 +35,8 @@ const signUpSchema = z.object({
 type SignUpFormData = z.infer<typeof signUpSchema>;
 
 export default function SignUpPage() {
-  const { isLoaded, signUp, setActive } = useSignUp();
+  const { isLoaded: signUpLoaded, signUp, setActive: setSignUpActive } = useSignUp();
+  const { isLoaded: signInLoaded, signIn, setActive: setSignInActive } = useSignIn();
   const { organization } = useOrganization();
   const router = useRouter();
 
@@ -62,13 +63,62 @@ export default function SignUpPage() {
     },
   });
 
+  // Check if both hooks are loaded
+  const isLoaded = signUpLoaded && signInLoaded;
+
+  // Check for OAuth completion on component mount
+  useEffect(() => {
+    if (!isLoaded) return;
+
+    // Check URL parameters for OAuth completion
+    const urlParams = new URLSearchParams(window.location.search);
+    const hasOAuthParams = urlParams.has('__clerk_status') || 
+                          urlParams.has('__clerk_db_jwt') || 
+                          urlParams.has('__clerk_strategy') ||
+                          (urlParams.has('code') && urlParams.has('state'));
+    
+    if (hasOAuthParams) {
+      console.log("🔍 OAuth parameters detected in URL:", {
+        __clerk_status: urlParams.get('__clerk_status'),
+        __clerk_strategy: urlParams.get('__clerk_strategy'),
+        hasCode: urlParams.has('code'),
+        hasState: urlParams.has('state'),
+      });
+    }
+  }, [isLoaded]);
+
   // Check if user is already verified on component load
   useEffect(() => {
     if (isLoaded && signUp?.status === "complete") {
       console.log("User already verified on component load");
-      handleSignUpComplete();
+      void handleSignUpComplete();
     }
-  }, [isLoaded, signUp]);
+  }, [isLoaded, signUp?.status]);
+
+  // Handle OAuth completion for both sign-up and sign-in
+  useEffect(() => {
+    if (!isLoaded) return;
+
+    console.log("🔍 Checking OAuth completion status...");
+    console.log("Sign-up status:", signUp?.status);
+    console.log("Sign-in status:", signIn?.status);
+    console.log("Sign-up createdSessionId:", signUp?.createdSessionId);
+    console.log("Sign-in createdSessionId:", signIn?.createdSessionId);
+
+    // Handle OAuth sign-up completion
+    if (signUp?.status === "complete" && signUp?.createdSessionId) {
+      console.log("🔄 OAuth sign-up completed, setting session...");
+      void handleOAuthSignUpCompletion();
+      return;
+    }
+
+    // Handle OAuth sign-in completion
+    if (signIn?.status === "complete" && signIn?.createdSessionId) {
+      console.log("🔄 OAuth sign-in completed, setting session...");
+      void handleOAuthSignInCompletion();
+      return;
+    }
+  }, [isLoaded, signUp?.status, signIn?.status]);
 
   // Handle routing after verification
   useEffect(() => {
@@ -77,10 +127,25 @@ export default function SignUpPage() {
       console.log("Routing after verification...");
       
       setTimeout(() => {
-        handlePostVerificationRouting();
+        void handlePostVerificationRouting();
       }, 2000);
     }
   }, [isVerified, isRedirecting]);
+
+  // Simple timeout for OAuth completion
+  useEffect(() => {
+    if (!isLoaded) return;
+
+    // Only set timeout if no sign-up or sign-in is in progress
+    if (!signUp?.status && !signIn?.status) {
+      const timeout = setTimeout(() => {
+        console.log("⏰ OAuth completion timeout - redirecting to create-shop");
+        router.push("/create-shop");
+      }, 5000);
+
+      return () => clearTimeout(timeout);
+    }
+  }, [isLoaded, signUp?.status, signIn?.status, router]);
 
   // OAuth sign-up handler
   const signUpWithOAuth = async (strategy: "oauth_google" | "oauth_discord") => {
@@ -88,10 +153,13 @@ export default function SignUpPage() {
 
     try {
       setOauthLoading(strategy);
+      console.log(`🔄 Starting OAuth sign-up with ${strategy}...`);
+      
+      // Use the correct OAuth approach for Clerk
       await signUp.authenticateWithRedirect({
         strategy,
-        redirectUrl: "/create-shop",
-        redirectUrlComplete: "/create-shop",
+        redirectUrl: "/auth/sign-up",
+        redirectUrlComplete: "/auth/sign-up",
         unsafeMetadata: {
           oauthProvider: strategy,
         },
@@ -150,7 +218,7 @@ export default function SignUpPage() {
       });
 
       if (completeSignUp.status === "complete") {
-        await setActive({ session: completeSignUp.createdSessionId });
+        await setSignUpActive({ session: completeSignUp.createdSessionId });
         await syncUserToDatabase();
         
         setIsVerified(true);
@@ -181,7 +249,7 @@ export default function SignUpPage() {
   const handleSignUpComplete = async () => {
     try {
       if (signUp?.createdSessionId) {
-        await setActive({ session: signUp.createdSessionId });
+        await setSignUpActive({ session: signUp.createdSessionId });
         await syncUserToDatabase();
         setIsVerified(true);
         toast.success("Account verified! Redirecting...");
@@ -251,6 +319,60 @@ export default function SignUpPage() {
     setIsRedirecting(false);
     form.reset();
     toast.info("Starting over with a fresh sign-up form");
+  };
+
+  // Helper: Handle OAuth sign-up completion
+  const handleOAuthSignUpCompletion = async () => {
+    try {
+      console.log("🔄 Starting OAuth sign-up completion handler...");
+      console.log("Sign-up status:", signUp?.status);
+      console.log("Sign-up createdSessionId:", signUp?.createdSessionId);
+      
+      if (signUp?.createdSessionId) {
+        console.log("Setting active session...");
+        await setSignUpActive({ session: signUp.createdSessionId });
+        console.log("Session set successfully");
+        
+        console.log("Syncing user to database...");
+        await syncUserToDatabase();
+        console.log("User synced to database");
+        
+        setIsVerified(true);
+        toast.success("OAuth sign-up completed! Redirecting...");
+        console.log("OAuth sign-up completion successful, user verified");
+      }
+    } catch (error) {
+      console.error("Error completing OAuth sign-up:", error);
+      toast.error("OAuth sign-up completed but unable to sign in. Please try signing in instead.");
+      setTimeout(() => router.push("/auth/sign-in"), 3000);
+    }
+  };
+
+  // Helper: Handle OAuth sign-in completion
+  const handleOAuthSignInCompletion = async () => {
+    try {
+      console.log("🔄 Starting OAuth sign-in completion handler...");
+      console.log("Sign-in status:", signIn?.status);
+      console.log("Sign-in createdSessionId:", signIn?.createdSessionId);
+      
+      if (signIn?.createdSessionId) {
+        console.log("Setting active session...");
+        await setSignInActive({ session: signIn.createdSessionId });
+        console.log("Session set successfully");
+        
+        console.log("Syncing user to database...");
+        await syncUserToDatabase();
+        console.log("User synced to database");
+        
+        setIsVerified(true);
+        toast.success("OAuth sign-in completed! Redirecting...");
+        console.log("OAuth sign-in completion successful, user verified");
+      }
+    } catch (error) {
+      console.error("Error completing OAuth sign-in:", error);
+      toast.error("OAuth sign-in completed but unable to sign in. Please try signing in instead.");
+      setTimeout(() => router.push("/auth/sign-in"), 3000);
+    }
   };
 
   // Render: Verification success state
