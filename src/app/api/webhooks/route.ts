@@ -3,32 +3,43 @@ import { Webhook } from 'svix'
 import { headers } from 'next/headers'
 import type { WebhookEvent } from '@clerk/nextjs/server'
 import { db } from '~/server/db'
-import { env } from '~/env'
 import { syncRoleToDatabase, normalizeRole } from '~/lib/roles'
+import { env } from '~/env'
 import type { PrismaClient } from '@prisma/client'
 
 export async function POST(req: Request) {
-  const SIGNING_SECRET = env.SIGNING_SECRET ?? process.env.SIGNING_SECRET
+  console.log('🔍 Webhook received - checking configuration...')
+  console.log('SIGNING_SECRET length:', env.SIGNING_SECRET?.length ?? 0)
 
-  if (!SIGNING_SECRET) {
-    console.error('SIGNING_SECRET is not configured')
+  if (!env.SIGNING_SECRET) {
+    console.error('❌ SIGNING_SECRET is not configured')
     return new Response('Webhook signing secret not configured', {
       status: 500,
     })
   }
 
-  const wh = new Webhook(SIGNING_SECRET)
+  const wh = new Webhook(env.SIGNING_SECRET)
   const headerPayload = await headers()
   const svix_id = headerPayload.get('svix-id')
   const svix_timestamp = headerPayload.get('svix-timestamp')
   const svix_signature = headerPayload.get('svix-signature')
 
+  console.log('📋 Webhook headers:', {
+    svix_id: svix_id?.substring(0, 10) + '...',
+    svix_timestamp,
+    svix_signature: svix_signature?.substring(0, 10) + '...',
+  })
+
   if (!svix_id || !svix_timestamp || !svix_signature) {
+    console.error('❌ Missing Svix headers:', { svix_id: !!svix_id, svix_timestamp: !!svix_timestamp, svix_signature: !!svix_signature })
     return new Response('Error: Missing Svix headers', { status: 400 })
   }
 
   const payload = await req.json() as Record<string, unknown>
   const body = JSON.stringify(payload)
+
+  console.log('📦 Webhook payload type:', payload.type)
+  console.log('📦 Webhook payload data keys:', Object.keys(payload.data ?? {}))
 
   let evt: WebhookEvent
 
@@ -38,15 +49,17 @@ export async function POST(req: Request) {
       'svix-timestamp': svix_timestamp,
       'svix-signature': svix_signature,
     }) as WebhookEvent
+    console.log('✅ Webhook verification successful')
   } catch (err) {
-    console.error('Error: Could not verify webhook:', err)
+    console.error('❌ Error: Could not verify webhook:', err)
     return new Response('Error: Verification error', { status: 400 })
   }
 
   const eventData = evt.data as unknown as Record<string, unknown>
   const { id } = eventData
   const eventType = evt.type
-  console.log(`Received webhook: ${eventType} for ID ${String(id)}`)
+  console.log(`🔄 Processing webhook: ${eventType} for ID ${String(id)}`)
+  console.log('📊 Full event data:', JSON.stringify(evt.data, null, 2))
 
   try {
     switch (evt.type) {
@@ -191,35 +204,54 @@ async function handleUserCreated(userData: UserCreatedData) {
   const email = email_addresses[0]?.email_address ?? ''
   const name = `${first_name ?? ''} ${last_name ?? ''}`.trim() || null
 
-  console.log('Creating user:', { id, email, name })
+  console.log('🔄 Creating user:', { id, email, name })
+  console.log('📧 Email addresses:', email_addresses)
+  console.log('👤 First name:', first_name)
+  console.log('👤 Last name:', last_name)
+  console.log('🔍 Is OAuth user:', !first_name && !last_name ? 'Likely OAuth' : 'Regular signup')
 
-  // Check if user already exists (from invitation flow)
-  const existingUser = await db.user.findUnique({
-    where: { email },
-  })
-
-  if (existingUser) {
-    // Update existing user with Clerk ID
-    const updatedUser = await db.user.update({
+  try {
+    // Check if user already exists (from invitation flow)
+    const existingUser = await db.user.findUnique({
       where: { email },
-      data: {
-        clerkId: id,
-        name: name ?? existingUser.name,
-      },
     })
-    console.log('Linked existing user to Clerk account:', updatedUser)
-    return updatedUser
-  } else {
-    // Create new user
-    const newUser = await db.user.create({
-      data: {
-        clerkId: id,
-        email,
-        name,
-      },
-    })
-    console.log('Created new user:', newUser)
-    return newUser
+
+    if (existingUser) {
+      console.log('📝 User already exists, updating with Clerk ID:', existingUser.id)
+      // Update existing user with Clerk ID
+      const updatedUser = await db.user.update({
+        where: { email },
+        data: {
+          clerkId: id,
+          name: name ?? existingUser.name,
+        },
+      })
+      console.log('✅ Linked existing user to Clerk account:', updatedUser.id)
+      return updatedUser
+    } else {
+      console.log('🆕 Creating new user in database...')
+      // Create new user
+      const newUser = await db.user.create({
+        data: {
+          clerkId: id,
+          email,
+          name,
+        },
+      })
+      console.log('✅ Created new user:', newUser.id)
+      return newUser
+    }
+  } catch (error) {
+    console.error('❌ Error in handleUserCreated:', error)
+    if (error instanceof Error) {
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        userData: { id, email, name },
+        emailAddresses: email_addresses,
+      })
+    }
+    throw error // Re-throw to be handled by the main webhook handler
   }
 }
 
@@ -291,7 +323,6 @@ async function handleOrganizationCreated(orgData: OrganizationCreatedData) {
           slug,
           type: 'local',
           description: null,
-          location: null,
         },
       })
 

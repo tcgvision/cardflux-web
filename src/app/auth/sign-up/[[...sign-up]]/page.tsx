@@ -23,21 +23,6 @@ import { toast } from "sonner";
 import { Eye, EyeOff, Loader2, Mail, CheckCircle, ArrowRight } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "~/components/ui/input-otp";
 
-/**
- * SignUpPage Component
- * 
- * A custom sign-up page using Clerk Elements with shadcn/ui styling.
- * Handles user registration with email and password.
- * 
- * Features:
- * - Email and password validation
- * - Loading states
- * - Error handling
- * - Automatic redirect if already signed in
- * - Responsive design
- * - OTP verification with improved UX
- */
-
 // Form validation schema
 const signUpSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
@@ -51,16 +36,19 @@ type SignUpFormData = z.infer<typeof signUpSchema>;
 
 export default function SignUpPage() {
   const { isLoaded, signUp, setActive } = useSignUp();
-  const { organization, isLoaded: orgLoaded } = useOrganization();
-  const { user, isLoaded: userLoaded } = useUser();
+  const { organization } = useOrganization();
+  const router = useRouter();
+
+  // Form state
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [oauthLoading, setOauthLoading] = useState<string | null>(null);
+
+  // Verification state
   const [pendingVerification, setPendingVerification] = useState(false);
   const [verificationCode, setVerificationCode] = useState("");
   const [isVerified, setIsVerified] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
-  const [oauthLoading, setOauthLoading] = useState<string | null>(null);
-  const router = useRouter();
 
   const form = useForm<SignUpFormData>({
     resolver: zodResolver(signUpSchema),
@@ -74,38 +62,13 @@ export default function SignUpPage() {
     },
   });
 
-  // Check if user is already verified (e.g., after page refresh)
+  // Check if user is already verified on component load
   useEffect(() => {
-    if (isLoaded && signUp && signUp.status === "complete") {
-      console.log("User already verified on component load, attempting to complete flow...");
-      
-      const completeFlow = async () => {
-        try {
-          if (signUp.createdSessionId) {
-            await setActive({ session: signUp.createdSessionId });
-            await syncUserToDatabase();
-            setIsVerified(true);
-            toast.success("Email already verified! Redirecting...");
-          }
-        } catch (error) {
-          console.error("Error completing flow for already verified user:", error);
-          toast.error("Account verified but unable to sign in. Please try signing in instead.");
-          setTimeout(() => {
-            router.push("/auth/sign-in");
-          }, 3000);
-        }
-      };
-      
-      void completeFlow();
+    if (isLoaded && signUp?.status === "complete") {
+      console.log("User already verified on component load");
+      handleSignUpComplete();
     }
   }, [isLoaded, signUp]);
-
-  // Reset verification code when component mounts or when pendingVerification changes
-  useEffect(() => {
-    if (pendingVerification) {
-      setVerificationCode("");
-    }
-  }, [pendingVerification]);
 
   // Handle routing after verification
   useEffect(() => {
@@ -113,41 +76,13 @@ export default function SignUpPage() {
       setIsRedirecting(true);
       console.log("Routing after verification...");
       
-      // Give webhook time to process organization membership
       setTimeout(() => {
-        void (async () => {
-          try {
-            // Check if user is already linked to a shop via invitation
-            const membershipResponse = await fetch('/api/check-shop-membership');
-            const membershipData = await membershipResponse.json() as { hasShop: boolean; shop?: unknown; message?: string };
-            
-            if (membershipData.hasShop) {
-              console.log("User is linked to shop via invitation, redirecting to dashboard");
-              router.push("/dashboard");
-            } else {
-              console.log("User not linked to shop, redirecting to create-shop");
-              router.push("/dashboard/create-shop");
-            }
-          } catch (error) {
-            console.error("Error checking shop membership:", error);
-            // Fallback to create-shop
-            console.log("Error checking membership, redirecting to create-shop");
-            router.push("/dashboard/create-shop");
-          }
-        })();
+        handlePostVerificationRouting();
       }, 2000);
     }
-  }, [isVerified, isRedirecting, router]);
+  }, [isVerified, isRedirecting]);
 
-  // Check for existing organization membership on component load
-  useEffect(() => {
-    if (userLoaded && orgLoaded && user && !organization) {
-      // Check if user might be linked to a shop via invitation
-      // This will be handled by the webhook, but we can check here too
-      console.log("User loaded but no organization found - checking for invitation status");
-    }
-  }, [userLoaded, orgLoaded, user, organization]);
-
+  // OAuth sign-up handler
   const signUpWithOAuth = async (strategy: "oauth_google" | "oauth_discord") => {
     if (!isLoaded) return;
 
@@ -155,8 +90,11 @@ export default function SignUpPage() {
       setOauthLoading(strategy);
       await signUp.authenticateWithRedirect({
         strategy,
-        redirectUrl: "/auth/sso-callback",
-        redirectUrlComplete: organization ? "/dashboard" : "/dashboard/create-shop",
+        redirectUrl: "/create-shop",
+        redirectUrlComplete: "/create-shop",
+        unsafeMetadata: {
+          oauthProvider: strategy,
+        },
       });
     } catch (err: unknown) {
       console.error("OAuth error:", err);
@@ -166,13 +104,13 @@ export default function SignUpPage() {
     }
   };
 
+  // Email/password sign-up handler
   const onSubmit = async (data: SignUpFormData) => {
     if (!isLoaded) return;
 
-    console.log("Form submission started:", data);
     setIsLoading(true);
     try {
-      const result = await signUp.create({
+      await signUp.create({
         firstName: data.firstName,
         lastName: data.lastName,
         username: data.username,
@@ -180,9 +118,6 @@ export default function SignUpPage() {
         password: data.password,
       });
 
-      console.log("Sign up creation result:", result);
-
-      // Send email verification
       await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
       setPendingVerification(true);
       toast.success("Verification email sent! Please check your inbox.");
@@ -195,216 +130,107 @@ export default function SignUpPage() {
     }
   };
 
+  // Email verification handler
   const onPressVerify = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isLoaded || !verificationCode || verificationCode.length !== 6) return;
-
-    // Prevent multiple simultaneous verification attempts
-    if (isLoading) return;
+    if (!isLoaded || !verificationCode || verificationCode.length !== 6 || isLoading) return;
 
     setIsLoading(true);
     
     try {
-      console.log("Attempting verification with code:", verificationCode);
-      console.log("SignUp status:", signUp.status);
-      console.log("SignUp object:", signUp);
-      
-      // Check if the sign-up is already complete
+      // Check if already complete
       if (signUp.status === "complete") {
-        console.log("Sign-up already complete, activating session...");
-        
-        try {
-          await setActive({ session: signUp.createdSessionId });
-          
-          // Manually sync user to database
-          await syncUserToDatabase();
-          
-          setIsVerified(true);
-          toast.success("Email already verified! Redirecting...");
-          setVerificationCode("");
-          
-          // Use helper function to handle routing with organization check
-          void handleRouting();
-          
-          return; // Exit early since we're already complete
-        } catch (sessionError) {
-          console.error("Session activation error:", sessionError);
-          toast.error("Account verified but unable to sign in. Please try signing in instead.");
-          
-          setTimeout(() => {
-            router.push("/auth/sign-in");
-          }, 3000);
-          return;
-        }
+        await handleSignUpComplete();
+        return;
       }
       
       // Attempt verification
-      let completeSignUp;
-      try {
-        completeSignUp = await signUp.attemptEmailAddressVerification({
-          code: verificationCode,
-        });
-      } catch (verificationError) {
-        // Handle the "already verified" error specifically
-        const errorMessage = verificationError instanceof Error ? verificationError.message : String(verificationError);
-        
-        if (errorMessage.includes("already been verified") || 
-            errorMessage.includes("already verified") ||
-            errorMessage.includes("verification has already been verified")) {
-          
-          console.log("Email already verified, attempting to complete sign-up...");
-          
-          // Try to activate session with existing session ID
-          try {
-            if (signUp.createdSessionId) {
-              await setActive({ session: signUp.createdSessionId });
-            }
-            
-            // Manually sync user to database
-            await syncUserToDatabase();
-            
-            setIsVerified(true);
-            toast.success("Email already verified! Redirecting...");
-            setVerificationCode("");
-            
-            // Use helper function to handle routing with organization check
-            void handleRouting();
-            
-            return;
-          } catch (sessionError) {
-            console.error("Session activation error:", sessionError);
-            toast.error("Account verified but unable to sign in. Please try signing in instead.");
-            
-            setTimeout(() => {
-              router.push("/auth/sign-in");
-            }, 3000);
-            return;
-          }
-        } else {
-          // Re-throw other verification errors to be handled below
-          throw verificationError;
-        }
-      }
-
-      console.log("Verification result:", completeSignUp);
+      const completeSignUp = await signUp.attemptEmailAddressVerification({
+        code: verificationCode,
+      });
 
       if (completeSignUp.status === "complete") {
-        console.log("Verification completed successfully");
-        console.log("User ID:", completeSignUp.createdUserId);
-        console.log("Session ID:", completeSignUp.createdSessionId);
-        
-        // Set the session as active
         await setActive({ session: completeSignUp.createdSessionId });
-        
-        // Manually sync user to database
         await syncUserToDatabase();
         
-        // Mark as verified and let useEffect handle routing
         setIsVerified(true);
-        toast.success("Email verified successfully!");
-        
-        // Clear verification code to prevent re-submission
         setVerificationCode("");
-        
-        // Give webhook time to process user creation before redirecting
-        setTimeout(() => {
-          void (async () => {
-            if (!isRedirecting) {
-              console.log("Fallback routing triggered");
-              
-              try {
-                // Check if user is already linked to a shop via invitation
-                const membershipResponse = await fetch('/api/check-shop-membership');
-                const membershipData = await membershipResponse.json() as { hasShop: boolean; shop?: unknown; message?: string };
-                
-                if (membershipData.hasShop) {
-                  console.log("User is linked to shop via invitation, redirecting to dashboard");
-                  router.push("/dashboard");
-                  return;
-                }
-              } catch (error) {
-                console.error("Error checking shop membership:", error);
-              }
-              
-              // Fallback to organization check
-              if (organization) {
-                console.log("User is in organization, redirecting to dashboard");
-                router.push("/dashboard");
-              } else {
-                console.log("User not in organization, redirecting to create-shop");
-                router.push("/dashboard/create-shop");
-              }
-            }
-          })();
-        }, 5000);
+        toast.success("Email verified successfully!");
       } else {
-        // Handle incomplete verification
-        console.log("Incomplete verification:", completeSignUp);
         toast.error("Verification incomplete. Please try again.");
       }
     } catch (err: unknown) {
       console.error("Verification error:", err);
       
-      // Handle other errors
       const error = err as { errors?: Array<{ message: string }> };
-      const errorMsg = error.errors?.[0]?.message ?? "Invalid verification code. Please try again.";
-      toast.error(errorMsg);
+      const errorMessage = error.errors?.[0]?.message ?? "Invalid verification code. Please try again.";
+      
+      // Handle already verified case
+      if (errorMessage.includes("already verified")) {
+        await handleSignUpComplete();
+        return;
+      }
+      
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Helper function to sync user to database
-  const syncUserToDatabase = async () => {
+  // Helper: Handle sign-up completion
+  const handleSignUpComplete = async () => {
     try {
-      const syncResponse = await fetch('/api/sync-user', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      if (syncResponse.ok) {
-        const syncData = await syncResponse.json() as { message: string; user?: unknown };
-        console.log('User sync result:', syncData);
-      } else {
-        console.log('User sync failed, but continuing with flow');
+      if (signUp?.createdSessionId) {
+        await setActive({ session: signUp.createdSessionId });
+        await syncUserToDatabase();
+        setIsVerified(true);
+        toast.success("Account verified! Redirecting...");
       }
-    } catch (syncError) {
-      console.log('User sync error:', syncError);
-      // Don't fail the flow if sync fails - webhook might have worked
+    } catch (error) {
+      console.error("Error completing sign-up:", error);
+      toast.error("Account verified but unable to sign in. Please try signing in instead.");
+      setTimeout(() => router.push("/auth/sign-in"), 3000);
     }
   };
 
-  // Helper function to handle routing with organization check
-  const handleRouting = async () => {
-    // Give webhook time to process organization membership
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
+  // Helper: Sync user to database
+  const syncUserToDatabase = async () => {
     try {
-      // Check if user is already linked to a shop via invitation
+      const response = await fetch('/api/sync-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      
+      if (response.ok) {
+        const data = await response.json() as { message: string };
+        console.log('User sync result:', data);
+      }
+    } catch (error) {
+      console.log('User sync error:', error);
+      // Don't fail the flow if sync fails - webhook might handle it
+    }
+  };
+
+  // Helper: Handle post-verification routing
+  const handlePostVerificationRouting = async () => {
+    try {
       const membershipResponse = await fetch('/api/check-shop-membership');
-      const membershipData = await membershipResponse.json() as { hasShop: boolean; shop?: unknown; message?: string };
+      const membershipData = await membershipResponse.json() as { hasShop: boolean };
       
       if (membershipData.hasShop) {
-        console.log("User is linked to shop via invitation, redirecting to dashboard");
+        console.log("User linked to shop, redirecting to dashboard");
         router.push("/dashboard");
-        return;
+      } else {
+        console.log("User not linked to shop, redirecting to create-shop");
+        router.push("/create-shop");
       }
     } catch (error) {
       console.error("Error checking shop membership:", error);
-    }
-    
-    // Fallback to organization check
-    if (organization) {
-      console.log("User is in organization, redirecting to dashboard");
-      router.push("/dashboard");
-    } else {
-      console.log("User not in organization, redirecting to create-shop");
-      router.push("/dashboard/create-shop");
+      router.push("/create-shop");
     }
   };
 
+  // Helper: Resend verification code
   const handleResendCode = async () => {
     if (!isLoaded) return;
     
@@ -417,19 +243,17 @@ export default function SignUpPage() {
     }
   };
 
+  // Helper: Start over with new email
   const handleStartOver = () => {
-    // Reset all states
     setPendingVerification(false);
     setVerificationCode("");
     setIsVerified(false);
     setIsRedirecting(false);
-    
-    // Reset form
     form.reset();
-    
     toast.info("Starting over with a fresh sign-up form");
   };
 
+  // Render: Verification success state
   if (isVerified) {
     return (
       <div className="min-h-[calc(100vh-7rem)] flex items-center justify-center p-4 bg-background">
@@ -438,7 +262,9 @@ export default function SignUpPage() {
             <div className="flex justify-center">
               <CheckCircle className="h-12 w-12 text-green-500" />
             </div>
-            <CardTitle className="text-2xl font-semibold text-foreground">Email Verified!</CardTitle>
+            <CardTitle className="text-2xl font-semibold text-foreground">
+              Email Verified!
+            </CardTitle>
             <CardDescription className="text-muted-foreground">
               {organization 
                 ? "Redirecting you to your organization dashboard..."
@@ -459,12 +285,15 @@ export default function SignUpPage() {
     );
   }
 
+  // Render: Email verification state
   if (pendingVerification) {
     return (
       <div className="min-h-[calc(100vh-7rem)] flex items-center justify-center p-4 bg-background">
         <Card className="w-full max-w-md border-border shadow-lg">
           <CardHeader className="text-center space-y-2">
-            <CardTitle className="text-2xl font-semibold text-foreground">Verify your email</CardTitle>
+            <CardTitle className="text-2xl font-semibold text-foreground">
+              Verify your email
+            </CardTitle>
             <CardDescription className="text-muted-foreground">
               We&apos;ve sent a 6-digit verification code to your email address
             </CardDescription>
@@ -478,7 +307,7 @@ export default function SignUpPage() {
                   </label>
                   <InputOTP
                     value={verificationCode}
-                    onChange={(value) => setVerificationCode(value)}
+                    onChange={setVerificationCode}
                     maxLength={6}
                     disabled={isLoading}
                     containerClassName="justify-center"
@@ -494,7 +323,7 @@ export default function SignUpPage() {
                   </InputOTP>
                 </div>
                 
-                <div className="text-center">
+                <div className="text-center space-y-2">
                   <Button
                     type="button"
                     variant="link"
@@ -504,62 +333,22 @@ export default function SignUpPage() {
                   >
                     Didn&apos;t receive the code? Resend
                   </Button>
-                </div>
-
-                {/* <div className="text-center">
+                  
                   <Button
                     type="button"
-                    variant="outline"
+                    variant="ghost"
                     onClick={handleStartOver}
                     disabled={isLoading}
                     className="text-sm"
                   >
                     Start Over with New Email
                   </Button>
-                </div> */}
-
-                <div className="text-center">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => {
-                      console.log("=== DEBUG INFO ===");
-                      console.log("SignUp status:", signUp?.status);
-                      console.log("SignUp object:", signUp);
-                      console.log("Created Session ID:", signUp?.createdSessionId);
-                      console.log("Created User ID:", signUp?.createdUserId);
-                      console.log("Pending verification:", pendingVerification);
-                      console.log("Is verified:", isVerified);
-                      console.log("==================");
-                      
-                      // Try to manually complete the flow
-                      if (signUp?.status === "complete" && signUp?.createdSessionId) {
-                        void (async () => {
-                          try {
-                            await setActive({ session: signUp.createdSessionId });
-                            await syncUserToDatabase();
-                            setIsVerified(true);
-                            toast.success("Manually completed verification!");
-                          } catch (error) {
-                            console.error("Manual completion error:", error);
-                            toast.error("Manual completion failed. Try signing in instead.");
-                          }
-                        })();
-                      } else {
-                        toast.info("Check console for debug info");
-                      }
-                    }}
-                    disabled={isLoading}
-                    className="text-xs text-muted-foreground"
-                  >
-                    Debug & Force Complete
-                  </Button>
                 </div>
               </div>
               
               <Button 
                 type="submit" 
-                className="w-full bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer disabled:cursor-not-allowed" 
+                className="w-full" 
                 disabled={isLoading || verificationCode.length !== 6}
               >
                 {isLoading ? (
@@ -581,23 +370,27 @@ export default function SignUpPage() {
     );
   }
 
+  // Render: Main sign-up form
   return (
     <div className="min-h-[calc(100vh-7rem)] flex items-center justify-center p-4 bg-background">
       <Card className="w-full max-w-md border-border shadow-lg">
         <CardHeader className="text-center space-y-2">
-          <CardTitle className="text-2xl font-semibold text-foreground">Create your account</CardTitle>
+          <CardTitle className="text-2xl font-semibold text-foreground">
+            Create your account
+          </CardTitle>
           <CardDescription className="text-muted-foreground">
-            Get started with CardFlux and manage your card inventory
+            Get started with CardFlux to manage your TCG business
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           {/* OAuth Buttons */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-3">
             <Button
+              type="button"
               variant="outline"
+              className="w-full"
               onClick={() => signUpWithOAuth("oauth_google")}
-              disabled={!isLoaded || oauthLoading === "oauth_google"}
-              className="w-full border-border text-foreground hover:bg-accent hover:text-accent-foreground cursor-pointer disabled:cursor-not-allowed"
+              disabled={oauthLoading !== null}
             >
               {oauthLoading === "oauth_google" ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -621,13 +414,15 @@ export default function SignUpPage() {
                   />
                 </svg>
               )}
-              Google
+              Continue with Google
             </Button>
+            
             <Button
+              type="button"
               variant="outline"
+              className="w-full"
               onClick={() => signUpWithOAuth("oauth_discord")}
-              disabled={!isLoaded || oauthLoading === "oauth_discord"}
-              className="w-full border-border text-foreground hover:bg-accent hover:text-accent-foreground cursor-pointer disabled:cursor-not-allowed"
+              disabled={oauthLoading !== null}
             >
               {oauthLoading === "oauth_discord" ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -636,21 +431,20 @@ export default function SignUpPage() {
                   <path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419-.0188 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9554 2.4189-2.1568 2.4189Z"/>
                 </svg>
               )}
-              Discord
+              Continue with Discord
             </Button>
           </div>
 
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
-              <Separator className="w-full border-border" />
+              <Separator className="w-full" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground font-medium">
-                Or continue with email
-              </span>
+              <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
             </div>
           </div>
 
+          {/* Email/Password Form */}
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
@@ -659,85 +453,63 @@ export default function SignUpPage() {
                   name="firstName"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-foreground">First name</FormLabel>
+                      <FormLabel>First name</FormLabel>
                       <FormControl>
-                        <Input
-                          placeholder="John"
-                          {...field}
-                          disabled={isLoading}
-                          className="bg-background border-border text-foreground placeholder:text-muted-foreground"
-                        />
+                        <Input placeholder="John" {...field} disabled={isLoading} />
                       </FormControl>
-                      <FormMessage className="text-destructive" />
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
-
                 <FormField
                   control={form.control}
                   name="lastName"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-foreground">Last name</FormLabel>
+                      <FormLabel>Last name</FormLabel>
                       <FormControl>
-                        <Input
-                          placeholder="Doe"
-                          {...field}
-                          disabled={isLoading}
-                          className="bg-background border-border text-foreground placeholder:text-muted-foreground"
-                        />
+                        <Input placeholder="Doe" {...field} disabled={isLoading} />
                       </FormControl>
-                      <FormMessage className="text-destructive" />
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
               </div>
-
+              
               <FormField
                 control={form.control}
                 name="username"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-foreground">Username</FormLabel>
+                    <FormLabel>Username</FormLabel>
                     <FormControl>
-                      <Input
-                        placeholder="johndoe_123"
-                        {...field}
-                        disabled={isLoading}
-                        className="bg-background border-border text-foreground placeholder:text-muted-foreground"
-                      />
+                      <Input placeholder="johndoe" {...field} disabled={isLoading} />
                     </FormControl>
-                    <FormMessage className="text-destructive" />
+                    <FormMessage />
                   </FormItem>
                 )}
               />
-
+              
               <FormField
                 control={form.control}
                 name="emailAddress"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-foreground">Email</FormLabel>
+                    <FormLabel>Email</FormLabel>
                     <FormControl>
-                      <Input
-                        placeholder="john@example.com"
-                        type="email"
-                        {...field}
-                        disabled={isLoading}
-                        className="bg-background border-border text-foreground placeholder:text-muted-foreground"
-                      />
+                      <Input placeholder="john@example.com" type="email" {...field} disabled={isLoading} />
                     </FormControl>
-                    <FormMessage className="text-destructive" />
+                    <FormMessage />
                   </FormItem>
                 )}
               />
-
+              
               <FormField
                 control={form.control}
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-foreground">Password</FormLabel>
+                    <FormLabel>Password</FormLabel>
                     <FormControl>
                       <div className="relative">
                         <Input
@@ -745,32 +517,31 @@ export default function SignUpPage() {
                           type={showPassword ? "text" : "password"}
                           {...field}
                           disabled={isLoading}
-                          className="bg-background border-border text-foreground placeholder:text-muted-foreground pr-10"
                         />
-                        <button
+                        <Button
                           type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                           onClick={() => setShowPassword(!showPassword)}
-                          className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground"
+                          disabled={isLoading}
                         >
                           {showPassword ? (
                             <EyeOff className="h-4 w-4" />
                           ) : (
                             <Eye className="h-4 w-4" />
                           )}
-                        </button>
+                        </Button>
                       </div>
                     </FormControl>
-                    <FormMessage className="text-destructive" />
+                    <FormMessage />
                   </FormItem>
                 )}
               />
-
-              {/* CAPTCHA Widget - Required for custom sign-up flows */}
-              <div id="clerk-captcha" data-cl-theme="auto" data-cl-size="normal" />
-
+              
               <Button 
                 type="submit" 
-                className="w-full bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer disabled:cursor-not-allowed" 
+                className="w-full" 
                 disabled={isLoading}
               >
                 {isLoading ? (
@@ -780,7 +551,7 @@ export default function SignUpPage() {
                   </>
                 ) : (
                   <>
-                    <Mail className="mr-2 h-4 w-4" />
+                    <ArrowRight className="mr-2 h-4 w-4" />
                     Create account
                   </>
                 )}
@@ -790,12 +561,15 @@ export default function SignUpPage() {
 
           <div className="text-center text-sm text-muted-foreground">
             Already have an account?{" "}
-            <Link href="/auth/sign-in" className="text-primary hover:text-primary/90 font-medium">
+            <Link href="/auth/sign-in" className="text-primary hover:text-primary/90">
               Sign in
             </Link>
           </div>
         </CardContent>
       </Card>
+      
+      {/* Required CAPTCHA element for Clerk OAuth flows */}
+      <div id="clerk-captcha" style={{ display: 'none' }}></div>
     </div>
   );
-} 
+}

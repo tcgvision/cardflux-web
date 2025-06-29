@@ -28,8 +28,6 @@ export default function DashboardLayout({
     <ClerkProvider
       signInUrl="/auth/sign-in"
       signUpUrl="/auth/sign-up"
-      afterSignInUrl="/dashboard"
-      afterSignUpUrl="/dashboard"
     >
       <TRPCReactProvider>
         <LoadingProvider>

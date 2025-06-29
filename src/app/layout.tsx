@@ -46,7 +46,8 @@ export default function RootLayout({
             signInUrl="/auth/sign-in"
             signUpUrl="/auth/sign-up"
             afterSignInUrl="/dashboard"
-            afterSignUpUrl="/dashboard"
+            afterSignUpUrl="/create-shop"
+            publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
           >
             <NavbarWrapper />
             <TRPCReactProvider>{children}</TRPCReactProvider>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useSignIn } from "@clerk/nextjs";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -66,7 +66,7 @@ export default function SignInPage() {
       setOauthLoading(strategy);
       await signIn.authenticateWithRedirect({
         strategy,
-        redirectUrl: "/auth/sso-callback",
+        redirectUrl: "/auth/oauth-complete",
         redirectUrlComplete: "/dashboard",
       });
     } catch (err: unknown) {

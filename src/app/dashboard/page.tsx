@@ -1,6 +1,6 @@
 "use client";
 
-import { useUser } from "@clerk/nextjs";
+import { useUser, useOrganization, useClerk } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
 import { useShopMembership } from "~/hooks/use-shop-membership";
@@ -26,7 +26,9 @@ interface SyncResponse {
 }
 
 export default function DashboardPage() {
-  const { user, isLoaded } = useUser();
+  const { user, isLoaded: userLoaded } = useUser();
+  const { organization, isLoaded: orgLoaded } = useOrganization();
+  const { signOut } = useClerk();
   const router = useRouter();
   const { membershipData, isChecking, clearCache } = useShopMembership();
   const { shopName, isLoaded: shopLoaded, hasShop, source, needsSync, isVerified } = useUnifiedShop();
@@ -34,6 +36,26 @@ export default function DashboardPage() {
   const [debugInfo, setDebugInfo] = useState<Record<string, unknown> | null>(null);
   const [isLoadingDebug, setIsLoadingDebug] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+
+  // Add OAuth debugging
+  useEffect(() => {
+    if (userLoaded && user) {
+      console.log("🔍 Dashboard: User loaded", {
+        userId: user.id,
+        email: user.emailAddresses[0]?.emailAddress,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        oauthProvider: user.unsafeMetadata?.oauthProvider,
+      });
+    }
+    
+    if (orgLoaded && organization) {
+      console.log("🔍 Dashboard: Organization loaded", {
+        orgId: organization.id,
+        orgName: organization.name,
+      });
+    }
+  }, [userLoaded, user, orgLoaded, organization]);
 
   const fetchDebugInfo = useCallback(async () => {
     setIsLoadingDebug(true);
@@ -119,7 +141,7 @@ export default function DashboardPage() {
   }));
 
   // Show loading while Clerk is loading
-  if (!isLoaded) {
+  if (!userLoaded) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -132,7 +154,7 @@ export default function DashboardPage() {
 
   // Show sign-in if not authenticated
   if (!user) {
-    router.push("/sign-in");
+    router.push("/auth/sign-in");
     return null;
   }
 
@@ -243,7 +265,7 @@ export default function DashboardPage() {
                 <Button 
                   variant="outline" 
                   onClick={() => {
-                    window.location.href = "/sign-out";
+                    void signOut();
                   }}
                   className="w-full"
                 >
