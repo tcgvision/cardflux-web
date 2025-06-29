@@ -79,25 +79,26 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
     return NextResponse.next();
   }
 
-  // Handle auth routes (sign-in and sign-up)
+  // Handle auth routes (sign-in and sign-up) - always allow access
   if (isAuthRoute(req)) {
-    // If user is already signed in and has an organization, redirect to dashboard
+    // If user is authenticated and has organization, redirect to dashboard
     if (userId && orgId) {
       console.log(`🔄 Auth route: User ${userId.substring(0, 8)}... has org ${orgId.substring(0, 8)}..., redirecting to dashboard`);
       return NextResponse.redirect(new URL("/dashboard", req.url));
     }
     
-    // If user is signed in but has no organization, allow them to stay on sign-up page
-    // This gives the page time to handle OAuth completion and redirect appropriately
+    // If user is authenticated but no organization, redirect to create-shop
     if (userId && !orgId) {
-      console.log(`✅ Auth route: User ${userId.substring(0, 8)}... has no org, allowing access to sign-up page for OAuth completion`);
-      return NextResponse.next();
+      console.log(`🔄 Auth route: User ${userId.substring(0, 8)}... has no org, redirecting to create-shop`);
+      return NextResponse.redirect(new URL("/create-shop", req.url));
     }
     
+    // Allow unauthenticated users to access auth routes
+    console.log(`✅ Auth route allowed: ${url.pathname}`);
     return NextResponse.next();
   }
 
-  // Handle unauthenticated users
+  // Handle unauthenticated users trying to access protected routes
   if (!userId) {
     console.log(`🔄 Unauthenticated user accessing ${url.pathname}, redirecting to sign-in`);
     const signInUrl = new URL("/auth/sign-in", req.url);
@@ -105,7 +106,7 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
     return NextResponse.redirect(signInUrl);
   }
 
-  // Handle create-shop route
+  // Handle create-shop route - allow authenticated users without org
   if (isCreateShopRoute(req)) {
     // If user already has an organization, redirect to dashboard
     if (orgId && orgRole) {
@@ -113,18 +114,11 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
       return NextResponse.redirect(new URL("/dashboard", req.url));
     }
     // Allow access to create-shop if user has no organization
+    console.log(`✅ Create-shop route: User ${userId.substring(0, 8)}... has no org, allowing access`);
     return NextResponse.next();
   }
 
-  // Handle team management route - allow users with database membership
-  if (isTeamManagementRoute(req)) {
-    // Allow access to team management routes
-    // The team page will handle checking for shop membership and admin privileges via TRPC
-    // This allows users with database membership but no active Clerk org context to access team management
-    return NextResponse.next();
-  }
-
-  // Handle dashboard routes
+  // Handle dashboard routes - require organization
   if (isDashboardRoute(req)) {
     // If user has no organization, redirect to create-shop
     if (!orgId) {
@@ -132,6 +126,7 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
       return NextResponse.redirect(new URL("/create-shop", req.url));
     }
     // Allow access to dashboard routes if user has organization
+    console.log(`✅ Dashboard route: User ${userId.substring(0, 8)}... has org ${orgId.substring(0, 8)}..., allowing access`);
     return NextResponse.next();
   }
 

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useSignUp, useSignIn, useOrganization, useUser } from "@clerk/nextjs";
+import { useSignUp, useUser, useOrganization } from "@clerk/nextjs";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -20,7 +20,7 @@ import { Input } from "~/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Separator } from "~/components/ui/separator";
 import { toast } from "sonner";
-import { Eye, EyeOff, Loader2, Mail, CheckCircle, ArrowRight } from "lucide-react";
+import { Eye, EyeOff, Loader2, CheckCircle, ArrowRight } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "~/components/ui/input-otp";
 
 // Form validation schema
@@ -35,8 +35,8 @@ const signUpSchema = z.object({
 type SignUpFormData = z.infer<typeof signUpSchema>;
 
 export default function SignUpPage() {
-  const { isLoaded: signUpLoaded, signUp, setActive: setSignUpActive } = useSignUp();
-  const { isLoaded: signInLoaded, signIn, setActive: setSignInActive } = useSignIn();
+  const { isLoaded, signUp, setActive } = useSignUp();
+  const { user } = useUser();
   const { organization } = useOrganization();
   const router = useRouter();
 
@@ -48,8 +48,6 @@ export default function SignUpPage() {
   // Verification state
   const [pendingVerification, setPendingVerification] = useState(false);
   const [verificationCode, setVerificationCode] = useState("");
-  const [isVerified, setIsVerified] = useState(false);
-  const [isRedirecting, setIsRedirecting] = useState(false);
 
   const form = useForm<SignUpFormData>({
     resolver: zodResolver(signUpSchema),
@@ -63,118 +61,43 @@ export default function SignUpPage() {
     },
   });
 
-  // Check if both hooks are loaded
-  const isLoaded = signUpLoaded && signInLoaded;
-
-  // Check for OAuth completion on component mount
+  // Handle user already authenticated - redirect them
   useEffect(() => {
-    if (!isLoaded) return;
-
-    // Check URL parameters for OAuth completion
-    const urlParams = new URLSearchParams(window.location.search);
-    const hasOAuthParams = urlParams.has('__clerk_status') || 
-                          urlParams.has('__clerk_db_jwt') || 
-                          urlParams.has('__clerk_strategy') ||
-                          (urlParams.has('code') && urlParams.has('state'));
-    
-    if (hasOAuthParams) {
-      console.log("🔍 OAuth parameters detected in URL:", {
-        __clerk_status: urlParams.get('__clerk_status'),
-        __clerk_strategy: urlParams.get('__clerk_strategy'),
-        hasCode: urlParams.has('code'),
-        hasState: urlParams.has('state'),
-      });
-    }
-  }, [isLoaded]);
-
-  // Check if user is already verified on component load
-  useEffect(() => {
-    if (isLoaded && signUp?.status === "complete") {
-      console.log("User already verified on component load");
-      void handleSignUpComplete();
-    }
-  }, [isLoaded, signUp?.status]);
-
-  // Handle OAuth completion for both sign-up and sign-in
-  useEffect(() => {
-    if (!isLoaded) return;
-
-    console.log("🔍 Checking OAuth completion status...");
-    console.log("Sign-up status:", signUp?.status);
-    console.log("Sign-in status:", signIn?.status);
-    console.log("Sign-up createdSessionId:", signUp?.createdSessionId);
-    console.log("Sign-in createdSessionId:", signIn?.createdSessionId);
-
-    // Handle OAuth sign-up completion
-    if (signUp?.status === "complete" && signUp?.createdSessionId) {
-      console.log("🔄 OAuth sign-up completed, setting session...");
-      void handleOAuthSignUpCompletion();
-      return;
-    }
-
-    // Handle OAuth sign-in completion
-    if (signIn?.status === "complete" && signIn?.createdSessionId) {
-      console.log("🔄 OAuth sign-in completed, setting session...");
-      void handleOAuthSignInCompletion();
-      return;
-    }
-  }, [isLoaded, signUp?.status, signIn?.status]);
-
-  // Handle routing after verification
-  useEffect(() => {
-    if (isVerified && !isRedirecting) {
-      setIsRedirecting(true);
-      console.log("Routing after verification...");
-      
-      setTimeout(() => {
-        void handlePostVerificationRouting();
-      }, 2000);
-    }
-  }, [isVerified, isRedirecting]);
-
-  // Simple timeout for OAuth completion
-  useEffect(() => {
-    if (!isLoaded) return;
-
-    // Only set timeout if no sign-up or sign-in is in progress
-    if (!signUp?.status && !signIn?.status) {
-      const timeout = setTimeout(() => {
-        console.log("⏰ OAuth completion timeout - redirecting to create-shop");
+    if (user) {
+      console.log("✅ User already authenticated, checking organization...");
+      if (organization) {
+        console.log("✅ User has organization, redirecting to dashboard");
+        router.push("/dashboard");
+      } else {
+        console.log("✅ User authenticated but no organization, redirecting to create-shop");
         router.push("/create-shop");
-      }, 5000);
-
-      return () => clearTimeout(timeout);
+      }
     }
-  }, [isLoaded, signUp?.status, signIn?.status, router]);
+  }, [user, organization, router]);
 
-  // OAuth sign-up handler
-  const signUpWithOAuth = async (strategy: "oauth_google" | "oauth_discord") => {
+  // OAuth sign-up handler - simplified
+  const signUpWithOAuth = (strategy: "oauth_google" | "oauth_discord") => {
     if (!isLoaded) return;
 
-    try {
-      setOauthLoading(strategy);
-      console.log(`🔄 Starting OAuth sign-up with ${strategy}...`);
-      
-      // Use the correct OAuth approach for Clerk
-      await signUp.authenticateWithRedirect({
-        strategy,
-        redirectUrl: "/auth/sign-up",
-        redirectUrlComplete: "/auth/sign-up",
-        unsafeMetadata: {
-          oauthProvider: strategy,
-        },
-      });
-    } catch (err: unknown) {
+    setOauthLoading(strategy);
+    console.log(`🔄 Starting OAuth with ${strategy}...`);
+    
+    // Let Clerk handle the OAuth flow and redirect to success URL
+    void signUp.authenticateWithRedirect({
+      strategy,
+      redirectUrl: "/create-shop", // Redirect directly to create-shop after OAuth
+      redirectUrlComplete: "/create-shop",
+    }).catch((err) => {
       console.error("OAuth error:", err);
       setOauthLoading(null);
       const error = err as { errors?: Array<{ longMessage?: string }> };
       toast.error(error.errors?.[0]?.longMessage ?? "Failed to sign up with OAuth");
-    }
+    });
   };
 
   // Email/password sign-up handler
   const onSubmit = async (data: SignUpFormData) => {
-    if (!isLoaded) return;
+    if (!isLoaded || !signUp) return;
 
     setIsLoading(true);
     try {
@@ -201,106 +124,80 @@ export default function SignUpPage() {
   // Email verification handler
   const onPressVerify = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isLoaded || !verificationCode || verificationCode.length !== 6 || isLoading) return;
+    if (!isLoaded || !signUp || !verificationCode || verificationCode.length !== 6 || isLoading) return;
 
     setIsLoading(true);
     
     try {
-      // Check if already complete
-      if (signUp.status === "complete") {
-        await handleSignUpComplete();
-        return;
-      }
-      
-      // Attempt verification
       const completeSignUp = await signUp.attemptEmailAddressVerification({
         code: verificationCode,
       });
 
       if (completeSignUp.status === "complete") {
-        await setSignUpActive({ session: completeSignUp.createdSessionId });
+        await setActive({ session: completeSignUp.createdSessionId });
         await syncUserToDatabase();
         
-        setIsVerified(true);
-        setVerificationCode("");
         toast.success("Email verified successfully!");
+        
+        // Check shop membership and redirect appropriately
+        setTimeout(async () => {
+          try {
+            const membershipResponse = await fetch('/api/check-shop-membership');
+            const membershipData = await membershipResponse.json() as { hasShop: boolean };
+            
+            if (membershipData.hasShop) {
+              router.push("/dashboard");
+            } else {
+              router.push("/create-shop");
+            }
+          } catch (error) {
+            console.error("Error checking shop membership:", error);
+            router.push("/create-shop");
+          }
+        }, 1000);
       } else {
         toast.error("Verification incomplete. Please try again.");
       }
     } catch (err: unknown) {
       console.error("Verification error:", err);
-      
       const error = err as { errors?: Array<{ message: string }> };
-      const errorMessage = error.errors?.[0]?.message ?? "Invalid verification code. Please try again.";
-      
-      // Handle already verified case
-      if (errorMessage.includes("already verified")) {
-        await handleSignUpComplete();
-        return;
-      }
-      
-      toast.error(errorMessage);
+      toast.error(error.errors?.[0]?.message ?? "Invalid verification code. Please try again.");
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Helper: Handle sign-up completion
-  const handleSignUpComplete = async () => {
-    try {
-      if (signUp?.createdSessionId) {
-        await setSignUpActive({ session: signUp.createdSessionId });
-        await syncUserToDatabase();
-        setIsVerified(true);
-        toast.success("Account verified! Redirecting...");
-      }
-    } catch (error) {
-      console.error("Error completing sign-up:", error);
-      toast.error("Account verified but unable to sign in. Please try signing in instead.");
-      setTimeout(() => router.push("/auth/sign-in"), 3000);
-    }
-  };
-
-  // Helper: Sync user to database
+  // Sync user to database function
   const syncUserToDatabase = async () => {
+    if (!user) return;
+    
     try {
-      const response = await fetch('/api/sync-user', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      console.log("🔄 Syncing user to database...");
+      const response = await fetch("/api/sync-user", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userId: user.id,
+          email: user.emailAddresses[0]?.emailAddress,
+          name: `${user.firstName} ${user.lastName}`.trim(),
+        }),
       });
-      
-      if (response.ok) {
-        const data = await response.json() as { message: string };
-        console.log('User sync result:', data);
-      }
-    } catch (error) {
-      console.log('User sync error:', error);
-      // Don't fail the flow if sync fails - webhook might handle it
-    }
-  };
 
-  // Helper: Handle post-verification routing
-  const handlePostVerificationRouting = async () => {
-    try {
-      const membershipResponse = await fetch('/api/check-shop-membership');
-      const membershipData = await membershipResponse.json() as { hasShop: boolean };
-      
-      if (membershipData.hasShop) {
-        console.log("User linked to shop, redirecting to dashboard");
-        router.push("/dashboard");
+      if (response.ok) {
+        console.log("✅ User synced to database successfully");
       } else {
-        console.log("User not linked to shop, redirecting to create-shop");
-        router.push("/create-shop");
+        console.error("❌ Failed to sync user to database");
       }
     } catch (error) {
-      console.error("Error checking shop membership:", error);
-      router.push("/create-shop");
+      console.error("❌ Error syncing user to database:", error);
     }
   };
 
   // Helper: Resend verification code
   const handleResendCode = async () => {
-    if (!isLoaded) return;
+    if (!isLoaded || !signUp) return;
     
     try {
       await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
@@ -315,92 +212,18 @@ export default function SignUpPage() {
   const handleStartOver = () => {
     setPendingVerification(false);
     setVerificationCode("");
-    setIsVerified(false);
-    setIsRedirecting(false);
     form.reset();
     toast.info("Starting over with a fresh sign-up form");
   };
 
-  // Helper: Handle OAuth sign-up completion
-  const handleOAuthSignUpCompletion = async () => {
-    try {
-      console.log("🔄 Starting OAuth sign-up completion handler...");
-      console.log("Sign-up status:", signUp?.status);
-      console.log("Sign-up createdSessionId:", signUp?.createdSessionId);
-      
-      if (signUp?.createdSessionId) {
-        console.log("Setting active session...");
-        await setSignUpActive({ session: signUp.createdSessionId });
-        console.log("Session set successfully");
-        
-        console.log("Syncing user to database...");
-        await syncUserToDatabase();
-        console.log("User synced to database");
-        
-        setIsVerified(true);
-        toast.success("OAuth sign-up completed! Redirecting...");
-        console.log("OAuth sign-up completion successful, user verified");
-      }
-    } catch (error) {
-      console.error("Error completing OAuth sign-up:", error);
-      toast.error("OAuth sign-up completed but unable to sign in. Please try signing in instead.");
-      setTimeout(() => router.push("/auth/sign-in"), 3000);
-    }
-  };
-
-  // Helper: Handle OAuth sign-in completion
-  const handleOAuthSignInCompletion = async () => {
-    try {
-      console.log("🔄 Starting OAuth sign-in completion handler...");
-      console.log("Sign-in status:", signIn?.status);
-      console.log("Sign-in createdSessionId:", signIn?.createdSessionId);
-      
-      if (signIn?.createdSessionId) {
-        console.log("Setting active session...");
-        await setSignInActive({ session: signIn.createdSessionId });
-        console.log("Session set successfully");
-        
-        console.log("Syncing user to database...");
-        await syncUserToDatabase();
-        console.log("User synced to database");
-        
-        setIsVerified(true);
-        toast.success("OAuth sign-in completed! Redirecting...");
-        console.log("OAuth sign-in completion successful, user verified");
-      }
-    } catch (error) {
-      console.error("Error completing OAuth sign-in:", error);
-      toast.error("OAuth sign-in completed but unable to sign in. Please try signing in instead.");
-      setTimeout(() => router.push("/auth/sign-in"), 3000);
-    }
-  };
-
-  // Render: Verification success state
-  if (isVerified) {
+  // Don't render anything if user is already authenticated
+  if (user) {
     return (
-      <div className="min-h-[calc(100vh-7rem)] flex items-center justify-center p-4 bg-background">
-        <Card className="w-full max-w-md border-border shadow-lg">
-          <CardHeader className="text-center space-y-2">
-            <div className="flex justify-center">
-              <CheckCircle className="h-12 w-12 text-green-500" />
-            </div>
-            <CardTitle className="text-2xl font-semibold text-foreground">
-              Email Verified!
-            </CardTitle>
-            <CardDescription className="text-muted-foreground">
-              {organization 
-                ? "Redirecting you to your organization dashboard..."
-                : "Setting up your account..."
-              }
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="text-center">
-            <div className="flex items-center justify-center gap-2 text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span className="text-sm">
-                {organization ? "Joining your team..." : "Creating your workspace..."}
-              </span>
-            </div>
+      <div className="min-h-[calc(100vh-7rem)] flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="pt-6 text-center">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+            <p>You&apos;re already signed in. Redirecting...</p>
           </CardContent>
         </Card>
       </div>
@@ -512,7 +335,7 @@ export default function SignUpPage() {
               variant="outline"
               className="w-full"
               onClick={() => signUpWithOAuth("oauth_google")}
-              disabled={oauthLoading !== null}
+              disabled={oauthLoading !== null || !isLoaded}
             >
               {oauthLoading === "oauth_google" ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -544,7 +367,7 @@ export default function SignUpPage() {
               variant="outline"
               className="w-full"
               onClick={() => signUpWithOAuth("oauth_discord")}
-              disabled={oauthLoading !== null}
+              disabled={oauthLoading !== null || !isLoaded}
             >
               {oauthLoading === "oauth_discord" ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -664,7 +487,7 @@ export default function SignUpPage() {
               <Button 
                 type="submit" 
                 className="w-full" 
-                disabled={isLoading}
+                disabled={isLoading || !isLoaded}
               >
                 {isLoading ? (
                   <>
@@ -681,6 +504,9 @@ export default function SignUpPage() {
             </form>
           </Form>
 
+          {/* Clerk CAPTCHA element - required for bot protection */}
+          <div id="clerk-captcha" className="hidden" />
+
           <div className="text-center text-sm text-muted-foreground">
             Already have an account?{" "}
             <Link href="/auth/sign-in" className="text-primary hover:text-primary/90">
@@ -689,9 +515,6 @@ export default function SignUpPage() {
           </div>
         </CardContent>
       </Card>
-      
-      {/* Required CAPTCHA element for Clerk OAuth flows */}
-      <div id="clerk-captcha" style={{ display: 'none' }}></div>
     </div>
   );
 }
