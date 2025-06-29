@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useSignUp, useUser, useOrganization } from "@clerk/nextjs";
+import { useSignUp, useUser, useOrganization, useSignIn } from "@clerk/nextjs";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -20,14 +20,30 @@ import { Input } from "~/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Separator } from "~/components/ui/separator";
 import { toast } from "sonner";
-import { Eye, EyeOff, Loader2, CheckCircle, ArrowRight } from "lucide-react";
+import { Eye, EyeOff, Loader2, Mail, UserPlus, CheckCircle } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "~/components/ui/input-otp";
+
+/**
+ * SignUpPage Component
+ * 
+ * A custom sign-up page using Clerk Elements with shadcn/ui styling.
+ * Handles user registration with email/password and OAuth providers.
+ * 
+ * Features:
+ * - Email and password validation
+ * - OAuth sign-up (Google, Discord)
+ * - Email verification
+ * - Loading states
+ * - Error handling
+ * - Automatic redirect if already signed in
+ * - Responsive design
+ */
 
 // Form validation schema
 const signUpSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
-  username: z.string().min(3, "Username must be at least 3 characters").regex(/^[a-zA-Z0-9_]+$/, "Username can only contain letters, numbers, and underscores"),
+  username: z.string().min(3, "Username must be at least 3 characters"),
   emailAddress: z.string().email("Please enter a valid email address"),
   password: z.string().min(8, "Password must be at least 8 characters"),
 });
@@ -36,6 +52,7 @@ type SignUpFormData = z.infer<typeof signUpSchema>;
 
 export default function SignUpPage() {
   const { isLoaded, signUp, setActive } = useSignUp();
+  const { signIn } = useSignIn();
   const { user } = useUser();
   const { organization } = useOrganization();
   const router = useRouter();
@@ -75,20 +92,30 @@ export default function SignUpPage() {
     }
   }, [user, organization, router]);
 
-  // OAuth sign-up handler - simplified
+  // OAuth sign-up handler - use sign-in flow since OAuth creates user and signs in
   const signUpWithOAuth = (strategy: "oauth_google" | "oauth_discord") => {
-    if (!isLoaded) return;
+    console.log("🔍 OAuth button clicked with strategy:", strategy);
+    console.log("🔍 OAuth readiness check:", { isLoaded, hasSignIn: !!signIn });
+    
+    if (!isLoaded || !signIn) {
+      console.log("❌ OAuth not ready:", { isLoaded, hasSignIn: !!signIn });
+      return;
+    }
 
     setOauthLoading(strategy);
     console.log(`🔄 Starting OAuth with ${strategy}...`);
+    console.log("Current URL:", window.location.href);
+    console.log("SignIn object:", signIn);
     
-    // Let Clerk handle the OAuth flow and redirect to success URL
-    void signUp.authenticateWithRedirect({
+    // Use signIn.authenticateWithRedirect for OAuth (creates user and signs in)
+    // Let Clerk handle the OAuth completion automatically
+    console.log("🔄 Calling signIn.authenticateWithRedirect...");
+    void signIn.authenticateWithRedirect({
       strategy,
       redirectUrl: "/create-shop", // Redirect directly to create-shop after OAuth
       redirectUrlComplete: "/create-shop",
     }).catch((err) => {
-      console.error("OAuth error:", err);
+      console.error("❌ OAuth error:", err);
       setOauthLoading(null);
       const error = err as { errors?: Array<{ longMessage?: string }> };
       toast.error(error.errors?.[0]?.longMessage ?? "Failed to sign up with OAuth");
@@ -496,7 +523,7 @@ export default function SignUpPage() {
                   </>
                 ) : (
                   <>
-                    <ArrowRight className="mr-2 h-4 w-4" />
+                    <UserPlus className="mr-2 h-4 w-4" />
                     Create account
                   </>
                 )}

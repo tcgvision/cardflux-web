@@ -35,7 +35,7 @@ async function testOAuthFixed() {
       orderBy: {
         id: 'desc',
       },
-      take: 5,
+      take: 3,
     })
 
     console.log(`Total users: ${users.length}`)
@@ -47,29 +47,46 @@ async function testOAuthFixed() {
       console.log(`  Name: ${user.name}`)
       console.log(`  Clerk ID: ${user.clerkId ?? 'Not set'}`)
       console.log(`  Shop: ${user.shop?.name ?? 'No shop'}`)
+      console.log(`  Role: ${user.role ?? 'No role'}`)
     })
 
-    console.log('\n🔧 Fixed OAuth Flow:')
-    console.log('1. User clicks OAuth button')
-    console.log('2. Clerk redirects to OAuth provider')
-    console.log('3. User authenticates with OAuth provider')
-    console.log('4. OAuth provider redirects back to Clerk')
-    console.log('5. Clerk redirects to /auth/oauth-complete')
-    console.log('6. OAuth completion page handles session setting')
-    console.log('7. User is synced to database')
-    console.log('8. User is redirected to /dashboard/create-shop')
-    console.log('9. Middleware allows access (no conflicts)')
+    console.log('\n🔧 FIXED OAuth Flow:')
+    console.log('1. User clicks OAuth button on /auth/sign-up')
+    console.log('2. Uses signIn.authenticateWithRedirect() (not signUp)')
+    console.log('3. Clerk redirects to OAuth provider (Google)')
+    console.log('4. User authenticates with Google')
+    console.log('5. Google redirects back to Clerk')
+    console.log('6. Clerk processes OAuth and creates user + sets session')
+    console.log('7. Clerk redirects to /create-shop (user already authenticated)')
+    console.log('8. Webhook fires and syncs user to database')
+    console.log('9. User can create shop or join existing organization')
 
-    console.log('\n📋 Key Fixes Applied:')
-    console.log('✅ Middleware detects OAuth completion parameters')
-    console.log('✅ Dedicated OAuth completion page created')
-    console.log('✅ OAuth redirects to /auth/oauth-complete')
-    console.log('✅ Removed complex OAuth logic from sign-up page')
-    console.log('✅ Proper session handling in completion page')
-    console.log('✅ Database sync after OAuth completion')
+    console.log('\n📋 Key Changes Made:')
+    console.log('• Changed from signUp.authenticateWithRedirect() to signIn.authenticateWithRedirect()')
+    console.log('• OAuth creates user and signs in automatically')
+    console.log('• Direct redirect to /create-shop after OAuth completion')
+    console.log('• No complex OAuth detection logic needed')
+    console.log('• Uses Clerk\'s built-in OAuth completion handling')
+
+    console.log('\n📋 Expected Behavior:')
+    console.log('• OAuth completion → User automatically authenticated')
+    console.log('• Redirect to /create-shop → User can create organization')
+    console.log('• Webhook syncs user → Database updated')
+    console.log('• No infinite loops → Clean flow')
+    console.log('• No redirect to sign-in → User stays authenticated')
+
+    console.log('\n📋 Middleware Behavior:')
+    console.log('• Authenticated user with org → /dashboard')
+    console.log('• Authenticated user without org → /create-shop')
+    console.log('• Unauthenticated user → Access to auth routes')
 
     console.log('\n🚀 Ready for OAuth Testing!')
-    console.log('Try OAuth sign-up now - should work without conflicts.')
+    console.log('Try OAuth sign-up now and check:')
+    console.log('• User should be redirected to /create-shop after OAuth')
+    console.log('• User should be authenticated (no sign-in loop)')
+    console.log('• Webhook should sync user to database')
+    console.log('• User can create shop or join organization')
+    console.log('• No more "Unauthenticated user accessing /create-shop" errors')
 
   } catch (error) {
     console.error('❌ OAuth fixed test failed:', error)

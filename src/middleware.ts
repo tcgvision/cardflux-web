@@ -81,6 +81,18 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
 
   // Handle auth routes (sign-in and sign-up) - always allow access
   if (isAuthRoute(req)) {
+    // Check for OAuth completion parameters
+    const hasOAuthParams = url.searchParams.has('__clerk_status') || 
+                          url.searchParams.has('__clerk_db_jwt') || 
+                          url.searchParams.has('__clerk_strategy') ||
+                          (url.searchParams.has('code') && url.searchParams.has('state'));
+
+    // If OAuth completion detected, allow access regardless of auth status
+    if (hasOAuthParams) {
+      console.log(`✅ OAuth completion detected on ${url.pathname}, allowing access`);
+      return NextResponse.next();
+    }
+
     // If user is authenticated and has organization, redirect to dashboard
     if (userId && orgId) {
       console.log(`🔄 Auth route: User ${userId.substring(0, 8)}... has org ${orgId.substring(0, 8)}..., redirecting to dashboard`);

@@ -7,108 +7,110 @@
 import { config } from 'dotenv';
 import { readFileSync } from 'fs';
 import { join } from 'path';
+import { PrismaClient } from '@prisma/client'
 
 // Load environment variables
 config();
 
-console.log('🔍 Debugging OAuth Flow');
-console.log('=======================');
+const db = new PrismaClient()
 
-// Check OAuth completion page
-console.log('\n1. Checking OAuth completion page...');
-try {
-  const oauthPage = readFileSync(join(process.cwd(), 'src/app/auth/oauth-complete/page.tsx'), 'utf8');
-  
-  const checks = [
-    { name: 'useSignUp hook', pattern: 'useSignUp' },
-    { name: 'useUser hook', pattern: 'useUser' },
-    { name: 'setActive call', pattern: 'setActive' },
-    { name: 'signUp.status check', pattern: 'signUp\\?\\..*status' },
-    { name: 'createdSessionId check', pattern: 'createdSessionId' },
-    { name: 'router.push to create-shop', pattern: 'router\\.push\\("/create-shop"\\)' },
-    { name: 'Error handling', pattern: 'catch.*error' },
-    { name: 'Search params logging', pattern: 'searchParams' }
-  ];
-  
-  for (const check of checks) {
-    if (oauthPage.includes(check.pattern)) {
-      console.log(`✅ ${check.name}`);
-    } else {
-      console.log(`❌ Missing: ${check.name}`);
-    }
+async function debugOAuthFlow() {
+  console.log('🔍 Debugging OAuth Flow...\n')
+
+  try {
+    // Check environment variables
+    console.log('📋 Environment Check:')
+    const requiredVars = [
+      'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY',
+      'CLERK_SECRET_KEY',
+      'SIGNING_SECRET'
+    ]
+    
+    requiredVars.forEach(varName => {
+      const value = process.env[varName]
+      if (value) {
+        console.log(`   ✅ ${varName}: Set (${value.length} characters)`)
+      } else {
+        console.log(`   ❌ ${varName}: Not set`)
+      }
+    })
+
+    // Check database state
+    console.log('\n📊 Database State:')
+    
+    const users = await db.user.findMany({
+      include: {
+        shop: true,
+      },
+      orderBy: {
+        id: 'desc',
+      },
+      take: 5,
+    })
+
+    console.log(`Total users: ${users.length}`)
+    
+    users.forEach((user, index) => {
+      console.log(`\nUser ${index + 1}:`)
+      console.log(`  ID: ${user.id}`)
+      console.log(`  Email: ${user.email}`)
+      console.log(`  Name: ${user.name}`)
+      console.log(`  Clerk ID: ${user.clerkId ?? 'Not set'}`)
+      console.log(`  Shop: ${user.shop?.name ?? 'No shop'}`)
+      console.log(`  Role: ${user.role ?? 'No role'}`)
+    })
+
+    console.log('\n🔧 OAuth Flow Debug Steps:')
+    console.log('1. Open browser developer tools (F12)')
+    console.log('2. Go to Console tab')
+    console.log('3. Navigate to /auth/sign-up')
+    console.log('4. Click Google OAuth button')
+    console.log('5. Check console logs for:')
+    console.log('   • "🔄 Starting OAuth with oauth_google..."')
+    console.log('   • Any error messages')
+    console.log('   • URL redirects')
+    console.log('6. After OAuth completion, check for:')
+    console.log('   • "🔍 Checking for OAuth parameters..."')
+    console.log('   • "URL search params: ..."')
+    console.log('   • "Has OAuth params: true/false"')
+    console.log('   • "User authenticated: true/false"')
+
+    console.log('\n📋 Common OAuth Issues:')
+    console.log('• Clerk configuration not set up properly')
+    console.log('• OAuth redirect URLs not configured in Clerk dashboard')
+    console.log('• Google OAuth app not configured correctly')
+    console.log('• Missing or incorrect environment variables')
+    console.log('• CORS issues with OAuth redirects')
+
+    console.log('\n📋 Clerk Dashboard Check:')
+    console.log('1. Go to Clerk Dashboard')
+    console.log('2. Check OAuth settings for Google')
+    console.log('3. Verify redirect URLs include:')
+    console.log('   • http://localhost:3001/auth/sign-up')
+    console.log('   • http://localhost:3001/auth/sign-in')
+    console.log('4. Check if Google OAuth is enabled')
+    console.log('5. Verify Google OAuth app configuration')
+
+    console.log('\n📋 Google OAuth App Check:')
+    console.log('1. Go to Google Cloud Console')
+    console.log('2. Check OAuth 2.0 Client IDs')
+    console.log('3. Verify authorized redirect URIs include:')
+    console.log('   • https://clerk.your-domain.com/v1/oauth_callback')
+    console.log('4. Check if OAuth consent screen is configured')
+
+    console.log('\n🚀 Debug Instructions:')
+    console.log('1. Try OAuth sign-up and check browser console')
+    console.log('2. Look for any error messages')
+    console.log('3. Check if OAuth redirects are happening')
+    console.log('4. Verify if user is being created in Clerk')
+    console.log('5. Check if webhook is firing')
+    console.log('6. Report back with console logs and any errors')
+
+  } catch (error) {
+    console.error('❌ OAuth debug failed:', error)
+  } finally {
+    await db.$disconnect()
   }
-} catch (error) {
-  console.log('❌ Error reading OAuth completion page:', error instanceof Error ? error.message : String(error));
 }
 
-// Check sign-up page OAuth configuration
-console.log('\n2. Checking sign-up page OAuth config...');
-try {
-  const signUpPage = readFileSync(join(process.cwd(), 'src/app/auth/sign-up/[[...sign-up]]/page.tsx'), 'utf8');
-  
-  if (signUpPage.includes('redirectUrl: "/auth/oauth-complete"')) {
-    console.log('✅ OAuth redirects to oauth-complete');
-  } else {
-    console.log('❌ OAuth not configured to redirect to oauth-complete');
-  }
-  
-  if (signUpPage.includes('redirectUrlComplete')) {
-    console.log('❌ redirectUrlComplete is still configured (this might cause conflicts)');
-  } else {
-    console.log('✅ redirectUrlComplete removed (good)');
-  }
-} catch (error) {
-  console.log('❌ Error reading sign-up page:', error instanceof Error ? error.message : String(error));
-}
-
-// Check middleware configuration
-console.log('\n3. Checking middleware...');
-try {
-  const middleware = readFileSync(join(process.cwd(), 'src/middleware.ts'), 'utf8');
-  
-  if (middleware.includes('/auth/oauth-complete')) {
-    console.log('✅ OAuth completion route allowed in middleware');
-  } else {
-    console.log('❌ OAuth completion route not allowed in middleware');
-  }
-  
-  if (middleware.includes('/create-shop')) {
-    console.log('✅ Create-shop route configured in middleware');
-  } else {
-    console.log('❌ Create-shop route not configured in middleware');
-  }
-} catch (error) {
-  console.log('❌ Error reading middleware:', error instanceof Error ? error.message : String(error));
-}
-
-// Check ClerkProvider configuration
-console.log('\n4. Checking ClerkProvider config...');
-try {
-  const layout = readFileSync(join(process.cwd(), 'src/app/layout.tsx'), 'utf8');
-  
-  if (layout.includes('afterSignUpUrl="/create-shop"')) {
-    console.log('✅ ClerkProvider configured for create-shop redirect');
-  } else {
-    console.log('❌ ClerkProvider not configured for create-shop redirect');
-  }
-} catch (error) {
-  console.log('❌ Error reading layout:', error instanceof Error ? error.message : String(error));
-}
-
-console.log('\n📋 Potential Issues:');
-console.log('1. OAuth completion page might not be getting the right signUp state');
-console.log('2. Clerk might be redirecting before our completion page can process');
-console.log('3. Middleware might be interfering with the OAuth completion');
-console.log('4. Session might not be properly set before redirect');
-
-console.log('\n🔧 Suggested Debugging Steps:');
-console.log('1. Add console.log in oauth-complete page to see what signUp.status is');
-console.log('2. Check browser network tab for any failed requests');
-console.log('3. Check if Clerk webhooks are firing correctly');
-console.log('4. Verify that the OAuth provider is returning the right parameters');
-
-console.log('\n🚀 Next Steps:');
-console.log('1. Test OAuth flow and check browser console');
-console.log('2. Look for the console.log output from oauth-complete page');
-console.log('3. Check if signUp.status is "complete" when the page loads');
-console.log('4. Verify that createdSessionId exists'); 
+debugOAuthFlow().catch(console.error) 
