@@ -43,7 +43,7 @@ const isTeamManagementRoute = createRouteMatcher([
   "/dashboard/team",
 ]);
 
-// Helper function to detect OAuth completion
+// Enhanced OAuth completion detection
 function isOAuthCompletion(req: NextRequest): boolean {
   const url = new URL(req.url);
   const searchParams = url.searchParams;
@@ -53,8 +53,9 @@ function isOAuthCompletion(req: NextRequest): boolean {
   const hasClerkDbJwt = searchParams.has('__clerk_db_jwt');
   const hasClerkStrategy = searchParams.has('__clerk_strategy');
   const hasOAuthCode = searchParams.has('code') && searchParams.has('state');
+  const hasClerkHandshake = url.pathname.includes('/clerk/v1/client/handshake');
   
-  return hasClerkStatus || hasClerkDbJwt || hasClerkStrategy || hasOAuthCode;
+  return hasClerkStatus || hasClerkDbJwt || hasClerkStrategy || hasOAuthCode || hasClerkHandshake;
 }
 
 // Export the middleware
@@ -63,10 +64,16 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
   const url = new URL(req.url);
   const hostname = req.headers.get("host") ?? "";
 
-  // Check for OAuth completion
+  // Check for OAuth completion - MUST be first
   const isOAuthCallback = isOAuthCompletion(req);
   if (isOAuthCallback) {
     console.log(`🔄 OAuth completion detected, allowing through to ${url.pathname}`);
+    return NextResponse.next();
+  }
+
+  // Allow Clerk internal routes
+  if (url.pathname.startsWith('/__clerk') || url.pathname.includes('/clerk/')) {
+    console.log(`✅ Clerk internal route allowed: ${url.pathname}`);
     return NextResponse.next();
   }
 
