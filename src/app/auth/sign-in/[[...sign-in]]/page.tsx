@@ -66,7 +66,7 @@ export default function SignInPage() {
       setOauthLoading(strategy);
       await signIn.authenticateWithRedirect({
         strategy,
-        redirectUrl: "/auth/oauth-complete",
+        redirectUrl: "/dashboard",
         redirectUrlComplete: "/dashboard",
       });
     } catch (err: unknown) {

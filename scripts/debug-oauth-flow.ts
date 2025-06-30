@@ -15,25 +15,104 @@ config();
 const db = new PrismaClient()
 
 async function debugOAuthFlow() {
-  console.log('🔍 Debugging OAuth Flow...\n')
+  console.log('🔍 Debugging OAuth Flow Issue\n');
 
   try {
-    // Check environment variables
-    console.log('📋 Environment Check:')
-    const requiredVars = [
-      'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY',
-      'CLERK_SECRET_KEY',
-      'SIGNING_SECRET'
-    ]
-    
-    requiredVars.forEach(varName => {
-      const value = process.env[varName]
-      if (value) {
-        console.log(`   ✅ ${varName}: Set (${value.length} characters)`)
+    // Check middleware logic
+    console.log('1. Checking middleware logic...');
+    const middlewarePath = join(process.cwd(), 'src/middleware.ts');
+    const middlewareContent = readFileSync(middlewarePath, 'utf8');
+
+    // Check OAuth completion detection
+    console.log('\n📋 OAuth Completion Detection:');
+    const oauthDetectionLines = middlewareContent
+      .split('\n')
+      .filter(line => line.includes('isOAuthCompletion') || line.includes('hasClerkStatus') || line.includes('hasOAuthCode'))
+      .map(line => line.trim());
+
+    oauthDetectionLines.forEach(line => {
+      console.log(`   ${line}`);
+    });
+
+    // Check create-shop route handling
+    console.log('\n📋 Create-Shop Route Handling:');
+    const createShopLines = middlewareContent
+      .split('\n')
+      .filter(line => line.includes('isCreateShopRoute') || line.includes('create-shop'))
+      .map(line => line.trim());
+
+    createShopLines.forEach(line => {
+      console.log(`   ${line}`);
+    });
+
+    // Check authentication checks
+    console.log('\n📋 Authentication Checks:');
+    const authCheckLines = middlewareContent
+      .split('\n')
+      .filter(line => line.includes('!userId') || line.includes('userId &&') || line.includes('await auth()'))
+      .map(line => line.trim());
+
+    authCheckLines.forEach(line => {
+      console.log(`   ${line}`);
+    });
+
+    // Check sign-up page OAuth redirects
+    console.log('\n2. Checking sign-up page OAuth redirects...');
+    const signUpPath = join(process.cwd(), 'src/app/auth/sign-up/[[...sign-up]]/page.tsx');
+    const signUpContent = readFileSync(signUpPath, 'utf8');
+
+    const oauthRedirectLines = signUpContent
+      .split('\n')
+      .filter(line => line.includes('redirectUrl') || line.includes('authenticateWithRedirect'))
+      .map(line => line.trim());
+
+    console.log('\n📋 OAuth Redirect Configuration:');
+    oauthRedirectLines.forEach(line => {
+      console.log(`   ${line}`);
+    });
+
+    // Check if create-shop page exists
+    console.log('\n3. Checking create-shop page...');
+    const createShopPagePath = join(process.cwd(), 'src/app/create-shop/page.tsx');
+    try {
+      const createShopPageContent = readFileSync(createShopPagePath, 'utf8');
+      console.log('✅ Create-shop page exists');
+      
+      // Check if it has proper authentication handling
+      if (createShopPageContent.includes('useUser') || createShopPageContent.includes('useOrganization')) {
+        console.log('✅ Create-shop page has authentication hooks');
       } else {
-        console.log(`   ❌ ${varName}: Not set`)
+        console.log('⚠️ Create-shop page may not have proper authentication handling');
       }
-    })
+    } catch (error) {
+      console.log('❌ Create-shop page does not exist');
+    }
+
+    // Check environment variables
+    console.log('\n4. Checking environment variables...');
+    const envPath = join(process.cwd(), 'src/env.js');
+    try {
+      const envContent = readFileSync(envPath, 'utf8');
+      
+      const requiredVars = [
+        'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY',
+        'CLERK_SECRET_KEY',
+        'NEXT_PUBLIC_CLERK_SIGN_IN_URL',
+        'NEXT_PUBLIC_CLERK_SIGN_UP_URL',
+        'NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL',
+        'NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL'
+      ];
+      
+      requiredVars.forEach(varName => {
+        if (envContent.includes(varName)) {
+          console.log(`✅ ${varName} is configured`);
+        } else {
+          console.log(`❌ ${varName} is missing`);
+        }
+      });
+    } catch (error) {
+      console.log('❌ Could not read env.js file');
+    }
 
     // Check database state
     console.log('\n📊 Database State:')
@@ -105,6 +184,25 @@ async function debugOAuthFlow() {
     console.log('4. Verify if user is being created in Clerk')
     console.log('5. Check if webhook is firing')
     console.log('6. Report back with console logs and any errors')
+
+    // Analysis and recommendations
+    console.log('\n🔍 ANALYSIS:');
+    console.log('\nThe issue is likely one of these:');
+    console.log('1. OAuth completion timing - user not authenticated when reaching /create-shop');
+    console.log('2. Session not properly set after OAuth completion');
+    console.log('3. Middleware redirecting before Clerk finishes processing OAuth');
+
+    console.log('\n💡 RECOMMENDATIONS:');
+    console.log('1. Add more detailed logging to middleware to see auth state');
+    console.log('2. Check if OAuth completion parameters are being detected properly');
+    console.log('3. Consider adding a delay or retry mechanism for OAuth completion');
+    console.log('4. Verify that Clerk environment variables are set correctly');
+
+    console.log('\n🔧 NEXT STEPS:');
+    console.log('1. Test OAuth flow and check browser console for middleware logs');
+    console.log('2. Check if user is properly authenticated when reaching /create-shop');
+    console.log('3. Verify OAuth completion parameters in URL');
+    console.log('4. Check Clerk dashboard for OAuth configuration');
 
   } catch (error) {
     console.error('❌ OAuth debug failed:', error)

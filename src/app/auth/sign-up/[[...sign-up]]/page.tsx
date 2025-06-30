@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useSignUp, useUser, useOrganization, useSSO } from "@clerk/nextjs"; // Add useSSO
+import { useSignUp, useUser, useOrganization, useSignIn } from "@clerk/nextjs";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -23,7 +23,7 @@ import { toast } from "sonner";
 import { Eye, EyeOff, Loader2, Mail, UserPlus, CheckCircle } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "~/components/ui/input-otp";
 
-// Form validation schema (same as before)
+// Form validation schema
 const signUpSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
@@ -36,7 +36,7 @@ type SignUpFormData = z.infer<typeof signUpSchema>;
 
 export default function SignUpPage() {
   const { isLoaded, signUp, setActive } = useSignUp();
-  const { startSSOFlow } = useSSO(); // Use the correct hook for OAuth
+  const { signIn } = useSignIn();
   const { user } = useUser();
   const { organization } = useOrganization();
   const router = useRouter();
@@ -76,86 +76,59 @@ export default function SignUpPage() {
     }
   }, [user, organization, router]);
 
-  // Add OAuth completion detection
+  // Handle OAuth completion
   useEffect(() => {
-    // Log OAuth completion parameters for debugging
     const urlParams = new URLSearchParams(window.location.search);
     const hasOAuthParams = urlParams.has('__clerk_status') || 
                           urlParams.has('__clerk_db_jwt') || 
-                          urlParams.has('__clerk_strategy');
-    
-    if (hasOAuthParams) {
-      console.log('🔍 OAuth completion detected with params:', {
-        status: urlParams.get('__clerk_status'),
-        strategy: urlParams.get('__clerk_strategy'),
-        hasJwt: urlParams.has('__clerk_db_jwt'),
-        allParams: Object.fromEntries(urlParams.entries())
-      });
-    }
-  }, []);
+                          urlParams.has('__clerk_strategy') ||
+                          (urlParams.has('code') && urlParams.has('state'));
 
-  // CORRECTED OAuth sign-up handler using useSSO
+    if (hasOAuthParams) {
+      console.log("🔄 OAuth completion detected on sign-up page");
+      console.log("🔄 OAuth params:", Object.fromEntries(urlParams.entries()));
+      
+      // Wait a bit for Clerk to process the OAuth completion
+      setTimeout(() => {
+        if (user) {
+          console.log("✅ OAuth user authenticated, redirecting to create-shop");
+          router.push("/create-shop");
+        } else {
+          console.log("⚠️ OAuth completion detected but user not authenticated yet");
+        }
+      }, 1000);
+    }
+  }, [user, router]);
+
+  // OAuth handler using useSignIn (this is the correct approach)
   const signUpWithOAuth = async (strategy: "oauth_google" | "oauth_discord") => {
     console.log("🔍 OAuth button clicked with strategy:", strategy);
+    console.log("🔍 Current state:", { isLoaded, hasSignIn: !!signIn, oauthLoading });
     
-    if (!isLoaded) {
-      console.log("❌ OAuth not ready:", { isLoaded });
+    if (!isLoaded || !signIn) {
+      console.log("❌ OAuth not ready:", { isLoaded, hasSignIn: !!signIn });
       toast.error("Authentication not ready. Please try again.");
       return;
     }
 
     setOauthLoading(strategy);
     console.log(`🔄 Starting OAuth with ${strategy}...`);
+    console.log(`🔄 Redirect URL: ${window.location.origin}/auth/sign-up`);
     
     try {
-      // Use startSSOFlow for OAuth (this is the correct approach according to latest docs)
-      console.log("🔄 Calling startSSOFlow...");
-      const { createdSessionId, setActive, signIn, signUp } = await startSSOFlow({
+      // Use signIn.authenticateWithRedirect for OAuth (works for both sign-up and sign-in)
+      // This is the recommended approach from Clerk docs
+      console.log("🔄 Calling signIn.authenticateWithRedirect...");
+      const result = await signIn.authenticateWithRedirect({
         strategy,
-        redirectUrl: `${window.location.origin}/create-shop`,
-        redirectUrlComplete: `${window.location.origin}/create-shop`,
+        redirectUrl: `${window.location.origin}/auth/sign-up`, // Redirect back to sign-up page first
+        redirectUrlComplete: `${window.location.origin}/auth/sign-up`, // Redirect back to sign-up page first
       });
-
-      // Handle the OAuth response
-      if (createdSessionId) {
-        console.log("✅ OAuth successful, setting active session:", createdSessionId);
-        await setActive({ session: createdSessionId });
-        
-        // Sync user to database after successful OAuth
-        setTimeout(async () => {
-          try {
-            const membershipResponse = await fetch('/api/check-shop-membership');
-            const membershipData = await membershipResponse.json() as { hasShop: boolean };
-            
-            if (membershipData.hasShop) {
-              router.push("/dashboard");
-            } else {
-              router.push("/create-shop");
-            }
-          } catch (error) {
-            console.error("Error checking shop membership:", error);
-            router.push("/create-shop");
-          }
-        }, 1000);
-      } else {
-        // Handle incomplete sign-up/sign-in
-        console.log('🔄 Additional steps required:', { signIn, signUp });
-        
-        if (signUp) {
-          console.log('🔄 Sign-up requires additional steps');
-          // Handle additional sign-up requirements if needed
-        }
-        
-        if (signIn) {
-          console.log('🔄 Sign-in requires additional steps');
-          // Handle additional sign-in requirements if needed
-        }
-      }
+      console.log("🔄 authenticateWithRedirect result:", result);
     } catch (err) {
       console.error("❌ OAuth error:", err);
       setOauthLoading(null);
       
-      // Enhanced error handling
       const error = err as { 
         errors?: Array<{ 
           longMessage?: string; 
@@ -178,10 +151,7 @@ export default function SignUpPage() {
     }
   };
 
-  // Rest of your component remains the same...
-  // (onSubmit, onPressVerify, syncUserToDatabase, etc.)
-
-  // Email/password sign-up handler (unchanged)
+  // Email/password sign-up handler using useSignUp (this is the correct approach)
   const onSubmit = async (data: SignUpFormData) => {
     if (!isLoaded || !signUp) return;
 
@@ -424,7 +394,10 @@ export default function SignUpPage() {
               type="button"
               variant="outline"
               className="w-full"
-              onClick={() => void signUpWithOAuth("oauth_google")}
+              onClick={() => {
+                console.log("🔍 Google OAuth button clicked");
+                void signUpWithOAuth("oauth_google");
+              }}
               disabled={oauthLoading !== null || !isLoaded}
             >
               {oauthLoading === "oauth_google" ? (
@@ -456,7 +429,10 @@ export default function SignUpPage() {
               type="button"
               variant="outline"
               className="w-full"
-              onClick={() => void signUpWithOAuth("oauth_discord")}
+              onClick={() => {
+                console.log("🔍 Discord OAuth button clicked");
+                void signUpWithOAuth("oauth_discord");
+              }}
               disabled={oauthLoading !== null || !isLoaded}
             >
               {oauthLoading === "oauth_discord" ? (

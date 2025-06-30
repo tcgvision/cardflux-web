@@ -55,6 +55,17 @@ function isOAuthCompletion(req: NextRequest): boolean {
   const hasOAuthCode = searchParams.has('code') && searchParams.has('state');
   const hasClerkHandshake = url.pathname.includes('/clerk/v1/client/handshake');
   
+  // Log OAuth detection for debugging
+  console.log(`🔍 OAuth detection check:`, {
+    pathname: url.pathname,
+    hasClerkStatus,
+    hasClerkDbJwt,
+    hasClerkStrategy,
+    hasOAuthCode,
+    hasClerkHandshake,
+    allParams: Object.fromEntries(searchParams.entries())
+  });
+  
   return hasClerkStatus || hasClerkDbJwt || hasClerkStrategy || hasOAuthCode || hasClerkHandshake;
 }
 
@@ -64,10 +75,15 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
   const url = new URL(req.url);
   const hostname = req.headers.get("host") ?? "";
 
+  // Enhanced logging for debugging OAuth flow
+  console.log(`🔍 Middleware: ${req.method} ${url.pathname}${url.search}`);
+  console.log(`🔍 Auth state: userId=${userId ? userId.substring(0, 8) + '...' : 'null'}, orgId=${orgId ? orgId.substring(0, 8) + '...' : 'null'}, orgRole=${orgRole ?? 'null'}`);
+
   // Check for OAuth completion - MUST be first
   const isOAuthCallback = isOAuthCompletion(req);
   if (isOAuthCallback) {
     console.log(`🔄 OAuth completion detected, allowing through to ${url.pathname}`);
+    console.log(`🔄 OAuth params: ${url.search}`);
     return NextResponse.next();
   }
 
@@ -120,6 +136,7 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
   // Handle unauthenticated users trying to access protected routes
   if (!userId) {
     console.log(`🔄 Unauthenticated user accessing ${url.pathname}, redirecting to sign-in`);
+    console.log(`🔄 Redirect URL will be: /auth/sign-in?redirect_url=${url.pathname}`);
     const signInUrl = new URL("/auth/sign-in", req.url);
     signInUrl.searchParams.set("redirect_url", url.pathname);
     return NextResponse.redirect(signInUrl);
@@ -127,11 +144,20 @@ export default clerkMiddleware(async (auth, req: NextRequest) => {
 
   // Handle create-shop route - allow authenticated users without org
   if (isCreateShopRoute(req)) {
+    console.log(`🔍 Create-shop route check: userId=${userId ? 'present' : 'null'}, orgId=${orgId ? 'present' : 'null'}, orgRole=${orgRole ?? 'null'}`);
+    
     // If user already has an organization, redirect to dashboard
     if (orgId && orgRole) {
       console.log(`🔄 Create-shop route: User ${userId.substring(0, 8)}... already has org ${orgId.substring(0, 8)}..., redirecting to dashboard`);
       return NextResponse.redirect(new URL("/dashboard", req.url));
     }
+    
+    // If user is not authenticated, redirect to sign-in
+    if (!userId) {
+      console.log(`🔄 Create-shop route: No user ID, redirecting to sign-in`);
+      return NextResponse.redirect(new URL("/auth/sign-in", req.url));
+    }
+    
     // Allow access to create-shop if user has no organization
     console.log(`✅ Create-shop route: User ${userId.substring(0, 8)}... has no org, allowing access`);
     return NextResponse.next();
