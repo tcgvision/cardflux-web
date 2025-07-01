@@ -109,12 +109,12 @@ export default function DashboardPage() {
     }
   }, [clearCache]);
 
-  // Fetch shop statistics using tRPC - only if user has shop membership
+  // Fetch shop statistics using tRPC - only if user has shop membership and is verified
   const { data: shopStats, isLoading: statsLoading, error: statsError } = api.shop.getStats.useQuery(
     undefined,
     {
       refetchInterval: 30000, // Refetch every 30 seconds
-      enabled: hasShop, // Run query if user has shop membership
+      enabled: hasShop && isVerified, // Run query if user has shop membership and is verified
       retry: 1, // Only retry once to avoid infinite loops
       staleTime: 10000, // Consider data fresh for 10 seconds
     }
@@ -127,6 +127,11 @@ export default function DashboardPage() {
     activeInventory: shopStats?.productCount ?? stats.totalInventory,
     growthRate: 12.5, // This would be calculated from historical data
   };
+
+  // Log stats error for debugging
+  if (statsError) {
+    console.error("Shop stats query error:", statsError);
+  }
 
   // Transform inventory data for the data table
   const tableData = sampleProducts.map((product, index) => ({

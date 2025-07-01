@@ -19,7 +19,7 @@ import {
 import { Input } from "~/components/ui/input";
 import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
-import { Combobox } from "~/components/ui/combobox";
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { Loader2, Store } from "lucide-react";
 
@@ -27,23 +27,12 @@ import { Loader2, Store } from "lucide-react";
 const formSchema = z.object({
   name: z.string().min(2, "Shop name must be at least 2 characters"),
   description: z.string().min(10, "Description must be at least 10 characters"),
-  location: z.object({
-    value: z.string().min(1, "Location is required"),
-    label: z.string().min(1, "Location is required"),
-  }),
   type: z.enum(["local", "online", "both"]),
 });
 
 type FormData = z.infer<typeof formSchema>;
 
-// Mock locations for now - replace with Google Places API
-const locations = [
-  { value: "new-york", label: "New York, NY" },
-  { value: "los-angeles", label: "Los Angeles, CA" },
-  { value: "chicago", label: "Chicago, IL" },
-  { value: "houston", label: "Houston, TX" },
-  { value: "phoenix", label: "Phoenix, AZ" },
-];
+
 
 export default function CreateShopPage() {
   const router = useRouter();
@@ -51,13 +40,18 @@ export default function CreateShopPage() {
   const { createOrganization, setActive } = useClerk();
   const { organization, isLoaded: orgLoaded } = useOrganization();
   const [activeTab, setActiveTab] = useState<"create" | "join">("create");
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   // Handle organization changes - redirect to dashboard when organization is available
   useEffect(() => {
-    if (orgLoaded && organization) {
-      router.push("/dashboard");
+    if (orgLoaded && organization && !isRedirecting) {
+      setIsRedirecting(true);
+      // Use setTimeout to avoid setState during render
+      setTimeout(() => {
+        router.push("/dashboard");
+      }, 0);
     }
-  }, [orgLoaded, organization, router]);
+  }, [orgLoaded, organization, router, isRedirecting]);
 
   // Form setup
   const form = useForm<FormData>({
@@ -65,7 +59,6 @@ export default function CreateShopPage() {
     defaultValues: {
       name: "",
       description: "",
-      location: { value: "", label: "" },
       type: "local",
     },
   });
@@ -76,7 +69,6 @@ export default function CreateShopPage() {
       toast.success("Success!", {
         description: "Your shop has been created successfully.",
       });
-      // Don't navigate here - let the onSubmit handler handle it
     },
     onError: (error) => {
       toast.error("Error", {
@@ -98,17 +90,51 @@ export default function CreateShopPage() {
         throw new Error("Failed to create organization");
       }
 
+      console.log("✅ Organization created in Clerk:", org.id);
+
       // Set the newly created organization as active
       await setActive({ organization: org.id });
+      console.log("✅ Organization set as active");
 
       // Create shop in database
       await createShopMutation.mutateAsync({
         name: data.name,
         slug: data.name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, ""),
         description: data.description,
-        location: data.location.label,
         type: data.type,
       });
+
+      console.log("✅ Shop created in database");
+
+      // Manual sync to ensure user is properly linked and role is set
+      try {
+        console.log("🔄 Starting manual sync...");
+        
+        // Sync user to database
+        const userSyncResponse = await fetch('/api/sync-user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        
+        if (userSyncResponse.ok) {
+          console.log("✅ User sync completed");
+        } else {
+          console.warn("⚠️ User sync failed:", await userSyncResponse.text());
+        }
+
+        // Wait a bit for webhooks to process
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        // Check if user is properly linked to shop
+        const membershipCheck = await fetch('/api/check-shop-membership');
+        if (membershipCheck.ok) {
+          const membershipData = await membershipCheck.json();
+          console.log("✅ Shop membership check:", membershipData);
+        }
+
+      } catch (syncError) {
+        console.warn("⚠️ Manual sync failed, but continuing:", syncError);
+      }
 
       // Small delay to ensure Clerk processes the organization change
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -116,12 +142,6 @@ export default function CreateShopPage() {
       // Navigate to onboarding - guide users through the setup process
       router.push("/dashboard/onboarding");
       
-      // Fallback: if router.push doesn't work due to middleware timing, force refresh
-      setTimeout(() => {
-        if (window.location.pathname !== "/dashboard/onboarding") {
-          window.location.href = "/dashboard/onboarding";
-        }
-      }, 2000);
     } catch (error) {
       console.error("Error creating shop:", error);
       const errorMessage = error instanceof Error ? error.message : "Failed to create shop. Please try again.";
@@ -131,12 +151,6 @@ export default function CreateShopPage() {
     }
   };
 
-  // If user already has an organization, redirect to dashboard
-  if (orgLoaded && organization) {
-    router.push("/dashboard");
-    return null;
-  }
-
   // Show loading while organization context is loading
   if (!orgLoaded) {
     return (
@@ -144,6 +158,18 @@ export default function CreateShopPage() {
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
           <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show redirecting state if user already has an organization
+  if (orgLoaded && organization) {
+    return (
+      <div className="container mx-auto flex min-h-[calc(100vh-7rem)] items-center justify-center px-4">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Redirecting to dashboard...</p>
         </div>
       </div>
     );
@@ -205,25 +231,7 @@ export default function CreateShopPage() {
                     )}
                   />
 
-                  <FormField
-                    control={form.control}
-                    name="location"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-foreground">Location</FormLabel>
-                        <FormControl>
-                          <Combobox
-                            options={locations}
-                            value={field.value}
-                            onChange={field.onChange}
-                            placeholder="Select a location"
-                            emptyText="No locations found."
-                          />
-                        </FormControl>
-                        <FormMessage className="text-destructive" />
-                      </FormItem>
-                    )}
-                  />
+
 
                   <FormField
                     control={form.control}

@@ -37,18 +37,6 @@ export const shopRouter = createTRPCRouter({
         });
       }
 
-      // Check if slug is available
-      const existingShop = await ctx.db.shop.findUnique({
-        where: { slug: input.slug },
-      });
-
-      if (existingShop) {
-        throw new TRPCError({
-          code: "CONFLICT",
-          message: "Shop slug already taken",
-        });
-      }
-
       // Get the organization ID from Clerk context
       const orgId = ctx.auth.orgId;
       if (!orgId) {
@@ -58,14 +46,44 @@ export const shopRouter = createTRPCRouter({
         });
       }
 
+      // Generate a unique slug with fallback options
+      const generateUniqueSlug = async (baseSlug: string): Promise<string> => {
+        let slug = baseSlug;
+        let counter = 1;
+        
+        while (true) {
+          const existingShop = await ctx.db.shop.findUnique({
+            where: { slug },
+          });
+          
+          if (!existingShop) {
+            return slug;
+          }
+          
+          // Try with counter suffix
+          slug = `${baseSlug}-${counter}`;
+          counter++;
+          
+          // Prevent infinite loop (max 100 attempts)
+          if (counter > 100) {
+            throw new TRPCError({
+              code: "CONFLICT",
+              message: "Unable to generate unique shop slug. Please try a different shop name.",
+            });
+          }
+        }
+      };
+
+      // Generate unique slug
+      const uniqueSlug = await generateUniqueSlug(input.slug);
+
       // Create shop and link user
       const shop = await ctx.db.shop.create({
         data: {
           id: orgId, // Use Clerk org ID
           name: input.name,
-          slug: input.slug,
+          slug: uniqueSlug,
           description: input.description,
-          location: input.location,
           type: input.type,
           settings: {
             create: {
@@ -81,8 +99,13 @@ export const shopRouter = createTRPCRouter({
       // Update user to link to shop
       await ctx.db.user.update({
         where: { clerkId: ctx.auth.userId! },
-        data: { shopId: shop.id },
+        data: { 
+          shopId: shop.id,
+          role: "org:admin", // Ensure the shop creator gets admin role
+        },
       });
+
+      console.log(`✅ User ${ctx.auth.userId} linked to shop ${shop.id} with admin role`);
 
       return shop;
     }),
@@ -92,7 +115,6 @@ export const shopRouter = createTRPCRouter({
     .input(z.object({
       name: z.string().min(1).optional(),
       description: z.string().optional(),
-      location: z.string().optional(),
       type: z.enum(["local", "online", "both"]).optional(),
     }))
     .mutation(async ({ ctx, input }) => {

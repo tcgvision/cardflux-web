@@ -391,14 +391,16 @@ async function handleMembershipCreated(membershipData: MembershipCreatedData) {
         await handleShopOwnershipConflict(tx, user.id, user.shopId, organizationId)
       }
 
-      // Update user's shop
+      // Update user's shop and role
       user = await tx.user.update({
         where: { email },
         data: {
           shopId: organizationId,
           name: name ?? user.name,
+          role: role, // Always update role when membership is created
         },
       })
+      console.log(`✅ Updated existing user ${email} with shop ${organizationId} and role ${role}`)
     } else {
       // Create new user (invitation accepted before account creation)
       user = await tx.user.create({
@@ -407,19 +409,29 @@ async function handleMembershipCreated(membershipData: MembershipCreatedData) {
           name,
           clerkId: '', // Will be set when user completes signup
           shopId: organizationId,
+          role: role, // Set role immediately
         },
       })
+      console.log(`✅ Created new user ${email} with shop ${organizationId} and role ${role}`)
     }
 
-    // Sync role to database
-    if (role === "org:admin" || role === "org:member") {
-      await tx.user.update({
-        where: { email },
-        data: { role: role },
-      });
-      console.log(`Synced role for ${email}: ${role}`);
-    } else {
-      console.warn(`Invalid role received from Clerk: ${role}`);
+    // Verify the update/creation worked
+    const verifyUser = await tx.user.findUnique({
+      where: { email },
+      select: { id: true, email: true, shopId: true, role: true },
+    })
+
+    console.log(`🔍 Verification - User ${email}:`, {
+      id: verifyUser?.id,
+      shopId: verifyUser?.shopId,
+      role: verifyUser?.role,
+      expectedShopId: organizationId,
+      expectedRole: role,
+    })
+
+    if (verifyUser?.shopId !== organizationId || verifyUser?.role !== role) {
+      console.error(`❌ User ${email} not properly linked or role not set correctly`)
+      throw new Error(`Failed to properly link user ${email} to shop ${organizationId} with role ${role}`)
     }
   })
 }

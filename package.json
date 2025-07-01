@@ -37,7 +37,8 @@
     "fix-user-role-correct": "tsx scripts/fix-user-role-correct.ts",
     "test-auth-flow": "tsx scripts/test-auth-flow.ts",
     "debug-auth-flow": "tsx scripts/debug-auth-flow.ts",
-    "test-webhook-endpoint": "tsx scripts/test-webhook-endpoint.ts"
+    "test-webhook-endpoint": "tsx scripts/test-webhook-endpoint.ts",
+    "fix-user-shop-linking": "tsx scripts/fix-user-shop-linking.ts"
   },
   "dependencies": {
     "@clerk/elements": "^0.23.33",
