@@ -1,8 +1,8 @@
-# Architecture Improvements - TCGVision Web
+# Architecture Improvements - CardFlux
 
 ## Overview
 
-This document outlines the comprehensive architectural improvements made to the TCGVision Web codebase to address critical issues identified in the senior engineer review. These improvements focus on code quality, maintainability, performance, and best practices.
+This document outlines the comprehensive architectural improvements made to the CardFlux codebase to address critical issues identified in the senior engineer review. These improvements focus on code quality, maintainability, performance, and best practices.
 
 ## Phase 1: Critical Architectural Fixes
 

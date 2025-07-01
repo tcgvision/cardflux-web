@@ -1,4 +1,4 @@
-# Deployment Guide for TCG Vision
+# Deployment Guide for CardFlux
 
 ## Environment Variables Setup
 
@@ -9,7 +9,7 @@ To deploy this application to Vercel, you need to configure the following enviro
 1. **DATABASE_URL**
    - Your PostgreSQL database connection string
    - Format: `postgresql://username:password@host:port/database`
-   - Example: `postgresql://user:pass@localhost:5432/tcgvision`
+   - Example: `postgresql://user:pass@localhost:5432/cardflux`
 
 2. **SIGNING_SECRET**
    - Webhook signing secret from Clerk Dashboard

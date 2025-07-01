@@ -1,4 +1,4 @@
-# TCG Vision UX Flow Analysis & Recommendations
+# CardFlux UX Flow Analysis & Recommendations
 
 ## Current State Analysis
 
@@ -28,7 +28,7 @@
 ### Recommended URL Structure
 
 ```
-Main Domain (tcgvision.com):
+Main Domain (cardflux.com):
 ├── / (landing page)
 ├── /pricing
 ├── /features  
@@ -37,7 +37,7 @@ Main Domain (tcgvision.com):
 ├── /auth/sign-up
 └── /auth/verify
 
-Dashboard Subdomain (dashboard.tcgvision.com):
+Dashboard Subdomain (dashboard.cardflux.com):
 ├── / (dashboard home)
 ├── /onboarding (first-time setup)
 ├── /inventory
@@ -50,13 +50,13 @@ Dashboard Subdomain (dashboard.tcgvision.com):
 ### Optimized User Journey
 
 #### Phase 1: Discovery & Sign Up
-1. **Landing Page** (`tcgvision.com`)
+1. **Landing Page** (`cardflux.com`)
    - Clear value proposition
    - Social proof (testimonials, case studies)
    - Feature highlights with demos
    - Clear CTA: "Start Free Trial" or "Get Started"
 
-2. **Sign Up** (`tcgvision.com/auth/sign-up`)
+2. **Sign Up** (`cardflux.com/auth/sign-up`)
    - Clean, focused form
    - Email verification required
    - Clear benefits listed
@@ -67,7 +67,7 @@ Dashboard Subdomain (dashboard.tcgvision.com):
    - Link to onboarding
 
 #### Phase 2: Onboarding (Critical for Retention)
-4. **Welcome Page** (`dashboard.tcgvision.com/onboarding`)
+4. **Welcome Page** (`dashboard.cardflux.com/onboarding`)
    - Personalized greeting
    - Progress indicator
    - Clear expectations
@@ -90,7 +90,7 @@ Dashboard Subdomain (dashboard.tcgvision.com):
    - Advanced features later
 
 #### Phase 3: Core Usage
-8. **Dashboard Home** (`dashboard.tcgvision.com`)
+8. **Dashboard Home** (`dashboard.cardflux.com`)
    - Overview with key metrics
    - Quick action buttons
    - Recent activity feed

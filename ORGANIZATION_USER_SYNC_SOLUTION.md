@@ -30,7 +30,7 @@ Based on the `fix-orphaned-users` script output, we have several critical issues
 1. **Create/Update `.env.local` file**:
 ```bash
 # Database
-DATABASE_URL="postgresql://username:password@localhost:5432/tcgvision"
+DATABASE_URL="postgresql://username:password@localhost:5432/cardflux"
 
 # Clerk Authentication (REQUIRED)
 CLERK_SECRET_KEY="sk_test_..." # Get from Clerk Dashboard

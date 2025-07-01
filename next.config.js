@@ -13,7 +13,7 @@ const config = {
         has: [
           {
             type: 'host',
-            value: 'enterprise.tcgvision.com',
+            value: 'enterprise.cardflux.com',
           },
         ],
         destination: '/enterprise/:path*',

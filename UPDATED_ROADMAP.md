@@ -1,4 +1,4 @@
-# TCG Vision - Updated Development Roadmap
+# CardFlux - Updated Development Roadmap
 
 ## 🎯 Current Status: Phase 1.5 Complete - Core Infrastructure & Shop Management
 
@@ -380,4 +380,4 @@ Based on thorough codebase analysis, here's the updated roadmap reflecting what'
 
 ---
 
-This roadmap represents a comprehensive plan to transform TCG Vision from its current solid foundation into a full-featured POS and inventory management system for TCG shops. The focus is on building practical, shop-ready features that provide immediate value while maintaining the scalability needed for future expansion. 
+This roadmap represents a comprehensive plan to transform CardFlux from its current solid foundation into a full-featured POS and inventory management system for TCG shops. The focus is on building practical, shop-ready features that provide immediate value while maintaining the scalability needed for future expansion. 

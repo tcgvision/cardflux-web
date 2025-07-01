@@ -1,6 +1,6 @@
 # Skeleton Loading System
 
-This directory contains skeleton loading components for all dashboard pages in the TCG Vision application.
+This directory contains skeleton loading components for all dashboard pages in the CardFlux application.
 
 ## Overview
 

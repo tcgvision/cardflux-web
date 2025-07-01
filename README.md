@@ -1,8 +1,8 @@
-# 🎴 TCG Vision Web
+# 🎴 CardFlux
 
 > AI-powered card recognition & inventory management for Trading Card Game shops and collectors.
 
-This is the **Next.js web frontend** for [TCG Vision](https://github.com/tcgvision), a vertical SaaS platform designed to help stores and collectors manage, scan, and track physical trading cards starting with **One Piece TCG**, with planned expansion to **Pokémon, Yu-Gi-Oh!**, and beyond.
+This is the **Next.js web frontend** for CardFlux, a vertical SaaS platform designed to help stores and collectors manage, scan, and track physical trading cards starting with **One Piece TCG**, with planned expansion to **Pokémon, Yu-Gi-Oh!**, and beyond.
 
 ## ⚙️ Tech Stack
 
@@ -40,8 +40,8 @@ This project is built using the [T3 Stack](https://create.t3.gg/), a collection 
 
 ### 1. Clone the repo
 ```bash
-git clone https://github.com/tcgvision/tcgvision-web.git
-cd tcgvision-web
+git clone https://github.com/cardflux/cardflux.git
+cd cardflux
 ```
 
 ### 2. Install dependencies
@@ -154,10 +154,10 @@ pnpm lint
 5. Submit a pull request to main
 
 ## 📄 License
-This project is proprietary and developed by the TCG Vision founding team.
+This project is proprietary and developed by the CardFlux founding team.
 
 ## 🧙 About the Project
-TCG Vision is being built by competitive players, shop owners, and engineers who deeply understand the problems of managing physical card games in the modern world. We aim to revolutionize TCG operations — starting with AI.
+CardFlux is being built by competitive players, shop owners, and engineers who deeply understand the problems of managing physical card games in the modern world. We aim to revolutionize TCG operations — starting with AI.
 
 ## 📚 Learn More
 To learn more about the [T3 Stack](https://create.t3.gg/), take a look at the following resources:

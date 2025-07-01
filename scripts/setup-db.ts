@@ -6,7 +6,7 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function setupDatabase() {
-  console.log('🚀 Setting up TCG Vision database...\n');
+  console.log('🚀 Setting up CardFlux database...\n');
 
   try {
     // Step 1: Push schema to database
@@ -45,4 +45,4 @@ async function setupDatabase() {
   }
 }
 
-setupDatabase(); 
+void setupDatabase(); 
