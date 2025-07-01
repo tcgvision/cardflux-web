@@ -2,6 +2,7 @@ import { z } from "zod";
 import { createTRPCRouter, shopProcedure, staffProcedure, protectedProcedure, adminProcedure } from "~/server/api/trpc";
 import { TRPCError } from "@trpc/server";
 import { ROLES, hasRolePermission, getNormalizedRole } from "~/lib/roles";
+import { ErrorHandler, ErrorMessages } from "~/lib/error-handling";
 
 export const shopRouter = createTRPCRouter({
   // Get current shop details
@@ -23,90 +24,95 @@ export const shopRouter = createTRPCRouter({
       type: z.enum(["local", "online", "both"]),
     }))
     .mutation(async ({ ctx, input }) => {
-      // Check if user already has a shop
-      const existingUser = await ctx.db.user.findUnique({
-        where: { clerkId: ctx.auth.userId! },
-        include: { shop: true },
-      });
-
-      if (existingUser?.shopId) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "User already belongs to a shop",
+      try {
+        // Check if user already has a shop
+        const existingUser = await ctx.db.user.findUnique({
+          where: { clerkId: ctx.auth.userId! },
+          include: { shop: true },
         });
-      }
 
-      // Get the organization ID from Clerk context
-      const orgId = ctx.auth.orgId;
-      if (!orgId) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Organization ID is required to create a shop",
-        });
-      }
-
-      // Generate a unique slug with fallback options
-      const generateUniqueSlug = async (baseSlug: string): Promise<string> => {
-        let slug = baseSlug;
-        let counter = 1;
-        
-        while (true) {
-          const existingShop = await ctx.db.shop.findUnique({
-            where: { slug },
-          });
-          
-          if (!existingShop) {
-            return slug;
-          }
-          
-          // Try with counter suffix
-          slug = `${baseSlug}-${counter}`;
-          counter++;
-          
-          // Prevent infinite loop (max 100 attempts)
-          if (counter > 100) {
-            throw new TRPCError({
-              code: "CONFLICT",
-              message: "Unable to generate unique shop slug. Please try a different shop name.",
-            });
-          }
+        if (existingUser?.shopId) {
+          throw ErrorHandler.createTRPCError(
+            "BAD_REQUEST",
+            ErrorMessages.SHOP.ALREADY_MEMBER
+          );
         }
-      };
 
-      // Generate unique slug
-      const uniqueSlug = await generateUniqueSlug(input.slug);
+        // Get the organization ID from Clerk context
+        const orgId = ctx.auth.orgId;
+        if (!orgId) {
+          throw ErrorHandler.createTRPCError(
+            "BAD_REQUEST",
+            "Organization ID is required to create a shop"
+          );
+        }
 
-      // Create shop and link user
-      const shop = await ctx.db.shop.create({
-        data: {
-          id: orgId, // Use Clerk org ID
-          name: input.name,
-          slug: uniqueSlug,
-          description: input.description,
-          type: input.type,
-          settings: {
-            create: {
-              // Default settings will be created via Prisma defaults
+        // Generate a unique slug with fallback options
+        const generateUniqueSlug = async (baseSlug: string): Promise<string> => {
+          let slug = baseSlug;
+          let counter = 1;
+          
+          while (true) {
+            const existingShop = await ctx.db.shop.findUnique({
+              where: { slug },
+            });
+            
+            if (!existingShop) {
+              return slug;
+            }
+            
+            // Try with counter suffix
+            slug = `${baseSlug}-${counter}`;
+            counter++;
+            
+            // Prevent infinite loop (max 100 attempts)
+            if (counter > 100) {
+              throw ErrorHandler.createTRPCError(
+                "CONFLICT",
+                "Unable to generate unique shop slug. Please try a different shop name."
+              );
+            }
+          }
+        };
+
+        // Generate unique slug
+        const uniqueSlug = await generateUniqueSlug(input.slug);
+
+        // Create shop and link user
+        const shop = await ctx.db.shop.create({
+          data: {
+            id: orgId, // Use Clerk org ID
+            name: input.name,
+            slug: uniqueSlug,
+            description: input.description,
+            type: input.type,
+            settings: {
+              create: {
+                // Default settings will be created via Prisma defaults
+              },
             },
           },
-        },
-        include: {
-          settings: true,
-        },
-      });
+          include: {
+            settings: true,
+          },
+        });
 
-      // Update user to link to shop
-      await ctx.db.user.update({
-        where: { clerkId: ctx.auth.userId! },
-        data: { 
-          shopId: shop.id,
-          role: "org:admin", // Ensure the shop creator gets admin role
-        },
-      });
+        // Update user to link to shop
+        await ctx.db.user.update({
+          where: { clerkId: ctx.auth.userId! },
+          data: { 
+            shopId: shop.id,
+            role: "org:admin", // Ensure the shop creator gets admin role
+          },
+        });
 
-      console.log(`✅ User ${ctx.auth.userId} linked to shop ${shop.id} with admin role`);
-
-      return shop;
+        return shop;
+      } catch (error) {
+        if (error instanceof TRPCError) {
+          throw error;
+        }
+        throw ErrorHandler.handleDatabaseError(error, "shop.create");
+      }
     }),
 
   // Update shop details (Admin only)
@@ -117,34 +123,42 @@ export const shopRouter = createTRPCRouter({
       type: z.enum(["local", "online", "both"]).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      // Check if user has admin permissions
-      const userRole = ctx.userRole;
-      
-      if (!hasRolePermission(userRole, ROLES.ADMIN)) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Admin privileges required to update shop details",
+      try {
+        // Check if user has admin permissions
+        const userRole = ctx.userRole;
+        
+        if (!hasRolePermission(userRole, ROLES.ADMIN)) {
+          throw ErrorHandler.handleForbiddenError(ErrorMessages.SHOP.ADMIN_REQUIRED);
+        }
+
+        const shop = await ctx.db.shop.update({
+          where: { id: ctx.shop.id },
+          data: input,
+          include: {
+            settings: true,
+          },
         });
+
+        return shop;
+      } catch (error) {
+        if (error instanceof TRPCError) {
+          throw error;
+        }
+        throw ErrorHandler.handleDatabaseError(error, "shop.update");
       }
-
-      const shop = await ctx.db.shop.update({
-        where: { id: ctx.shop.id },
-        data: input,
-        include: {
-          settings: true,
-        },
-      });
-
-      return shop;
     }),
 
   // Get shop settings
   getSettings: shopProcedure.query(async ({ ctx }) => {
-    const settings = await ctx.db.shopSettings.findUnique({
-      where: { shopId: ctx.shop.id },
-    });
+    try {
+      const settings = await ctx.db.shopSettings.findUnique({
+        where: { shopId: ctx.shop.id },
+      });
 
-    return settings;
+      return settings;
+    } catch (error) {
+      throw ErrorHandler.handleDatabaseError(error, "shop.getSettings");
+    }
   }),
 
   // Update shop settings (Admin only)
@@ -159,33 +173,35 @@ export const shopRouter = createTRPCRouter({
       maxCreditAmount: z.number().min(0).nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      // Check if user has admin permissions
-      const userRole = ctx.userRole;
-      
-      if (!hasRolePermission(userRole, ROLES.ADMIN)) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Admin privileges required to update shop settings",
+      try {
+        // Check if user has admin permissions
+        const userRole = ctx.userRole;
+        
+        if (!hasRolePermission(userRole, ROLES.ADMIN)) {
+          throw ErrorHandler.handleForbiddenError(ErrorMessages.SHOP.ADMIN_REQUIRED);
+        }
+
+        const settings = await ctx.db.shopSettings.upsert({
+          where: { shopId: ctx.shop.id },
+          update: input,
+          create: {
+            shopId: ctx.shop.id,
+            ...input,
+          },
         });
+
+        return settings;
+      } catch (error) {
+        if (error instanceof TRPCError) {
+          throw error;
+        }
+        throw ErrorHandler.handleDatabaseError(error, "shop.updateSettings");
       }
-
-      const settings = await ctx.db.shopSettings.upsert({
-        where: { shopId: ctx.shop.id },
-        update: input,
-        create: {
-          shopId: ctx.shop.id,
-          ...input,
-        },
-      });
-
-      return settings;
     }),
 
   // Get shop statistics
   getStats: shopProcedure.query(async ({ ctx }) => {
     try {
-      console.log('🔍 GET STATS: Starting query for shop:', ctx.shop.id);
-      
       const [
         customerCount,
         productCount,
@@ -195,15 +211,9 @@ export const shopRouter = createTRPCRouter({
       ] = await Promise.all([
         ctx.db.customer.count({
           where: { shopId: ctx.shop.id, isActive: true },
-        }).catch((error) => {
-          console.error('❌ GET STATS: Customer count error:', error);
-          return 0;
         }),
         ctx.db.product.count({
           where: { shopId: ctx.shop.id },
-        }).catch((error) => {
-          console.error('❌ GET STATS: Product count error:', error);
-          return 0;
         }),
         ctx.db.transaction.count({
           where: { 
@@ -213,9 +223,6 @@ export const shopRouter = createTRPCRouter({
               gte: new Date(new Date().setDate(new Date().getDate() - 30)), // Last 30 days
             },
           },
-        }).catch((error) => {
-          console.error('❌ GET STATS: Transaction count error:', error);
-          return 0;
         }),
         ctx.db.transaction.aggregate({
           where: { 
@@ -227,29 +234,14 @@ export const shopRouter = createTRPCRouter({
             },
           },
           _sum: { totalAmount: true },
-        }).catch((error) => {
-          console.error('❌ GET STATS: Revenue aggregate error:', error);
-          return { _sum: { totalAmount: 0 } };
         }),
         ctx.db.buylist.count({
           where: { 
             shopId: ctx.shop.id,
             status: "PENDING",
           },
-        }).catch((error) => {
-          console.error('❌ GET STATS: Buylist count error:', error);
-          return 0;
         }),
       ]);
-
-      console.log('✅ GET STATS: Query completed successfully');
-      console.log('📊 GET STATS: Results:', {
-        customerCount,
-        productCount,
-        transactionCount,
-        totalRevenue: totalRevenue._sum.totalAmount ?? 0,
-        activeBuylists,
-      });
 
       return {
         customerCount,
@@ -259,7 +251,7 @@ export const shopRouter = createTRPCRouter({
         activeBuylists,
       };
     } catch (error) {
-      console.error("❌ GET STATS: Error fetching shop stats:", error);
+      console.error("Error fetching shop stats:", error);
       // Return default values if there's an error
       return {
         customerCount: 0,
@@ -273,28 +265,32 @@ export const shopRouter = createTRPCRouter({
 
   // Get shop members (Admin only)
   getMembers: shopProcedure.query(async ({ ctx }) => {
-    // Check if user has admin permissions
-    const userRole = ctx.userRole;
-    
-    if (!hasRolePermission(userRole, ROLES.ADMIN)) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: "Admin privileges required to view team members",
+    try {
+      // Check if user has admin permissions
+      const userRole = ctx.userRole;
+      
+      if (!hasRolePermission(userRole, ROLES.ADMIN)) {
+        throw ErrorHandler.handleForbiddenError("Admin privileges required to view team members");
+      }
+
+      const members = await ctx.db.user.findMany({
+        where: { shopId: ctx.shop.id },
+        select: {
+          id: true,
+          clerkId: true,
+          email: true,
+          name: true,
+          role: true,
+        },
+        orderBy: { id: "asc" },
       });
+
+      return members;
+    } catch (error) {
+      if (error instanceof TRPCError) {
+        throw error;
+      }
+      throw ErrorHandler.handleDatabaseError(error, "shop.getMembers");
     }
-
-    const members = await ctx.db.user.findMany({
-      where: { shopId: ctx.shop.id },
-      select: {
-        id: true,
-        clerkId: true,
-        email: true,
-        name: true,
-        role: true,
-      },
-      orderBy: { id: "asc" },
-    });
-
-    return members;
   }),
 }); 

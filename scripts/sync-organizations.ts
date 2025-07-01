@@ -1,4 +1,4 @@
-npx#!/usr/bin/env tsx
+#!/usr/bin/env tsx
 
 import { db } from '../src/server/db';
 import { clerkClient } from '@clerk/nextjs/server';
@@ -64,7 +64,6 @@ async function syncOrganizations() {
               slug: org.slug,
               type: 'local', // Default type
               description: null,
-              location: null,
             },
           });
 
