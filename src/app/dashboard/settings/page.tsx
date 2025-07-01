@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Settings, Store, Users, Bell, Shield, Database, CreditCard, Palette, RefreshCw, AlertTriangle, CheckCircle, Wrench } from "lucide-react";
+import { Settings, Store, Users, Bell, Shield, Database, CreditCard, Palette, RefreshCw, AlertTriangle, CheckCircle, Wrench, MapPin, Phone, Globe } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
@@ -30,35 +30,103 @@ export default function SettingsPage() {
   const { isAdmin } = useRolePermissions();
   const { hasShop, shopName } = useUnifiedShop();
 
-  // Fetch shop settings
-  const { data: shopData, isLoading: shopLoading, refetch: refetchShop } = api.shop.getCurrent.useQuery();
-  const { data: settingsData, isLoading: settingsLoading, refetch: refetchSettings } = api.shop.getSettings.useQuery();
+  // Fetch shop data with real-time updates
+  const { data: shopData, isLoading: shopLoading, refetch: refetchShop } = api.shop.getCurrent.useQuery(undefined, {
+    refetchInterval: 30000, // Refetch every 30 seconds
+    staleTime: 10000, // Consider data fresh for 10 seconds
+  });
+  
+  const { data: settingsData, isLoading: settingsLoading, refetch: refetchSettings } = api.shop.getSettings.useQuery(undefined, {
+    refetchInterval: 30000,
+    staleTime: 10000,
+  });
+  
+  const { data: posSettingsData, isLoading: posSettingsLoading, refetch: refetchPOSSettings } = api.shop.getPOSSettings.useQuery(undefined, {
+    refetchInterval: 30000,
+    staleTime: 10000,
+  });
+  
   const { data: membersData, refetch: refetchMembers } = api.shop.getMembers.useQuery(undefined, {
     enabled: isAdmin,
+    refetchInterval: 30000,
+    staleTime: 10000,
   });
 
-  // Mutations
+  // Mutations with optimistic updates
   const updateShopMutation = api.shop.update.useMutation({
-    onSuccess: () => {
-      toast.success("Shop updated successfully!");
+    onMutate: async (newData) => {
+      // Cancel any outgoing refetches
+      await refetchShop.cancel();
+      
+      // Snapshot the previous value
+      const previousShop = refetchShop.data;
+      
+      // Optimistically update to the new value
+      refetchShop.setData(undefined, (old) => old ? { ...old, ...newData } : old);
+      
+      return { previousShop };
+    },
+    onError: (err, newData, context) => {
+      // If the mutation fails, use the context returned from onMutate to roll back
+      if (context?.previousShop) {
+        refetchShop.setData(undefined, context.previousShop);
+      }
+      toast.error("Failed to update shop", {
+        description: err.message,
+      });
+    },
+    onSettled: () => {
+      // Always refetch after error or success to ensure we have the latest data
       void refetchShop();
     },
-    onError: (error) => {
-      toast.error("Failed to update shop", {
-        description: error.message,
-      });
+    onSuccess: () => {
+      toast.success("Shop updated successfully!");
     },
   });
 
   const updateSettingsMutation = api.shop.updateSettings.useMutation({
-    onSuccess: () => {
-      toast.success("Settings updated successfully!");
+    onMutate: async (newData) => {
+      await refetchSettings.cancel();
+      const previousSettings = refetchSettings.data;
+      refetchSettings.setData(undefined, (old) => old ? { ...old, ...newData } : old);
+      return { previousSettings };
+    },
+    onError: (err, newData, context) => {
+      if (context?.previousSettings) {
+        refetchSettings.setData(undefined, context.previousSettings);
+      }
+      toast.error("Failed to update settings", {
+        description: err.message,
+      });
+    },
+    onSettled: () => {
       void refetchSettings();
     },
-    onError: (error) => {
-      toast.error("Failed to update settings", {
-        description: error.message,
+    onSuccess: () => {
+      toast.success("Settings updated successfully!");
+    },
+  });
+
+  const updatePOSSettingsMutation = api.shop.updatePOSSettings.useMutation({
+    onMutate: async (newData) => {
+      await refetchPOSSettings.cancel();
+      const previousPOSSettings = refetchPOSSettings.data;
+      refetchPOSSettings.setData(undefined, (old) => old ? { ...old, ...newData } : old);
+      return { previousPOSSettings };
+    },
+    onError: (err, newData, context) => {
+      if (context?.previousPOSSettings) {
+        refetchPOSSettings.setData(undefined, context.previousPOSSettings);
+      }
+      toast.error("Failed to update POS settings", {
+        description: err.message,
       });
+    },
+    onSettled: () => {
+      void refetchPOSSettings();
+    },
+    onSuccess: () => {
+      toast.success("POS settings updated successfully!");
     },
   });
 
@@ -82,7 +150,6 @@ export default function SettingsPage() {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          // Include credentials to ensure cookies are sent
         },
         credentials: 'include',
       });
@@ -100,6 +167,7 @@ export default function SettingsPage() {
         // Refresh all data
         void refetchShop();
         void refetchSettings();
+        void refetchPOSSettings();
         void refetchMembers();
       } else {
         setSyncStatus({
@@ -149,6 +217,7 @@ export default function SettingsPage() {
         // Refresh all data
         void refetchShop();
         void refetchSettings();
+        void refetchPOSSettings();
         void refetchMembers();
       } else {
         setSyncStatus({
@@ -198,7 +267,7 @@ export default function SettingsPage() {
         setSyncStatus({ 
           loading: false,
           success: false, 
-          message: result.message || 'Failed to fix user-shop linking' 
+          message: result.message 
         });
         toast.error("Failed to fix user-shop linking", {
           description: result.message,
@@ -208,284 +277,105 @@ export default function SettingsPage() {
       setSyncStatus({ 
         loading: false,
         success: false, 
-        message: 'Failed to fix user-shop linking' 
+        message: "Failed to fix user-shop linking" 
       });
       toast.error("Failed to fix user-shop linking");
     }
   };
 
+  // Show loading state
+  if (shopLoading || settingsLoading || posSettingsLoading) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4" />
+            <p className="text-muted-foreground">Loading shop settings...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
-          <p className="text-muted-foreground">
-            Manage your shop configuration and preferences
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button 
-            variant="outline" 
-            onClick={handleFixUserShop}
-            disabled={syncStatus.loading}
-          >
-            {syncStatus.loading ? (
-              <>
-                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                Fixing...
-              </>
-            ) : (
-              <>
-                <Wrench className="mr-2 h-4 w-4" />
-                Fix User-Shop Link
-              </>
-            )}
-          </Button>
-          {isAdmin && (
-            <Button 
-              variant="outline" 
-              onClick={handleVerifyConsistency}
-              disabled={syncStatus.loading}
-            >
-              {syncStatus.loading ? (
-                <>
-                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                  Checking...
-                </>
-              ) : (
-                <>
-                  <Shield className="mr-2 h-4 w-4" />
-                  Verify Data
-                </>
-              )}
-            </Button>
-          )}
-          {isAdmin && (
-            <Button 
-              variant="outline" 
-              onClick={handleSyncData}
-              disabled={syncStatus.loading}
-            >
-              {syncStatus.loading ? (
-                <>
-                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                  Syncing...
-                </>
-              ) : (
-                <>
-                  <Database className="mr-2 h-4 w-4" />
-                  Sync Data
-                </>
-              )}
-            </Button>
-          )}
-          <Button onClick={handleSaveSettings} disabled={isLoading}>
-            {isLoading ? "Saving..." : "Save Changes"}
-          </Button>
-        </div>
+    <div className="container mx-auto px-4 py-8">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold">Shop Settings</h1>
+        <p className="text-muted-foreground">
+          Manage your shop configuration and preferences
+        </p>
       </div>
 
       {/* Sync Status Alert */}
-      {syncStatus.message && (
-        <Alert className={syncStatus.success ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"}>
+      {syncStatus.loading && (
+        <Alert className="mb-6">
+          <RefreshCw className="h-4 w-4 animate-spin" />
+          <AlertDescription>
+            {syncStatus.message || "Syncing data..."}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {syncStatus.success !== undefined && !syncStatus.loading && (
+        <Alert className={`mb-6 ${syncStatus.success ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`}>
           {syncStatus.success ? (
             <CheckCircle className="h-4 w-4 text-green-600" />
           ) : (
             <AlertTriangle className="h-4 w-4 text-red-600" />
           )}
-          <AlertDescription className={syncStatus.success ? "text-green-800" : "text-red-800"}>
+          <AlertDescription className={syncStatus.success ? 'text-green-800' : 'text-red-800'}>
             {syncStatus.message}
-            {syncStatus.errors && syncStatus.errors.length > 0 && (
-              <ul className="mt-2 list-disc list-inside">
-                {syncStatus.errors.map((error, index) => (
-                  <li key={index} className="text-sm">{error}</li>
-                ))}
-              </ul>
-            )}
           </AlertDescription>
         </Alert>
       )}
 
-      {/* Settings Tabs */}
-      <Tabs defaultValue="general" className="w-full">
+      <Tabs defaultValue="general" className="space-y-6">
         <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="general">General</TabsTrigger>
-          <TabsTrigger value="shop">Shop</TabsTrigger>
-          <TabsTrigger value="users">Users</TabsTrigger>
+          <TabsTrigger value="pos">POS</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
-          <TabsTrigger value="security">Security</TabsTrigger>
+          <TabsTrigger value="team">Team</TabsTrigger>
+          <TabsTrigger value="sync">Sync</TabsTrigger>
           <TabsTrigger value="advanced">Advanced</TabsTrigger>
         </TabsList>
-        
-        <TabsContent value="general" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Settings className="h-4 w-4" />
-                  General Settings
-                </CardTitle>
-                <CardDescription>
-                  Basic application preferences
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="timezone">Timezone</Label>
-                  <Select defaultValue="pst">
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select timezone" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="pst">Pacific Standard Time</SelectItem>
-                      <SelectItem value="mst">Mountain Standard Time</SelectItem>
-                      <SelectItem value="cst">Central Standard Time</SelectItem>
-                      <SelectItem value="est">Eastern Standard Time</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="currency">Default Currency</Label>
-                  <Select defaultValue="usd">
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select currency" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="usd">USD ($)</SelectItem>
-                      <SelectItem value="cad">CAD ($)</SelectItem>
-                      <SelectItem value="eur">EUR (€)</SelectItem>
-                      <SelectItem value="gbp">GBP (£)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="dateFormat">Date Format</Label>
-                  <Select defaultValue="mm-dd-yyyy">
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select format" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="mm-dd-yyyy">MM/DD/YYYY</SelectItem>
-                      <SelectItem value="dd-mm-yyyy">DD/MM/YYYY</SelectItem>
-                      <SelectItem value="yyyy-mm-dd">YYYY-MM-DD</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Dark Mode</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Enable dark theme
-                    </p>
-                  </div>
-                  <Switch />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Palette className="h-4 w-4" />
-                  Appearance
-                </CardTitle>
-                <CardDescription>
-                  Customize the interface
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Theme</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Choose your preferred theme
-                    </p>
-                  </div>
-                  <ThemeToggle />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="accent">Accent Color</Label>
-                  <Select defaultValue="blue">
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select color" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="blue">Blue</SelectItem>
-                      <SelectItem value="green">Green</SelectItem>
-                      <SelectItem value="purple">Purple</SelectItem>
-                      <SelectItem value="orange">Orange</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Compact Mode</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Reduce spacing for more content
-                    </p>
-                  </div>
-                  <Switch />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-        
-        <TabsContent value="shop" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Store className="h-4 w-4" />
-                  Shop Information
-                </CardTitle>
-                <CardDescription>
-                  Basic shop details and contact information
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
+        {/* General Settings */}
+        <TabsContent value="general" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Store className="h-5 w-5" />
+                Shop Information
+              </CardTitle>
+              <CardDescription>
+                Basic shop details and configuration
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
                   <Label htmlFor="shopName">Shop Name</Label>
-                  <Input 
-                    id="shopName" 
-                    defaultValue={shopData?.name ?? "My TCG Shop"}
+                  <Input
+                    id="shopName"
+                    value={shopData?.name || ""}
+                    onChange={(e) => {
+                      updateShopMutation.mutate({ name: e.target.value });
+                    }}
+                    disabled={!isAdmin || updateShopMutation.isPending}
                     placeholder="Enter shop name"
                   />
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="shopSlug">Shop Slug</Label>
-                  <Input 
-                    id="shopSlug" 
-                    defaultValue={shopData?.slug ?? "my-tcg-shop"}
-                    placeholder="shop-url-slug"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    This will be used in your shop URL
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="shopDescription">Description</Label>
-                  <Textarea 
-                    id="shopDescription" 
-                    defaultValue={shopData?.description ?? ""}
-                    placeholder="Describe your shop..."
-                    rows={3}
-                  />
-                </div>
-
-                <div className="space-y-2">
+                <div>
                   <Label htmlFor="shopType">Shop Type</Label>
-                  <Select defaultValue={shopData?.type ?? "local"}>
+                  <Select
+                    value={shopData?.type || "local"}
+                    onValueChange={(value) => {
+                      updateShopMutation.mutate({ type: value as "local" | "online" | "both" });
+                    }}
+                    disabled={!isAdmin || updateShopMutation.isPending}
+                  >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select shop type" />
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="local">Local Store</SelectItem>
@@ -494,167 +384,188 @@ export default function SettingsPage() {
                     </SelectContent>
                   </Select>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+              
+              <div>
+                <Label htmlFor="description">Description</Label>
+                <Textarea
+                  id="description"
+                  value={shopData?.description || ""}
+                  onChange={(e) => {
+                    updateShopMutation.mutate({ description: e.target.value });
+                  }}
+                  disabled={!isAdmin || updateShopMutation.isPending}
+                  placeholder="Describe your shop"
+                  rows={3}
+                />
+              </div>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <CreditCard className="h-4 w-4" />
-                  Store Credit Settings
-                </CardTitle>
-                <CardDescription>
-                  Configure store credit options
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Enable Store Credit</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Allow customers to use store credit
-                    </p>
-                  </div>
-                  <Switch defaultChecked={settingsData?.enableStoreCredit ?? true} />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="minCredit">Minimum Credit Amount</Label>
-                  <Input 
-                    id="minCredit" 
-                    type="number" 
-                    defaultValue={settingsData?.minCreditAmount ?? 0}
-                    placeholder="0.00"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="maxCredit">Maximum Credit Amount</Label>
-                  <Input 
-                    id="maxCredit" 
-                    type="number" 
-                    defaultValue={settingsData?.maxCreditAmount ?? 1000}
-                    placeholder="1000.00"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Leave empty for unlimited
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="users" className="space-y-4">
-          {!isAdmin ? (
-            <Card>
-              <CardContent className="pt-6">
-                <div className="text-center">
-                  <Shield className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                  <h3 className="text-lg font-semibold mb-2">Admin Access Required</h3>
-                  <p className="text-muted-foreground">
-                    Only shop administrators can manage team members and roles.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Users className="h-4 w-4" />
-                    Team Members
-                  </CardTitle>
-                  <CardDescription>
-                    Manage your shop team and roles
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {membersData ? (
-                    <div className="space-y-3">
-                      {membersData.map((member) => (
-                        <div key={member.id} className="flex items-center justify-between p-3 border rounded-lg">
-                          <div>
-                            <p className="font-medium">{member.name || member.email}</p>
-                            <p className="text-sm text-muted-foreground">{member.email}</p>
-                          </div>
-                          <Badge variant={member.role === "admin" ? "default" : "secondary"}>
-                            {member.role}
-                          </Badge>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-8">
-                      <Users className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                      <p className="text-muted-foreground">No team members found</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Database className="h-4 w-4" />
-                    Data Synchronization
-                  </CardTitle>
-                  <CardDescription>
-                    Keep your data in sync with Clerk
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Current Status</Label>
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                      <span className="text-sm">All systems synchronized</span>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Last Sync</Label>
-                    <p className="text-sm text-muted-foreground">
-                      {new Date().toLocaleString()}
-                    </p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Team Members</Label>
-                    <p className="text-sm text-muted-foreground">
-                      {membersData?.length ?? 0} members in database
-                    </p>
-                  </div>
-
-                  <Button 
-                    onClick={handleSyncData}
-                    disabled={syncStatus.loading}
-                    className="w-full"
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="currency">Default Currency</Label>
+                  <Select
+                    value={settingsData?.defaultCurrency || "USD"}
+                    onValueChange={(value) => {
+                      updateSettingsMutation.mutate({ defaultCurrency: value });
+                    }}
+                    disabled={!isAdmin || updateSettingsMutation.isPending}
                   >
-                    {syncStatus.loading ? (
-                      <>
-                        <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                        Syncing...
-                      </>
-                    ) : (
-                      <>
-                        <Database className="mr-2 h-4 w-4" />
-                        Sync Now
-                      </>
-                    )}
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
-          )}
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="USD">USD ($)</SelectItem>
+                      <SelectItem value="EUR">EUR (€)</SelectItem>
+                      <SelectItem value="GBP">GBP (£)</SelectItem>
+                      <SelectItem value="CAD">CAD (C$)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="lowStock">Low Stock Threshold</Label>
+                  <Input
+                    id="lowStock"
+                    type="number"
+                    value={settingsData?.lowStockThreshold || 5}
+                    onChange={(e) => {
+                      updateSettingsMutation.mutate({ lowStockThreshold: parseInt(e.target.value) });
+                    }}
+                    disabled={!isAdmin || updateSettingsMutation.isPending}
+                    min="0"
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
-        <TabsContent value="notifications" className="space-y-4">
+        {/* POS Settings */}
+        <TabsContent value="pos" className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Bell className="h-4 w-4" />
+                <CreditCard className="h-5 w-5" />
+                Point of Sale Settings
+              </CardTitle>
+              <CardDescription>
+                Configure your POS system preferences
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label htmlFor="enableScanner">Enable Scanner</Label>
+                    <p className="text-sm text-muted-foreground">Allow barcode scanning</p>
+                  </div>
+                  <Switch
+                    id="enableScanner"
+                    checked={posSettingsData?.enableScanner || false}
+                    onCheckedChange={(checked) => {
+                      updatePOSSettingsMutation.mutate({ enableScanner: checked });
+                    }}
+                    disabled={!isAdmin || updatePOSSettingsMutation.isPending}
+                  />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label htmlFor="enableReceipts">Enable Receipts</Label>
+                    <p className="text-sm text-muted-foreground">Print receipts for transactions</p>
+                  </div>
+                  <Switch
+                    id="enableReceipts"
+                    checked={posSettingsData?.enableReceipts || false}
+                    onCheckedChange={(checked) => {
+                      updatePOSSettingsMutation.mutate({ enableReceipts: checked });
+                    }}
+                    disabled={!isAdmin || updatePOSSettingsMutation.isPending}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="defaultPayment">Default Payment Method</Label>
+                  <Select
+                    value={posSettingsData?.defaultPaymentMethod || "CASH"}
+                    onValueChange={(value) => {
+                      updatePOSSettingsMutation.mutate({ defaultPaymentMethod: value as any });
+                    }}
+                    disabled={!isAdmin || updatePOSSettingsMutation.isPending}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="CASH">Cash</SelectItem>
+                      <SelectItem value="CREDIT_CARD">Credit Card</SelectItem>
+                      <SelectItem value="DEBIT_CARD">Debit Card</SelectItem>
+                      <SelectItem value="STORE_CREDIT">Store Credit</SelectItem>
+                      <SelectItem value="MIXED">Mixed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div>
+                  <Label htmlFor="taxRate">Tax Rate (%)</Label>
+                  <Input
+                    id="taxRate"
+                    type="number"
+                    step="0.01"
+                    value={posSettingsData?.taxRate || 0}
+                    onChange={(e) => {
+                      updatePOSSettingsMutation.mutate({ taxRate: parseFloat(e.target.value) });
+                    }}
+                    disabled={!isAdmin || updatePOSSettingsMutation.isPending}
+                    min="0"
+                    max="100"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label htmlFor="enableDiscounts">Enable Discounts</Label>
+                    <p className="text-sm text-muted-foreground">Allow price discounts</p>
+                  </div>
+                  <Switch
+                    id="enableDiscounts"
+                    checked={posSettingsData?.enableDiscounts || false}
+                    onCheckedChange={(checked) => {
+                      updatePOSSettingsMutation.mutate({ enableDiscounts: checked });
+                    }}
+                    disabled={!isAdmin || updatePOSSettingsMutation.isPending}
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="maxDiscount">Max Discount (%)</Label>
+                  <Input
+                    id="maxDiscount"
+                    type="number"
+                    step="0.1"
+                    value={posSettingsData?.maxDiscountPercent || 20}
+                    onChange={(e) => {
+                      updatePOSSettingsMutation.mutate({ maxDiscountPercent: parseFloat(e.target.value) });
+                    }}
+                    disabled={!isAdmin || updatePOSSettingsMutation.isPending}
+                    min="0"
+                    max="100"
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Notifications Settings */}
+        <TabsContent value="notifications" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Bell className="h-5 w-5" />
                 Notification Settings
               </CardTitle>
               <CardDescription>
@@ -663,103 +574,241 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Email Notifications</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Receive notifications via email
-                  </p>
+                <div>
+                  <Label htmlFor="enableNotifications">Enable Notifications</Label>
+                  <p className="text-sm text-muted-foreground">Receive notifications for important events</p>
                 </div>
-                <Switch defaultChecked={settingsData?.enableNotifications ?? true} />
+                <Switch
+                  id="enableNotifications"
+                  checked={settingsData?.enableNotifications || false}
+                  onCheckedChange={(checked) => {
+                    updateSettingsMutation.mutate({ enableNotifications: checked });
+                  }}
+                  disabled={!isAdmin || updateSettingsMutation.isPending}
+                />
               </div>
-
+              
               <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Low Stock Alerts</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Get notified when inventory is low
-                  </p>
+                <div>
+                  <Label htmlFor="autoPriceSync">Auto Price Sync</Label>
+                  <p className="text-sm text-muted-foreground">Automatically sync prices with market data</p>
                 </div>
-                <Switch defaultChecked={true} />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>New Order Notifications</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Get notified of new orders
-                  </p>
-                </div>
-                <Switch defaultChecked={true} />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Price Update Notifications</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Get notified of price changes
-                  </p>
-                </div>
-                <Switch defaultChecked={settingsData?.autoPriceSync ?? true} />
+                <Switch
+                  id="autoPriceSync"
+                  checked={settingsData?.autoPriceSync || false}
+                  onCheckedChange={(checked) => {
+                    updateSettingsMutation.mutate({ autoPriceSync: checked });
+                  }}
+                  disabled={!isAdmin || updateSettingsMutation.isPending}
+                />
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
 
-        <TabsContent value="security" className="space-y-4">
+          {/* Store Credit Settings */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Shield className="h-4 w-4" />
-                Security Settings
+                <CreditCard className="h-5 w-5" />
+                Store Credit Settings
               </CardTitle>
               <CardDescription>
-                Manage your account security
+                Configure store credit policies
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Two-Factor Authentication</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Add an extra layer of security
-                  </p>
+                <div>
+                  <Label htmlFor="enableStoreCredit">Enable Store Credit</Label>
+                  <p className="text-sm text-muted-foreground">Allow customers to use store credit</p>
                 </div>
-                <Switch />
+                <Switch
+                  id="enableStoreCredit"
+                  checked={settingsData?.enableStoreCredit || false}
+                  onCheckedChange={(checked) => {
+                    updateSettingsMutation.mutate({ enableStoreCredit: checked });
+                  }}
+                  disabled={!isAdmin || updateSettingsMutation.isPending}
+                />
               </div>
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Session Timeout</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Automatically log out after inactivity
-                  </p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="minCredit">Minimum Credit Amount</Label>
+                  <Input
+                    id="minCredit"
+                    type="number"
+                    step="0.01"
+                    value={settingsData?.minCreditAmount || 0}
+                    onChange={(e) => {
+                      updateSettingsMutation.mutate({ minCreditAmount: parseFloat(e.target.value) });
+                    }}
+                    disabled={!isAdmin || updateSettingsMutation.isPending}
+                    min="0"
+                  />
                 </div>
-                <Switch defaultChecked={true} />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="sessionTimeout">Session Timeout (minutes)</Label>
-                <Select defaultValue="30">
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select timeout" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="15">15 minutes</SelectItem>
-                    <SelectItem value="30">30 minutes</SelectItem>
-                    <SelectItem value="60">1 hour</SelectItem>
-                    <SelectItem value="120">2 hours</SelectItem>
-                  </SelectContent>
-                </Select>
+                
+                <div>
+                  <Label htmlFor="maxCredit">Maximum Credit Amount</Label>
+                  <Input
+                    id="maxCredit"
+                    type="number"
+                    step="0.01"
+                    value={settingsData?.maxCreditAmount || 1000}
+                    onChange={(e) => {
+                      updateSettingsMutation.mutate({ maxCreditAmount: parseFloat(e.target.value) });
+                    }}
+                    disabled={!isAdmin || updateSettingsMutation.isPending}
+                    min="0"
+                  />
+                </div>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="advanced" className="space-y-4">
+        {/* Team Management */}
+        <TabsContent value="team" className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Settings className="h-4 w-4" />
+                <Users className="h-5 w-5" />
+                Team Members
+              </CardTitle>
+              <CardDescription>
+                Manage your shop team members and their roles
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isAdmin ? (
+                <div className="space-y-4">
+                  {membersData?.map((member) => (
+                    <div key={member.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div>
+                        <p className="font-medium">{member.name || member.email}</p>
+                        <p className="text-sm text-muted-foreground">{member.email}</p>
+                      </div>
+                      <Badge variant={member.role === "org:admin" ? "default" : "secondary"}>
+                        {member.role === "org:admin" ? "Admin" : "Member"}
+                      </Badge>
+                    </div>
+                  ))}
+                  {(!membersData || membersData.length === 0) && (
+                    <p className="text-muted-foreground text-center py-4">
+                      No team members found
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <Alert>
+                  <Shield className="h-4 w-4" />
+                  <AlertDescription>
+                    Only administrators can view and manage team members.
+                  </AlertDescription>
+                </Alert>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Sync Management */}
+        <TabsContent value="sync" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Database className="h-5 w-5" />
+                Data Synchronization
+              </CardTitle>
+              <CardDescription>
+                Manage data synchronization between Clerk and your database
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-4">
+                <div>
+                  <h4 className="font-medium mb-2">Manual Sync</h4>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Manually synchronize user data with Clerk organization data
+                  </p>
+                  <Button 
+                    onClick={handleSyncData}
+                    disabled={syncStatus.loading}
+                    className="w-full"
+                  >
+                    {syncStatus.loading ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                        Syncing...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Sync Users with Clerk
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                <div>
+                  <h4 className="font-medium mb-2">Consistency Check</h4>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Verify data consistency between Clerk and database
+                  </p>
+                  <Button 
+                    onClick={handleVerifyConsistency}
+                    disabled={syncStatus.loading}
+                    variant="outline"
+                    className="w-full"
+                  >
+                    {syncStatus.loading ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                        Checking...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Verify Consistency
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                <div>
+                  <h4 className="font-medium mb-2">Fix User-Shop Linking</h4>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Fix issues with user-shop associations
+                  </p>
+                  <Button 
+                    onClick={handleFixUserShop}
+                    disabled={syncStatus.loading}
+                    variant="outline"
+                    className="w-full"
+                  >
+                    {syncStatus.loading ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                        Fixing...
+                      </>
+                    ) : (
+                      <>
+                        <Wrench className="h-4 w-4 mr-2" />
+                        Fix User-Shop Linking
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Advanced Settings */}
+        <TabsContent value="advanced" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Wrench className="h-5 w-5" />
                 Advanced Settings
               </CardTitle>
               <CardDescription>
@@ -768,47 +817,22 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Debug Mode</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Enable detailed logging for troubleshooting
-                  </p>
+                <div>
+                  <Label htmlFor="theme">Theme</Label>
+                  <p className="text-sm text-muted-foreground">Choose your preferred theme</p>
                 </div>
-                <Switch />
+                <ThemeToggle />
               </div>
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Auto Backup</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Automatically backup your data
-                  </p>
-                </div>
-                <Switch defaultChecked={true} />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="backupFrequency">Backup Frequency</Label>
-                <Select defaultValue="daily">
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select frequency" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="hourly">Hourly</SelectItem>
-                    <SelectItem value="daily">Daily</SelectItem>
-                    <SelectItem value="weekly">Weekly</SelectItem>
-                    <SelectItem value="monthly">Monthly</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
+              
               <div className="pt-4 border-t">
-                <Button variant="destructive" className="w-full">
-                  Reset All Settings
+                <Button 
+                  onClick={() => window.location.reload()}
+                  variant="outline"
+                  className="w-full"
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Refresh Page
                 </Button>
-                <p className="text-xs text-muted-foreground mt-2 text-center">
-                  This will reset all settings to their default values
-                </p>
               </div>
             </CardContent>
           </Card>

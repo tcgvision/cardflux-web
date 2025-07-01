@@ -5,9 +5,36 @@ import { ROLES, hasRolePermission, getNormalizedRole } from "~/lib/roles";
 import { ErrorHandler, ErrorMessages } from "~/lib/error-handling";
 
 export const shopRouter = createTRPCRouter({
-  // Get current shop details
+  // Get current shop details with full data
   getCurrent: shopProcedure.query(async ({ ctx }) => {
-    return ctx.shop;
+    try {
+      const shop = await ctx.db.shop.findUnique({
+        where: { id: ctx.shop.id },
+        include: {
+          settings: true,
+          address: true,
+          contactInfo: true,
+          posSettings: true,
+          supportedFranchises: {
+            where: { isActive: true },
+          },
+        },
+      });
+
+      if (!shop) {
+        throw new TRPCError({ 
+          code: "NOT_FOUND", 
+          message: "Shop not found" 
+        });
+      }
+
+      return shop;
+    } catch (error) {
+      if (error instanceof TRPCError) {
+        throw error;
+      }
+      throw ErrorHandler.handleDatabaseError(error, "shop.getCurrent");
+    }
   }),
 
   // Get current shop details (database fallback)
@@ -78,7 +105,7 @@ export const shopRouter = createTRPCRouter({
         // Generate unique slug
         const uniqueSlug = await generateUniqueSlug(input.slug);
 
-        // Create shop and link user
+        // Create shop and link user with default settings
         const shop = await ctx.db.shop.create({
           data: {
             id: orgId, // Use Clerk org ID
@@ -88,12 +115,41 @@ export const shopRouter = createTRPCRouter({
             type: input.type,
             settings: {
               create: {
-                // Default settings will be created via Prisma defaults
+                defaultCurrency: "USD",
+                enableNotifications: true,
+                autoPriceSync: false,
+                lowStockThreshold: 5,
+                enableStoreCredit: true,
+                minCreditAmount: 1.0,
+                maxCreditAmount: 1000.0,
               },
+            },
+            posSettings: {
+              create: {
+                enableScanner: true,
+                scannerDeviceType: "camera",
+                enableReceipts: true,
+                enableCustomerDisplay: false,
+                defaultPaymentMethod: "CASH",
+                taxRate: 0.0,
+                enableDiscounts: true,
+                maxDiscountPercent: 20.0,
+                enableReturns: true,
+                returnWindowDays: 30,
+              },
+            },
+            supportedFranchises: {
+              create: [
+                { franchise: "One Piece TCG" },
+                { franchise: "Magic The Gathering" },
+                { franchise: "Pokemon TCG" },
+              ],
             },
           },
           include: {
             settings: true,
+            posSettings: true,
+            supportedFranchises: true,
           },
         });
 
@@ -136,6 +192,10 @@ export const shopRouter = createTRPCRouter({
           data: input,
           include: {
             settings: true,
+            posSettings: true,
+            supportedFranchises: {
+              where: { isActive: true },
+            },
           },
         });
 
@@ -154,6 +214,23 @@ export const shopRouter = createTRPCRouter({
       const settings = await ctx.db.shopSettings.findUnique({
         where: { shopId: ctx.shop.id },
       });
+
+      // If no settings exist, create default settings
+      if (!settings) {
+        const defaultSettings = await ctx.db.shopSettings.create({
+          data: {
+            shopId: ctx.shop.id,
+            defaultCurrency: "USD",
+            enableNotifications: true,
+            autoPriceSync: false,
+            lowStockThreshold: 5,
+            enableStoreCredit: true,
+            minCreditAmount: 1.0,
+            maxCreditAmount: 1000.0,
+          },
+        });
+        return defaultSettings;
+      }
 
       return settings;
     } catch (error) {
@@ -186,6 +263,13 @@ export const shopRouter = createTRPCRouter({
           update: input,
           create: {
             shopId: ctx.shop.id,
+            defaultCurrency: "USD",
+            enableNotifications: true,
+            autoPriceSync: false,
+            lowStockThreshold: 5,
+            enableStoreCredit: true,
+            minCreditAmount: 1.0,
+            maxCreditAmount: 1000.0,
             ...input,
           },
         });
@@ -196,6 +280,91 @@ export const shopRouter = createTRPCRouter({
           throw error;
         }
         throw ErrorHandler.handleDatabaseError(error, "shop.updateSettings");
+      }
+    }),
+
+  // Get POS settings
+  getPOSSettings: shopProcedure.query(async ({ ctx }) => {
+    try {
+      const posSettings = await ctx.db.pOSSettings.findUnique({
+        where: { shopId: ctx.shop.id },
+      });
+
+      // If no POS settings exist, create default settings
+      if (!posSettings) {
+        const defaultPOSSettings = await ctx.db.pOSSettings.create({
+          data: {
+            shopId: ctx.shop.id,
+            enableScanner: true,
+            scannerDeviceType: "camera",
+            enableReceipts: true,
+            enableCustomerDisplay: false,
+            defaultPaymentMethod: "CASH",
+            taxRate: 0.0,
+            enableDiscounts: true,
+            maxDiscountPercent: 20.0,
+            enableReturns: true,
+            returnWindowDays: 30,
+          },
+        });
+        return defaultPOSSettings;
+      }
+
+      return posSettings;
+    } catch (error) {
+      throw ErrorHandler.handleDatabaseError(error, "shop.getPOSSettings");
+    }
+  }),
+
+  // Update POS settings (Admin only)
+  updatePOSSettings: shopProcedure
+    .input(z.object({
+      enableScanner: z.boolean().optional(),
+      scannerDeviceType: z.string().optional(),
+      enableReceipts: z.boolean().optional(),
+      receiptTemplate: z.string().optional(),
+      enableCustomerDisplay: z.boolean().optional(),
+      defaultPaymentMethod: z.enum(["CASH", "CREDIT_CARD", "DEBIT_CARD", "STORE_CREDIT", "MIXED"]).optional(),
+      taxRate: z.number().min(0).max(100).optional(),
+      enableDiscounts: z.boolean().optional(),
+      maxDiscountPercent: z.number().min(0).max(100).optional(),
+      enableReturns: z.boolean().optional(),
+      returnWindowDays: z.number().int().min(1).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        // Check if user has admin permissions
+        const userRole = ctx.userRole;
+        
+        if (!hasRolePermission(userRole, ROLES.ADMIN)) {
+          throw ErrorHandler.handleForbiddenError(ErrorMessages.SHOP.ADMIN_REQUIRED);
+        }
+
+        const posSettings = await ctx.db.pOSSettings.upsert({
+          where: { shopId: ctx.shop.id },
+          update: input,
+          create: {
+            shopId: ctx.shop.id,
+            enableScanner: true,
+            scannerDeviceType: "camera",
+            enableReceipts: true,
+            enableCustomerDisplay: false,
+            defaultPaymentMethod: "CASH",
+            taxRate: 0.0,
+            enableDiscounts: true,
+            maxDiscountPercent: 20.0,
+            enableReturns: true,
+            returnWindowDays: 30,
+            ...input,
+          },
+        });
+
+        return posSettings;
+      } catch (error) {
+        if (error instanceof TRPCError) {
+          throw error;
+        }
+        throw ErrorHandler.handleDatabaseError(error, "shop.updatePOSSettings");
       }
     }),
 
