@@ -31,449 +31,271 @@ export interface SyncMembershipData {
 export interface SyncResult {
   success: boolean;
   message: string;
-  data?: any;
-  errors?: string[];
+  data?: {
+    userId?: string;
+    shopId?: string;
+    role?: string;
+    wasCreated?: boolean;
+    wasUpdated?: boolean;
+  };
+  error?: string;
+}
+
+export interface ConsistencyCheckResult {
+  isConsistent: boolean;
+  issues: string[];
+  fixes: string[];
 }
 
 /**
- * Comprehensive auth synchronization utility
- * Handles all Clerk-to-database sync scenarios with proper error handling
+ * Auth Sync Service
+ * Handles all Clerk-to-database synchronization logic
  */
-export class AuthSync {
-  private db: PrismaClient;
-
-  constructor() {
-    this.db = db;
-  }
-
+export class AuthSyncService {
   /**
-   * Sync a single user to database
+   * Sync a single user with their Clerk data
    */
-  async syncUser(userData: SyncUserData): Promise<SyncResult> {
+  static async syncUser(userId: string): Promise<SyncResult> {
     try {
-      console.log(`🔄 Syncing user: ${userData.email} (${userData.clerkId})`);
-
-      const existingUser = await this.db.user.findUnique({
-        where: { clerkId: userData.clerkId },
-      });
-
-      if (existingUser) {
-        // Update existing user
-        const updatedUser = await this.db.user.update({
-          where: { clerkId: userData.clerkId },
-          data: {
-            email: userData.email,
-            name: userData.name || existingUser.name,
-            shopId: userData.shopId || existingUser.shopId,
-            role: userData.role ? getNormalizedRole(userData.role) : existingUser.role,
-          },
-        });
-
-        console.log(`✅ Updated user: ${updatedUser.email}`);
-        return {
-          success: true,
-          message: "User updated successfully",
-          data: updatedUser,
-        };
-      } else {
-        // Create new user
-        const newUser = await this.db.user.create({
-          data: {
-            clerkId: userData.clerkId,
-            email: userData.email,
-            name: userData.name,
-            shopId: userData.shopId,
-            role: userData.role ? getNormalizedRole(userData.role) : ROLES.MEMBER,
-          },
-        });
-
-        console.log(`✅ Created user: ${newUser.email}`);
-        return {
-          success: true,
-          message: "User created successfully",
-          data: newUser,
-        };
-      }
-    } catch (error) {
-      console.error(`❌ Error syncing user ${userData.email}:`, error);
-      return {
-        success: false,
-        message: "Failed to sync user",
-        errors: [error instanceof Error ? error.message : "Unknown error"],
-      };
-    }
-  }
-
-  /**
-   * Sync a shop/organization to database
-   */
-  async syncShop(shopData: SyncShopData): Promise<SyncResult> {
-    try {
-      console.log(`🔄 Syncing shop: ${shopData.name} (${shopData.id})`);
-
-      const existingShop = await this.db.shop.findUnique({
-        where: { id: shopData.id },
-        include: { settings: true },
-      });
-
-      if (existingShop) {
-        // Update existing shop
-        const updatedShop = await this.db.shop.update({
-          where: { id: shopData.id },
-          data: {
-            name: shopData.name,
-            slug: shopData.slug,
-            description: shopData.description || existingShop.description,
-            type: shopData.type || existingShop.type,
-          },
-          include: { settings: true },
-        });
-
-        console.log(`✅ Updated shop: ${updatedShop.name}`);
-        return {
-          success: true,
-          message: "Shop updated successfully",
-          data: updatedShop,
-        };
-      } else {
-        // Create new shop with default settings
-        const newShop = await this.db.shop.create({
-          data: {
-            id: shopData.id,
-            name: shopData.name,
-            slug: shopData.slug,
-            description: shopData.description,
-            type: shopData.type || "local",
-            settings: {
-              create: {
-                // Default settings will be created via Prisma defaults
-              },
-            },
-          },
-          include: { settings: true },
-        });
-
-        console.log(`✅ Created shop: ${newShop.name}`);
-        return {
-          success: true,
-          message: "Shop created successfully",
-          data: newShop,
-        };
-      }
-    } catch (error) {
-      console.error(`❌ Error syncing shop ${shopData.name}:`, error);
-      return {
-        success: false,
-        message: "Failed to sync shop",
-        errors: [error instanceof Error ? error.message : "Unknown error"],
-      };
-    }
-  }
-
-  /**
-   * Sync user membership to shop
-   */
-  async syncMembership(membershipData: SyncMembershipData): Promise<SyncResult> {
-    try {
-      console.log(`🔄 Syncing membership: ${membershipData.email} -> ${membershipData.shopId} (${membershipData.role})`);
-
-      // Verify shop exists
-      const shop = await this.db.shop.findUnique({
-        where: { id: membershipData.shopId },
-      });
-
-      if (!shop) {
+      // Get user from Clerk
+      const clerkUser = await clerkClient.users.getUser(userId);
+      if (!clerkUser) {
         return {
           success: false,
-          message: "Shop not found",
-          errors: [`Shop ${membershipData.shopId} does not exist`],
+          message: "User not found in Clerk",
+          error: "CLERK_USER_NOT_FOUND"
         };
       }
 
-      // Find or create user
-      let user = await this.db.user.findUnique({
-        where: { clerkId: membershipData.userId },
+      // Get user's organization memberships
+      const orgMemberships = (clerkUser as any)?.organizationMemberships ?? [];
+      
+      if (orgMemberships.length === 0) {
+        return {
+          success: false,
+          message: "User has no organization memberships",
+          error: "NO_ORGANIZATION_MEMBERSHIPS"
+        };
+      }
+
+      // Get or create user in database
+      let user = await db.user.findUnique({
+        where: { clerkId: userId },
+        include: { shop: true }
       });
 
       if (!user) {
         // Create user if they don't exist
-        user = await this.db.user.create({
+        user = await db.user.create({
           data: {
-            clerkId: membershipData.userId,
-            email: membershipData.email,
-            name: membershipData.name,
-            shopId: membershipData.shopId,
-            role: getNormalizedRole(membershipData.role),
+            clerkId: userId,
+            email: clerkUser.emailAddresses[0]?.emailAddress || "",
+            name: `${clerkUser.firstName || ""} ${clerkUser.lastName || ""}`.trim() || null,
           },
+          include: { shop: true }
         });
-        console.log(`✅ Created user for membership: ${user.email}`);
-      } else {
-        // Update existing user's shop and role
-        user = await this.db.user.update({
-          where: { clerkId: membershipData.userId },
-          data: {
-            shopId: membershipData.shopId,
-            role: getNormalizedRole(membershipData.role),
-            name: membershipData.name || user.name,
-          },
-        });
-        console.log(`✅ Updated user membership: ${user.email}`);
       }
+
+      // Process first organization membership
+      const membership = orgMemberships[0];
+      const orgId = membership.organization?.id;
+      const orgName = membership.organization?.name;
+      const orgRole = membership.role;
+
+      if (!orgId) {
+        return {
+          success: false,
+          message: "Organization ID is missing",
+          error: "MISSING_ORG_ID"
+        };
+      }
+
+      // Get or create shop
+      let shop = await db.shop.findUnique({
+        where: { id: orgId },
+        include: { settings: true }
+      });
+
+      if (!shop) {
+        shop = await db.shop.create({
+          data: {
+            id: orgId,
+            name: orgName || `Shop ${orgId.substring(0, 8)}...`,
+            slug: orgName?.toLowerCase().replace(/\s+/g, '-') || `shop-${orgId.substring(0, 8)}`,
+            description: `Shop for ${orgName || orgId}`,
+            type: 'both',
+          },
+          include: { settings: true }
+        });
+      }
+
+      // Update user to link to shop
+      const updatedUser = await db.user.update({
+        where: { id: user.id },
+        data: {
+          shopId: shop.id,
+          role: orgRole || 'org:member',
+        },
+        include: { shop: true }
+      });
 
       return {
         success: true,
-        message: "Membership synced successfully",
-        data: user,
+        message: "User successfully synced with shop",
+        data: {
+          userId: updatedUser.id.toString(),
+          shopId: shop.id,
+          role: updatedUser.role,
+          wasCreated: !user.shopId,
+          wasUpdated: !!user.shopId && user.shopId !== shop.id
+        }
       };
+
     } catch (error) {
-      console.error(`❌ Error syncing membership for ${membershipData.email}:`, error);
+      console.error('Auth sync error:', error);
       return {
         success: false,
-        message: "Failed to sync membership",
-        errors: [error instanceof Error ? error.message : "Unknown error"],
+        message: "Failed to sync user",
+        error: error instanceof Error ? error.message : "Unknown error"
       };
     }
   }
 
   /**
-   * Remove user from shop
+   * Sync all users in an organization
    */
-  async removeMembership(userId: string, shopId: string): Promise<SyncResult> {
+  static async syncOrganization(orgId: string): Promise<SyncResult[]> {
     try {
-      console.log(`🔄 Removing membership: ${userId} from ${shopId}`);
+      // Get organization members from Clerk
+      const members = await clerkClient.organizations.getOrganizationMembershipList({
+        organizationId: orgId
+      });
 
-      const user = await this.db.user.findUnique({
+      const results: SyncResult[] = [];
+
+      for (const member of members) {
+        const result = await this.syncUser(member.publicUserData?.userId || "");
+        results.push(result);
+      }
+
+      return results;
+
+    } catch (error) {
+      console.error('Organization sync error:', error);
+      return [{
+        success: false,
+        message: "Failed to sync organization",
+        error: error instanceof Error ? error.message : "Unknown error"
+      }];
+    }
+  }
+
+  /**
+   * Check consistency between Clerk and database
+   */
+  static async checkConsistency(): Promise<ConsistencyCheckResult> {
+    const issues: string[] = [];
+    const fixes: string[] = [];
+
+    try {
+      // Get all users from database
+      const dbUsers = await db.user.findMany({
+        include: { shop: true }
+      });
+
+      // Check each user's consistency
+      for (const dbUser of dbUsers) {
+        try {
+          const clerkUser = await clerkClient.users.getUser(dbUser.clerkId);
+          const orgMemberships = (clerkUser as any)?.organizationMemberships ?? [];
+
+          // Check if user has shopId but no Clerk org membership
+          if (dbUser.shopId && orgMemberships.length === 0) {
+            issues.push(`User ${dbUser.email} has shopId but no Clerk org membership`);
+            fixes.push(`Remove shopId from user ${dbUser.email}`);
+          }
+
+          // Check if user has Clerk org membership but no shopId
+          if (!dbUser.shopId && orgMemberships.length > 0) {
+            issues.push(`User ${dbUser.email} has Clerk org membership but no shopId`);
+            fixes.push(`Sync user ${dbUser.email} with Clerk data`);
+          }
+
+          // Check role consistency
+          if (orgMemberships.length > 0) {
+            const clerkRole = orgMemberships[0].role;
+            if (dbUser.role !== clerkRole) {
+              issues.push(`User ${dbUser.email} has role mismatch: DB=${dbUser.role}, Clerk=${clerkRole}`);
+              fixes.push(`Update role for user ${dbUser.email} to match Clerk`);
+            }
+          }
+
+        } catch (error) {
+          issues.push(`Could not verify user ${dbUser.email}: ${error}`);
+        }
+      }
+
+      return {
+        isConsistent: issues.length === 0,
+        issues,
+        fixes
+      };
+
+    } catch (error) {
+      console.error('Consistency check error:', error);
+      return {
+        isConsistent: false,
+        issues: [`Failed to check consistency: ${error}`],
+        fixes: []
+      };
+    }
+  }
+
+  /**
+   * Fix user-shop linking issues
+   */
+  static async fixUserShopLinking(userId: string): Promise<SyncResult> {
+    try {
+      // Get user from database
+      const user = await db.user.findUnique({
         where: { clerkId: userId },
+        include: { shop: true }
       });
 
       if (!user) {
         return {
           success: false,
-          message: "User not found",
-          errors: [`User ${userId} not found in database`],
+          message: "User not found in database",
+          error: "USER_NOT_FOUND"
         };
       }
 
-      if (user.shopId !== shopId) {
+      // If user already has shopId, return success
+      if (user.shopId) {
         return {
-          success: false,
-          message: "User not a member of this shop",
-          errors: [`User ${userId} is not a member of shop ${shopId}`],
+          success: true,
+          message: "User already linked to shop",
+          data: {
+            userId: user.id.toString(),
+            shopId: user.shopId,
+            role: user.role
+          }
         };
       }
 
-      // Handle shop ownership conflict
-      if (user.role === ROLES.ADMIN) {
-        const shopMembers = await this.db.user.count({
-          where: { shopId },
-        });
+      // Try to sync user with Clerk data
+      return await this.syncUser(userId);
 
-        if (shopMembers === 1) {
-          // User owns the shop - delete it
-          await this.db.shop.delete({
-            where: { id: shopId },
-          });
-          console.log(`✅ Deleted shop ${shopId} (last admin removed)`);
-        }
-      }
-
-      // Remove user from shop
-      const updatedUser = await this.db.user.update({
-        where: { clerkId: userId },
-        data: {
-          shopId: null,
-          role: null,
-        },
-      });
-
-      console.log(`✅ Removed user ${updatedUser.email} from shop ${shopId}`);
-      return {
-        success: true,
-        message: "Membership removed successfully",
-        data: updatedUser,
-      };
     } catch (error) {
-      console.error(`❌ Error removing membership for ${userId}:`, error);
+      console.error('Fix user-shop linking error:', error);
       return {
         success: false,
-        message: "Failed to remove membership",
-        errors: [error instanceof Error ? error.message : "Unknown error"],
-      };
-    }
-  }
-
-  /**
-   * Full sync of organization from Clerk
-   */
-  async syncOrganizationFromClerk(orgId: string): Promise<SyncResult> {
-    try {
-      console.log(`🔄 Full sync of organization: ${orgId}`);
-
-      // Get organization details from Clerk
-      const org = await clerkClient.organizations.getOrganization({
-        organizationId: orgId,
-      });
-
-      // Sync shop
-      const shopResult = await this.syncShop({
-        id: org.id,
-        name: org.name,
-        slug: org.slug,
-      });
-
-      if (!shopResult.success) {
-        return shopResult;
-      }
-
-      // Get all members from Clerk
-      const memberships = await clerkClient.organizations.getOrganizationMembershipList({
-        organizationId: orgId,
-      });
-
-      const syncResults = [];
-      const errors = [];
-
-      // Sync each member
-      for (const membership of memberships.data) {
-        const memberResult = await this.syncMembership({
-          userId: membership.publicUserData.userId,
-          shopId: orgId,
-          role: membership.role,
-          email: membership.publicUserData.identifier,
-          name: membership.publicUserData.firstName && membership.publicUserData.lastName
-            ? `${membership.publicUserData.firstName} ${membership.publicUserData.lastName}`
-            : undefined,
-        });
-
-        if (memberResult.success) {
-          syncResults.push(memberResult.data);
-        } else {
-          errors.push(...(memberResult.errors || []));
-        }
-      }
-
-      return {
-        success: errors.length === 0,
-        message: `Organization sync completed. ${syncResults.length} members synced.`,
-        data: {
-          shop: shopResult.data,
-          members: syncResults,
-        },
-        errors: errors.length > 0 ? errors : undefined,
-      };
-    } catch (error) {
-      console.error(`❌ Error syncing organization ${orgId}:`, error);
-      return {
-        success: false,
-        message: "Failed to sync organization",
-        errors: [error instanceof Error ? error.message : "Unknown error"],
-      };
-    }
-  }
-
-  /**
-   * Verify and fix data consistency
-   */
-  async verifyConsistency(shopId: string): Promise<SyncResult> {
-    try {
-      console.log(`🔍 Verifying consistency for shop: ${shopId}`);
-
-      const issues = [];
-      const fixes = [];
-
-      // Get shop from database
-      const shop = await this.db.shop.findUnique({
-        where: { id: shopId },
-        include: { settings: true },
-      });
-
-      if (!shop) {
-        issues.push("Shop not found in database");
-        return {
-          success: false,
-          message: "Shop not found in database",
-          errors: issues,
-        };
-      }
-
-      // Get members from database
-      const dbMembers = await this.db.user.findMany({
-        where: { shopId },
-      });
-
-      // Get members from Clerk
-      const clerkMemberships = await clerkClient.organizations.getOrganizationMembershipList({
-        organizationId: shopId,
-      });
-
-      // Check for missing users in database
-      for (const clerkMember of clerkMemberships.data) {
-        const dbMember = dbMembers.find(m => m.clerkId === clerkMember.publicUserData.userId);
-        
-        if (!dbMember) {
-          issues.push(`User ${clerkMember.publicUserData.identifier} missing from database`);
-          const fixResult = await this.syncMembership({
-            userId: clerkMember.publicUserData.userId,
-            shopId,
-            role: clerkMember.role,
-            email: clerkMember.publicUserData.identifier,
-            name: clerkMember.publicUserData.firstName && clerkMember.publicUserData.lastName
-              ? `${clerkMember.publicUserData.firstName} ${clerkMember.publicUserData.lastName}`
-              : undefined,
-          });
-          if (fixResult.success) {
-            fixes.push(`Added user ${clerkMember.publicUserData.identifier}`);
-          }
-        } else if (dbMember.role !== getNormalizedRole(clerkMember.role)) {
-          issues.push(`Role mismatch for ${clerkMember.publicUserData.identifier}: DB=${dbMember.role}, Clerk=${clerkMember.role}`);
-          const fixResult = await this.syncMembership({
-            userId: clerkMember.publicUserData.userId,
-            shopId,
-            role: clerkMember.role,
-            email: clerkMember.publicUserData.identifier,
-            name: dbMember.name,
-          });
-          if (fixResult.success) {
-            fixes.push(`Fixed role for ${clerkMember.publicUserData.identifier}`);
-          }
-        }
-      }
-
-      // Check for orphaned users in database
-      for (const dbMember of dbMembers) {
-        const clerkMember = clerkMemberships.data.find(m => m.publicUserData.userId === dbMember.clerkId);
-        
-        if (!clerkMember) {
-          issues.push(`User ${dbMember.email} in database but not in Clerk organization`);
-          const fixResult = await this.removeMembership(dbMember.clerkId, shopId);
-          if (fixResult.success) {
-            fixes.push(`Removed orphaned user ${dbMember.email}`);
-          }
-        }
-      }
-
-      return {
-        success: issues.length === 0,
-        message: `Consistency check completed. ${fixes.length} issues fixed.`,
-        data: {
-          shop,
-          dbMemberCount: dbMembers.length,
-          clerkMemberCount: clerkMemberships.data.length,
-          issues,
-          fixes,
-        },
-        errors: issues.length > 0 ? issues : undefined,
-      };
-    } catch (error) {
-      console.error(`❌ Error verifying consistency for shop ${shopId}:`, error);
-      return {
-        success: false,
-        message: "Failed to verify consistency",
-        errors: [error instanceof Error ? error.message : "Unknown error"],
+        message: "Failed to fix user-shop linking",
+        error: error instanceof Error ? error.message : "Unknown error"
       };
     }
   }
 }
 
 // Export singleton instance
-export const authSync = new AuthSync(); 
+export const authSync = new AuthSyncService(); 

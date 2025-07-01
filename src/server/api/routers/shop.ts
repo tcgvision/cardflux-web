@@ -20,7 +20,6 @@ export const shopRouter = createTRPCRouter({
       name: z.string().min(1, "Shop name is required"),
       slug: z.string().min(1, "Shop slug is required").regex(/^[a-z0-9-]+$/, "Slug must contain only lowercase letters, numbers, and hyphens"),
       description: z.string().optional(),
-      location: z.string().optional(),
       type: z.enum(["local", "online", "both"]),
     }))
     .mutation(async ({ ctx, input }) => {
