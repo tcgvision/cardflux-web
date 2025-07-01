@@ -12,12 +12,28 @@ export async function POST() {
       );
     }
 
+    console.log('🔄 DEV SYNC: Starting sync request...');
+
     const { userId } = await auth();
     const clerkUser = await currentUser();
     
+    console.log('🔄 DEV SYNC: Auth context:', { 
+      userId: userId ? userId.substring(0, 8) + '...' : 'null',
+      hasClerkUser: !!clerkUser 
+    });
+    
     if (!userId) {
+      console.log('❌ DEV SYNC: No user ID found in auth context');
       return NextResponse.json(
-        { error: "Unauthorized" }, 
+        { error: "Unauthorized - No user ID found. Please ensure you are signed in." }, 
+        { status: 401 }
+      );
+    }
+
+    if (!clerkUser) {
+      console.log('❌ DEV SYNC: No clerk user found');
+      return NextResponse.json(
+        { error: "Unauthorized - No clerk user found. Please ensure you are signed in." }, 
         { status: 401 }
       );
     }

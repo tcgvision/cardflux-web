@@ -8,15 +8,16 @@
  */
 
 import { PrismaClient } from '@prisma/client'
+import { clerkClient } from '@clerk/nextjs/server'
 
-const db = new PrismaClient()
+const prisma = new PrismaClient()
 
 async function fixUserShopLinking() {
-  console.log('🔍 Checking for user-shop linking issues...\n')
-
   try {
-    // Find users without shopId
-    const usersWithoutShop = await db.user.findMany({
+    console.log('🔍 Starting user-shop linking fix...')
+
+    // Get all users without shopId
+    const usersWithoutShop = await prisma.user.findMany({
       where: {
         shopId: null,
       },
@@ -29,101 +30,142 @@ async function fixUserShopLinking() {
       },
     })
 
-    console.log(`📊 Found ${usersWithoutShop.length} users without shopId:`)
-    usersWithoutShop.forEach(user => {
-      console.log(`  - ${user.email} (ID: ${user.id}, Clerk: ${user.clerkId})`)
-    })
+    console.log(`📊 Found ${usersWithoutShop.length} users without shopId`)
 
-    // Find users with shopId but no role
-    const usersWithoutRole = await db.user.findMany({
-      where: {
-        shopId: { not: null },
-        role: null,
-      },
+    if (usersWithoutShop.length === 0) {
+      console.log('✅ All users are already linked to shops')
+      return
+    }
+
+    // Get all shops
+    const shops = await prisma.shop.findMany({
       select: {
         id: true,
-        clerkId: true,
-        email: true,
         name: true,
-        shopId: true,
-        shop: {
-          select: {
-            name: true,
-            slug: true,
-          },
-        },
+        slug: true,
       },
     })
 
-    console.log(`\n📊 Found ${usersWithoutRole.length} users with shopId but no role:`)
-    usersWithoutRole.forEach(user => {
-      console.log(`  - ${user.email} (Shop: ${user.shop?.name}, ID: ${user.shopId})`)
-    })
+    console.log(`🏪 Found ${shops.length} shops in database`)
 
-    // Find orphaned users (users with shopId but shop doesn't exist)
-    const orphanedUsers = await db.user.findMany({
-      where: {
-        shopId: { not: null },
-      },
-      select: {
-        id: true,
-        clerkId: true,
-        email: true,
-        name: true,
-        shopId: true,
-      },
-    })
+    if (shops.length === 0) {
+      console.log('❌ No shops found in database')
+      return
+    }
 
-    // Check for orphaned users (users with shopId but shop doesn't exist)
-    const orphanedUsersFiltered = []
-    for (const user of orphanedUsers) {
-      const shopExists = await db.shop.findUnique({
-        where: { id: user.shopId! },
-      })
-      if (!shopExists) {
-        orphanedUsersFiltered.push(user)
+    let fixedCount = 0
+    let errorCount = 0
+
+    for (const user of usersWithoutShop) {
+      try {
+        console.log(`\n🔍 Processing user: ${user.email} (${user.clerkId})`)
+
+        // Try to get user's Clerk organization memberships
+        let clerkUser
+        try {
+          clerkUser = await clerkClient.users.getUser(user.clerkId)
+        } catch (error) {
+          console.log(`⚠️ Could not fetch Clerk user for ${user.clerkId}:`, error)
+          continue
+        }
+
+        const orgMemberships = (clerkUser as any)?.organizationMemberships ?? []
+        console.log(`🏢 User has ${orgMemberships.length} organization memberships`)
+
+        if (orgMemberships.length === 0) {
+          console.log(`⚠️ User ${user.email} has no organization memberships`)
+          continue
+        }
+
+        // Find matching shop for each organization membership
+        for (const membership of orgMemberships) {
+          const orgId = membership.organization?.id
+          const orgName = membership.organization?.name
+          const orgRole = membership.role
+
+          console.log(`🔍 Checking organization: ${orgName} (${orgId}) with role: ${orgRole}`)
+
+          // Find shop with matching ID
+          const matchingShop = shops.find(shop => shop.id === orgId)
+          
+          if (matchingShop) {
+            console.log(`✅ Found matching shop: ${matchingShop.name}`)
+            
+            // Update user to link to this shop
+            await prisma.user.update({
+              where: { id: user.id },
+              data: {
+                shopId: matchingShop.id,
+                role: orgRole || 'org:member', // Use Clerk role or default
+              },
+            })
+
+            console.log(`✅ Linked user ${user.email} to shop ${matchingShop.name}`)
+            fixedCount++
+            break // Only link to first matching shop
+          } else {
+            console.log(`❌ No matching shop found for organization ${orgId}`)
+          }
+        }
+
+        // If no matching shop found but user has org memberships, create a shop
+        if (orgMemberships.length > 0 && !user.shopId) {
+          const firstOrg = orgMemberships[0]
+          const orgId = firstOrg.organization?.id
+          const orgName = firstOrg.organization?.name
+          const orgRole = firstOrg.role
+
+          console.log(`🏗️ Creating shop for organization: ${orgName} (${orgId})`)
+
+          // Create shop
+          const newShop = await prisma.shop.create({
+            data: {
+              id: orgId,
+              name: orgName || 'Unnamed Shop',
+              slug: orgName?.toLowerCase().replace(/\s+/g, '-') || `shop-${orgId.substring(0, 8)}`,
+              description: `Shop for ${orgName}`,
+              type: 'both',
+            },
+          })
+
+          // Link user to new shop
+          await prisma.user.update({
+            where: { id: user.id },
+            data: {
+              shopId: newShop.id,
+              role: orgRole || 'org:admin', // Give admin role to shop creator
+            },
+          })
+
+          console.log(`✅ Created shop ${newShop.name} and linked user ${user.email}`)
+          fixedCount++
+        }
+
+      } catch (error) {
+        console.error(`❌ Error processing user ${user.email}:`, error)
+        errorCount++
       }
     }
 
-    console.log(`\n📊 Found ${orphanedUsersFiltered.length} orphaned users (shop doesn't exist):`)
-    orphanedUsersFiltered.forEach(user => {
-      console.log(`  - ${user.email} (Shop ID: ${user.shopId})`)
-    })
-
-    // Summary and recommendations
-    console.log('\n📋 Summary:')
-    console.log(`  - Users without shopId: ${usersWithoutShop.length}`)
-    console.log(`  - Users without role: ${usersWithoutRole.length}`)
-    console.log(`  - Orphaned users: ${orphanedUsersFiltered.length}`)
-
-    if (usersWithoutShop.length > 0 || usersWithoutRole.length > 0 || orphanedUsersFiltered.length > 0) {
-      console.log('\n🔧 Recommendations:')
-      
-      if (usersWithoutShop.length > 0) {
-        console.log('  1. Users without shopId need to create or join a shop')
-        console.log('     - They should visit /create-shop to create a new shop')
-        console.log('     - Or accept an invitation to join an existing shop')
-      }
-      
-      if (usersWithoutRole.length > 0) {
-        console.log('  2. Users without role need role assignment')
-        console.log('     - This should be handled by webhooks when they join organizations')
-        console.log('     - Check if webhooks are firing properly')
-      }
-      
-      if (orphanedUsersFiltered.length > 0) {
-        console.log('  3. Orphaned users need shop cleanup')
-        console.log('     - Their shopId should be cleared or shop should be recreated')
-      }
-    } else {
-      console.log('\n✅ All users are properly linked to shops with roles!')
-    }
+    console.log(`\n📊 Summary:`)
+    console.log(`✅ Fixed: ${fixedCount} users`)
+    console.log(`❌ Errors: ${errorCount} users`)
+    console.log(`📋 Total processed: ${usersWithoutShop.length} users`)
 
   } catch (error) {
-    console.error('❌ Error checking user-shop linking:', error)
+    console.error('❌ Script error:', error)
   } finally {
-    await db.$disconnect()
+    await prisma.$disconnect()
   }
 }
 
-fixUserShopLinking().catch(console.error) 
+// Run the script
+fixUserShopLinking()
+  .then(() => {
+    console.log('✅ Script completed')
+    process.exit(0)
+  })
+  .catch((error) => {
+    console.error('❌ Script failed:', error)
+    process.exit(1)
+  }) 

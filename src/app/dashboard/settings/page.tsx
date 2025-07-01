@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Settings, Store, Users, Bell, Shield, Database, CreditCard, Palette, RefreshCw, AlertTriangle, CheckCircle } from "lucide-react";
+import { Settings, Store, Users, Bell, Shield, Database, CreditCard, Palette, RefreshCw, AlertTriangle, CheckCircle, Wrench } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
@@ -80,7 +80,11 @@ export default function SettingsPage() {
     try {
       const response = await fetch('/api/sync-users-with-clerk', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          // Include credentials to ensure cookies are sent
+        },
+        credentials: 'include',
       });
 
       const result = await response.json();
@@ -126,7 +130,10 @@ export default function SettingsPage() {
     try {
       const response = await fetch('/api/verify-consistency', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
       });
 
       const result = await response.json();
@@ -165,6 +172,48 @@ export default function SettingsPage() {
     }
   };
 
+  const handleFixUserShop = async () => {
+    setSyncStatus({ loading: true });
+    try {
+      const response = await fetch('/api/fix-user-shop', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        setSyncStatus({ 
+          loading: false,
+          success: true, 
+          message: `User-shop linking fixed: ${result.message}` 
+        });
+        toast.success("User-shop linking fixed!");
+        // Refresh the page to update the UI
+        setTimeout(() => window.location.reload(), 2000);
+      } else {
+        setSyncStatus({ 
+          loading: false,
+          success: false, 
+          message: result.message || 'Failed to fix user-shop linking' 
+        });
+        toast.error("Failed to fix user-shop linking", {
+          description: result.message,
+        });
+      }
+    } catch (error) {
+      setSyncStatus({ 
+        loading: false,
+        success: false, 
+        message: 'Failed to fix user-shop linking' 
+      });
+      toast.error("Failed to fix user-shop linking");
+    }
+  };
+
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6">
       {/* Header */}
@@ -176,6 +225,23 @@ export default function SettingsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            onClick={handleFixUserShop}
+            disabled={syncStatus.loading}
+          >
+            {syncStatus.loading ? (
+              <>
+                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                Fixing...
+              </>
+            ) : (
+              <>
+                <Wrench className="mr-2 h-4 w-4" />
+                Fix User-Shop Link
+              </>
+            )}
+          </Button>
           {isAdmin && (
             <Button 
               variant="outline" 

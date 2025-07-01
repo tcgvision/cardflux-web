@@ -18,6 +18,11 @@ const isPublicRoute = createRouteMatcher([
   "/api/debug-clerk(.*)",
   "/api/check-shop-membership(.*)",
   "/api/sync-organization(.*)",
+  "/api/sync-users-with-clerk(.*)",
+  "/api/verify-consistency(.*)",
+  "/api/test-auth(.*)",
+  "/api/test-db(.*)",
+  "/api/fix-user-shop(.*)",
 ]);
 
 const isAuthRoute = createRouteMatcher([

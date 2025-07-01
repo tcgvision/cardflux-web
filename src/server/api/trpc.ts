@@ -127,85 +127,167 @@ const isAuthed = t.middleware(({ next, ctx }) => {
  * This is our PRIMARY source of truth - no dependency on Clerk org context
  */
 const isShopMember = t.middleware(async ({ next, ctx }) => {
-  if (!ctx.auth.userId) {
-    throw new TRPCError({ code: "UNAUTHORIZED" });
-  }
+  try {
+    console.log('🔍 SHOP MEMBER MIDDLEWARE: Starting...');
+    console.log('🔍 SHOP MEMBER MIDDLEWARE: Auth context:', { 
+      userId: ctx.auth.userId ? ctx.auth.userId.substring(0, 8) + '...' : 'null' 
+    });
 
-  // Get user details from database (our source of truth)
-  const user = await ctx.db.user.findUnique({
-    where: { clerkId: ctx.auth.userId },
-    select: {
-      id: true,
-      clerkId: true,
-      email: true,
-      name: true,
-      shopId: true,
-      role: true,
-      shop: {
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-          description: true,
-          type: true,
-          createdAt: true,
-          updatedAt: true,
-          settings: true,
+    if (!ctx.auth.userId) {
+      console.log('❌ SHOP MEMBER MIDDLEWARE: No user ID');
+      throw new TRPCError({ code: "UNAUTHORIZED" });
+    }
+
+    // Get user details from database (our source of truth)
+    console.log('🔍 SHOP MEMBER MIDDLEWARE: Fetching user from database...');
+    const user = await ctx.db.user.findUnique({
+      where: { clerkId: ctx.auth.userId },
+      select: {
+        id: true,
+        clerkId: true,
+        email: true,
+        name: true,
+        shopId: true,
+        role: true,
+        shop: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            description: true,
+            type: true,
+            createdAt: true,
+            updatedAt: true,
+            settings: true,
+          },
         },
       },
-    },
-  });
-
-  if (!user) {
-    throw new TRPCError({ 
-      code: "NOT_FOUND", 
-      message: "User not found in database" 
     });
-  }
 
-  if (!user.shopId) {
-    throw new TRPCError({ 
-      code: "FORBIDDEN", 
-      message: "You must be a member of a shop to access this resource" 
+    console.log('🔍 SHOP MEMBER MIDDLEWARE: User found:', { 
+      userId: user?.id,
+      shopId: user?.shopId,
+      role: user?.role 
     });
-  }
 
-  // Get shop details
-  let shop;
-  try {
-    shop = await ctx.db.shop.findUnique({
-      where: { id: user.shopId },
-      include: {
-        settings: true,
+    if (!user) {
+      console.log('❌ SHOP MEMBER MIDDLEWARE: User not found in database');
+      throw new TRPCError({ 
+        code: "NOT_FOUND", 
+        message: "User not found in database" 
+      });
+    }
+
+    if (!user.shopId) {
+      console.log('❌ SHOP MEMBER MIDDLEWARE: User has no shop ID');
+      
+      // Check if user has a Clerk organization - if so, auto-fix the linking
+      if (ctx.auth.orgId) {
+        console.log('🔧 SHOP MEMBER MIDDLEWARE: Auto-fixing user-shop linking for org:', ctx.auth.orgId);
+        
+        try {
+          // Check if shop exists with this org ID
+          let shop = await ctx.db.shop.findUnique({
+            where: { id: ctx.auth.orgId },
+            include: {
+              settings: true,
+            },
+          });
+
+          if (!shop) {
+            console.log('🔧 SHOP MEMBER MIDDLEWARE: Creating shop for organization:', ctx.auth.orgId);
+            
+            // Create shop with org ID
+            shop = await ctx.db.shop.create({
+              data: {
+                id: ctx.auth.orgId,
+                name: `Shop ${ctx.auth.orgId.substring(0, 8)}...`,
+                slug: `shop-${ctx.auth.orgId.substring(0, 8)}`,
+                description: `Auto-created shop for organization ${ctx.auth.orgId}`,
+                type: 'both',
+              },
+              include: {
+                settings: true,
+              },
+            });
+          }
+
+          // Link user to shop
+          await ctx.db.user.update({
+            where: { id: user.id },
+            data: {
+              shopId: shop.id,
+              role: ctx.auth.orgRole ?? 'org:member',
+            },
+          });
+
+          console.log('✅ SHOP MEMBER MIDDLEWARE: Auto-fixed user-shop linking');
+          
+          // Update user object for this request
+          user.shopId = shop.id;
+          user.role = ctx.auth.orgRole ?? 'org:member';
+          
+        } catch (error) {
+          console.error('❌ SHOP MEMBER MIDDLEWARE: Failed to auto-fix user-shop linking:', error);
+          throw new TRPCError({ 
+            code: "FORBIDDEN", 
+            message: "You must be a member of a shop to access this resource. Please contact support if this error persists." 
+          });
+        }
+      } else {
+        throw new TRPCError({ 
+          code: "FORBIDDEN", 
+          message: "You must be a member of a shop to access this resource" 
+        });
+      }
+    }
+
+    // Get shop details
+    console.log('🔍 SHOP MEMBER MIDDLEWARE: Fetching shop details...');
+    let shop;
+    try {
+      shop = await ctx.db.shop.findUnique({
+        where: { id: user.shopId },
+        include: {
+          settings: true,
+        },
+      });
+      console.log('🔍 SHOP MEMBER MIDDLEWARE: Shop found with settings');
+    } catch (error) {
+      // If settings relation doesn't exist yet, try without it
+      console.warn('⚠️ SHOP MEMBER MIDDLEWARE: Settings relation not found, falling back to basic shop query:', error);
+      shop = await ctx.db.shop.findUnique({
+        where: { id: user.shopId },
+      });
+      console.log('🔍 SHOP MEMBER MIDDLEWARE: Shop found without settings');
+    }
+
+    if (!shop) {
+      console.log('❌ SHOP MEMBER MIDDLEWARE: Shop not found');
+      throw new TRPCError({ 
+        code: "NOT_FOUND", 
+        message: "Shop not found" 
+      });
+    }
+
+    // Get user's role from database (our source of truth)
+    const userRole: Role = user.role ? getNormalizedRole(user.role) : ROLES.MEMBER;
+    console.log('🔍 SHOP MEMBER MIDDLEWARE: User role:', userRole);
+
+    console.log('✅ SHOP MEMBER MIDDLEWARE: Successfully authenticated');
+    return next({
+      ctx: {
+        auth: ctx.auth,
+        shop,
+        user,
+        userRole, // Database role as source of truth
+        db: ctx.db,
       },
     });
   } catch (error) {
-    // If settings relation doesn't exist yet, try without it
-    console.warn('Settings relation not found, falling back to basic shop query:', error);
-    shop = await ctx.db.shop.findUnique({
-      where: { id: user.shopId },
-    });
+    console.error('❌ SHOP MEMBER MIDDLEWARE: Error:', error);
+    throw error;
   }
-
-  if (!shop) {
-    throw new TRPCError({ 
-      code: "NOT_FOUND", 
-      message: "Shop not found" 
-    });
-  }
-
-  // Get user's role from database (our source of truth)
-  const userRole: Role = user.role ? getNormalizedRole(user.role) : ROLES.MEMBER;
-
-  return next({
-    ctx: {
-      auth: ctx.auth,
-      shop,
-      user,
-      userRole, // Database role as source of truth
-      db: ctx.db,
-    },
-  });
 });
 
 /**

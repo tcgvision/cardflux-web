@@ -184,54 +184,92 @@ export const shopRouter = createTRPCRouter({
 
   // Get shop statistics
   getStats: shopProcedure.query(async ({ ctx }) => {
-    const [
-      customerCount,
-      productCount,
-      transactionCount,
-      totalRevenue,
-      activeBuylists,
-    ] = await Promise.all([
-      ctx.db.customer.count({
-        where: { shopId: ctx.shop.id, isActive: true },
-      }),
-      ctx.db.product.count({
-        where: { shopId: ctx.shop.id },
-      }),
-      ctx.db.transaction.count({
-        where: { 
-          shopId: ctx.shop.id,
-          status: "COMPLETED",
-          createdAt: {
-            gte: new Date(new Date().setDate(new Date().getDate() - 30)), // Last 30 days
+    try {
+      console.log('🔍 GET STATS: Starting query for shop:', ctx.shop.id);
+      
+      const [
+        customerCount,
+        productCount,
+        transactionCount,
+        totalRevenue,
+        activeBuylists,
+      ] = await Promise.all([
+        ctx.db.customer.count({
+          where: { shopId: ctx.shop.id, isActive: true },
+        }).catch((error) => {
+          console.error('❌ GET STATS: Customer count error:', error);
+          return 0;
+        }),
+        ctx.db.product.count({
+          where: { shopId: ctx.shop.id },
+        }).catch((error) => {
+          console.error('❌ GET STATS: Product count error:', error);
+          return 0;
+        }),
+        ctx.db.transaction.count({
+          where: { 
+            shopId: ctx.shop.id,
+            status: "COMPLETED",
+            createdAt: {
+              gte: new Date(new Date().setDate(new Date().getDate() - 30)), // Last 30 days
+            },
           },
-        },
-      }),
-      ctx.db.transaction.aggregate({
-        where: { 
-          shopId: ctx.shop.id,
-          status: "COMPLETED",
-          type: "CHECKOUT",
-          createdAt: {
-            gte: new Date(new Date().setDate(new Date().getDate() - 30)), // Last 30 days
+        }).catch((error) => {
+          console.error('❌ GET STATS: Transaction count error:', error);
+          return 0;
+        }),
+        ctx.db.transaction.aggregate({
+          where: { 
+            shopId: ctx.shop.id,
+            status: "COMPLETED",
+            type: "CHECKOUT",
+            createdAt: {
+              gte: new Date(new Date().setDate(new Date().getDate() - 30)), // Last 30 days
+            },
           },
-        },
-        _sum: { totalAmount: true },
-      }),
-      ctx.db.buylist.count({
-        where: { 
-          shopId: ctx.shop.id,
-          status: "PENDING",
-        },
-      }),
-    ]);
+          _sum: { totalAmount: true },
+        }).catch((error) => {
+          console.error('❌ GET STATS: Revenue aggregate error:', error);
+          return { _sum: { totalAmount: 0 } };
+        }),
+        ctx.db.buylist.count({
+          where: { 
+            shopId: ctx.shop.id,
+            status: "PENDING",
+          },
+        }).catch((error) => {
+          console.error('❌ GET STATS: Buylist count error:', error);
+          return 0;
+        }),
+      ]);
 
-    return {
-      customerCount,
-      productCount,
-      transactionCount,
-      totalRevenue: totalRevenue._sum.totalAmount ?? 0,
-      activeBuylists,
-    };
+      console.log('✅ GET STATS: Query completed successfully');
+      console.log('📊 GET STATS: Results:', {
+        customerCount,
+        productCount,
+        transactionCount,
+        totalRevenue: totalRevenue._sum.totalAmount ?? 0,
+        activeBuylists,
+      });
+
+      return {
+        customerCount,
+        productCount,
+        transactionCount,
+        totalRevenue: totalRevenue._sum.totalAmount ?? 0,
+        activeBuylists,
+      };
+    } catch (error) {
+      console.error("❌ GET STATS: Error fetching shop stats:", error);
+      // Return default values if there's an error
+      return {
+        customerCount: 0,
+        productCount: 0,
+        transactionCount: 0,
+        totalRevenue: 0,
+        activeBuylists: 0,
+      };
+    }
   }),
 
   // Get shop members (Admin only)

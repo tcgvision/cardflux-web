@@ -16,8 +16,17 @@ export async function POST() {
     const clerkUser = await currentUser();
     
     if (!userId) {
+      console.log('❌ CONSISTENCY CHECK: No user ID found in auth context');
       return NextResponse.json(
-        { error: "Unauthorized" }, 
+        { error: "Unauthorized - No user ID found" }, 
+        { status: 401 }
+      );
+    }
+
+    if (!clerkUser) {
+      console.log('❌ CONSISTENCY CHECK: No clerk user found');
+      return NextResponse.json(
+        { error: "Unauthorized - No clerk user found" }, 
         { status: 401 }
       );
     }

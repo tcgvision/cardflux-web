@@ -4,124 +4,142 @@ import { db } from "~/server/db";
 
 export async function POST() {
   try {
-    const { userId } = await auth();
+    console.log('🔧 FIX USER SHOP: Starting fix...');
+
+    const { userId, orgId } = await auth();
     const clerkUser = await currentUser();
     
     if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json(
+        { error: "Unauthorized" }, 
+        { status: 401 }
+      );
     }
 
-    console.log('🔧 FIX: Attempting to fix user-shop linking for:', {
-      clerkId: userId,
-      email: clerkUser?.emailAddresses?.[0]?.emailAddress
-    });
+    if (!clerkUser) {
+      return NextResponse.json(
+        { error: "No clerk user found" }, 
+        { status: 401 }
+      );
+    }
 
-    // Find the current user
+    console.log('🔧 FIX USER SHOP: Processing user:', userId);
+    console.log('🔧 FIX USER SHOP: Organization ID:', orgId);
+
+    // Get current user from database
     const user = await db.user.findUnique({
       where: { clerkId: userId },
-      include: {
-        shop: true
-      }
+      select: {
+        id: true,
+        clerkId: true,
+        email: true,
+        name: true,
+        shopId: true,
+        role: true,
+      },
     });
 
     if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "User not found in database" }, 
+        { status: 404 }
+      );
     }
 
-    console.log('🔧 FIX: Current user state:', {
-      userId: user.id,
-      email: user.email,
+    console.log('🔧 FIX USER SHOP: Current user state:', {
+      hasShopId: !!user.shopId,
       shopId: user.shopId,
-      hasShop: !!user.shop
+      role: user.role,
     });
 
-    // If user already has a shop, return success
-    if (user.shopId && user.shop) {
+    // If user already has shopId, return success
+    if (user.shopId) {
+      const shop = await db.shop.findUnique({
+        where: { id: user.shopId },
+        select: { id: true, name: true },
+      });
+
       return NextResponse.json({
         success: true,
         message: "User already linked to shop",
-        shop: user.shop
+        data: {
+          shopId: user.shopId,
+          shopName: shop?.name,
+          role: user.role,
+        },
       });
     }
 
-    // Get all available shops
-    const shops = await db.shop.findMany({
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        _count: {
-          select: {
-            users: true
-          }
-        }
-      }
-    });
-
-    console.log('🔧 FIX: Available shops:', shops);
-
-    // Strategy 1: Try to find a shop by email pattern or name
-    let targetShop = null;
-    
-    // Look for shops that might be related to this user
-    const userEmail = user.email.toLowerCase();
-    const emailPrefix = userEmail.split('@')[0];
-    
-    // Try to find a shop that matches the user's email or name
-    targetShop = shops.find(shop => {
-      const shopName = shop.name?.toLowerCase() ?? '';
-      const shopSlug = shop.slug?.toLowerCase() ?? '';
-      
-      return shopName.includes(emailPrefix) ||
-             shopSlug.includes(emailPrefix) ||
-             shopName.includes('eric') ||
-             shopName.includes('yun');
-    });
-
-    // If no specific match, use the first available shop
-    if (!targetShop && shops.length > 0) {
-      targetShop = shops[0];
-    }
-
-    if (targetShop) {
-      console.log('🔧 FIX: Linking user to shop:', targetShop);
-      
-      // Update the user to link to the shop
-      const updatedUser = await db.user.update({
-        where: { id: user.id },
-        data: { shopId: targetShop.id },
-        include: {
-          shop: {
-            select: {
-              id: true,
-              name: true,
-              slug: true
-            }
-          }
-        }
-      });
-
-      console.log('✅ FIX: Successfully linked user to shop:', updatedUser.shop);
-
-      return NextResponse.json({
-        success: true,
-        message: "User successfully linked to shop",
-        shop: updatedUser.shop,
-        action: "linked"
-      });
-    } else {
+    // If no organization ID, user needs to create or join a shop
+    if (!orgId) {
       return NextResponse.json({
         success: false,
-        message: "No shops available to link to",
-        availableShops: shops
-      }, { status: 400 });
+        message: "No organization found. Please create or join a shop first.",
+        data: {
+          needsShop: true,
+        },
+      });
     }
 
+    // Check if shop exists with this org ID
+    let shop = await db.shop.findUnique({
+      where: { id: orgId },
+      select: { id: true, name: true },
+    });
+
+    if (!shop) {
+      console.log('🔧 FIX USER SHOP: Creating shop for organization:', orgId);
+      
+      // Get organization name from Clerk
+      const orgName = clerkUser.organizationMemberships?.[0]?.organization?.name || 'Unnamed Shop';
+      
+      // Create shop
+      shop = await db.shop.create({
+        data: {
+          id: orgId,
+          name: orgName,
+          slug: orgName.toLowerCase().replace(/\s+/g, '-') || `shop-${orgId.substring(0, 8)}`,
+          description: `Shop for ${orgName}`,
+          type: 'both',
+        },
+        select: { id: true, name: true },
+      });
+
+      console.log('🔧 FIX USER SHOP: Created shop:', shop.name);
+    }
+
+    // Get user's role from Clerk organization
+    const orgRole = clerkUser.organizationMemberships?.[0]?.role || 'org:member';
+
+    // Link user to shop
+    await db.user.update({
+      where: { id: user.id },
+      data: {
+        shopId: shop.id,
+        role: orgRole,
+      },
+    });
+
+    console.log('🔧 FIX USER SHOP: Linked user to shop:', shop.name);
+
+    return NextResponse.json({
+      success: true,
+      message: "User successfully linked to shop",
+      data: {
+        shopId: shop.id,
+        shopName: shop.name,
+        role: orgRole,
+        wasCreated: !shop.id,
+      },
+    });
+
   } catch (error) {
-    console.error("❌ FIX: Error fixing user-shop linking:", error);
+    console.error('❌ FIX USER SHOP: Error:', error);
+    
     return NextResponse.json({ 
-      error: "Internal server error",
-      details: error instanceof Error ? error.message : 'Unknown error'
+      success: false,
+      error: "Failed to fix user-shop linking",
+      message: error instanceof Error ? error.message : "Unknown error",
     }, { status: 500 });
   }
 } 
