@@ -47,7 +47,7 @@ async function testWebhookConfig() {
     console.log('\n🔧 Webhook Testing:')
     console.log('1. Use ngrok to expose localhost: npx ngrok http 3001')
     console.log('2. Update Clerk webhook URL with ngrok URL')
-    console.log('3. Test OAuth sign-up')
+    console.log('3. Test sign-up')
     console.log('4. Check ngrok logs for webhook requests')
 
     console.log('\n📋 Common Issues:')
@@ -60,7 +60,7 @@ async function testWebhookConfig() {
     console.log('\n🚀 Next Steps:')
     console.log('1. Verify webhook URL in Clerk dashboard')
     console.log('2. Enable all required webhook events')
-    console.log('3. Test OAuth sign-up with ngrok')
+    console.log('3. Test sign-up with ngrok')
     console.log('4. Monitor webhook delivery logs')
 
   } catch (error) {

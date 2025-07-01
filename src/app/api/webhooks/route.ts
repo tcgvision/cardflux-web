@@ -208,38 +208,38 @@ async function handleUserCreated(userData: UserCreatedData) {
   console.log('📧 Email addresses:', email_addresses)
   console.log('👤 First name:', first_name)
   console.log('👤 Last name:', last_name)
-  console.log('🔍 Is OAuth user:', !first_name && !last_name ? 'Likely OAuth' : 'Regular signup')
+  console.log('🔍 User signup method:', first_name && last_name ? 'Regular signup' : 'Minimal signup')
 
   try {
-    // Check if user already exists (from invitation flow)
-    const existingUser = await db.user.findUnique({
-      where: { email },
-    })
+  // Check if user already exists (from invitation flow)
+  const existingUser = await db.user.findUnique({
+    where: { email },
+  })
 
-    if (existingUser) {
+  if (existingUser) {
       console.log('📝 User already exists, updating with Clerk ID:', existingUser.id)
-      // Update existing user with Clerk ID
-      const updatedUser = await db.user.update({
-        where: { email },
-        data: {
-          clerkId: id,
-          name: name ?? existingUser.name,
-        },
-      })
+    // Update existing user with Clerk ID
+    const updatedUser = await db.user.update({
+      where: { email },
+      data: {
+        clerkId: id,
+        name: name ?? existingUser.name,
+      },
+    })
       console.log('✅ Linked existing user to Clerk account:', updatedUser.id)
-      return updatedUser
-    } else {
+    return updatedUser
+  } else {
       console.log('🆕 Creating new user in database...')
-      // Create new user
-      const newUser = await db.user.create({
-        data: {
-          clerkId: id,
-          email,
-          name,
-        },
-      })
+    // Create new user
+    const newUser = await db.user.create({
+      data: {
+        clerkId: id,
+        email,
+        name,
+      },
+    })
       console.log('✅ Created new user:', newUser.id)
-      return newUser
+    return newUser
     }
   } catch (error) {
     console.error('❌ Error in handleUserCreated:', error)

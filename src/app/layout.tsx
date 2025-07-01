@@ -45,8 +45,6 @@ export default function RootLayout({
             }}
             signInUrl="/auth/sign-in"
             signUpUrl="/auth/sign-up"
-            afterSignInUrl="/dashboard"
-            afterSignUpUrl="/create-shop"
             publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
           >
             <NavbarWrapper />

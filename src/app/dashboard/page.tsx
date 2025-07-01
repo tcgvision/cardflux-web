@@ -37,7 +37,7 @@ export default function DashboardPage() {
   const [isLoadingDebug, setIsLoadingDebug] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // Add OAuth debugging
+  // Debug logging
   useEffect(() => {
     if (userLoaded && user) {
       console.log("🔍 Dashboard: User loaded", {
@@ -45,7 +45,6 @@ export default function DashboardPage() {
         email: user.emailAddresses[0]?.emailAddress,
         firstName: user.firstName,
         lastName: user.lastName,
-        oauthProvider: user.unsafeMetadata?.oauthProvider,
       });
     }
     

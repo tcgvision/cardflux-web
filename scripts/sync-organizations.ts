@@ -1,4 +1,4 @@
-#!/usr/bin/env tsx
+npx#!/usr/bin/env tsx
 
 import { db } from '../src/server/db';
 import { clerkClient } from '@clerk/nextjs/server';

@@ -58,7 +58,7 @@ Dashboard Subdomain (dashboard.tcgvision.com):
 
 2. **Sign Up** (`tcgvision.com/auth/sign-up`)
    - Clean, focused form
-   - OAuth options (Google, Discord)
+   - Email verification required
    - Clear benefits listed
    - No pricing discussion yet
 
