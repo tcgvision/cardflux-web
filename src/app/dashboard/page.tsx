@@ -36,6 +36,8 @@ export default function DashboardPage() {
   const [debugInfo, setDebugInfo] = useState<Record<string, unknown> | null>(null);
   const [isLoadingDebug, setIsLoadingDebug] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isDevSyncing, setIsDevSyncing] = useState(false);
+  const [devSyncResult, setDevSyncResult] = useState<Record<string, unknown> | null>(null);
 
   // Debug logging
   useEffect(() => {
@@ -108,6 +110,36 @@ export default function DashboardPage() {
       setIsSyncing(false);
     }
   }, [clearCache]);
+
+  const syncUsersWithClerk = useCallback(async () => {
+    setIsDevSyncing(true);
+    setDevSyncResult(null);
+    try {
+      const response = await fetch('/api/sync-users-with-clerk', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      setDevSyncResult(data);
+      
+      if (data.success) {
+        // Refresh the page to update context
+        window.location.reload();
+      }
+    } catch (error) {
+      console.error("Failed to sync users with Clerk:", error);
+      setDevSyncResult({ error: "Failed to sync users with Clerk" });
+    } finally {
+      setIsDevSyncing(false);
+    }
+  }, []);
 
   // Fetch shop statistics using tRPC - only if user has shop membership and is verified
   const { data: shopStats, isLoading: statsLoading, error: statsError } = api.shop.getStats.useQuery(
@@ -301,6 +333,43 @@ export default function DashboardPage() {
                   )}
                 </Button>
               </div>
+
+              {/* Development Sync Button */}
+              {process.env.NODE_ENV === 'development' && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">4. Development: Sync with Clerk</p>
+                  <p className="text-sm text-muted-foreground">
+                    Manually sync user roles with Clerk organization data:
+                  </p>
+                  <Button 
+                    variant="outline" 
+                    onClick={syncUsersWithClerk}
+                    disabled={isDevSyncing}
+                    className="w-full"
+                  >
+                    {isDevSyncing ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                        Syncing with Clerk...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Sync Users with Clerk
+                      </>
+                    )}
+                  </Button>
+                  {devSyncResult && (
+                    <div className="text-xs text-muted-foreground p-2 bg-gray-50 rounded">
+                      {(devSyncResult as any).success ? (
+                        <span className="text-green-600">✅ Sync completed successfully</span>
+                      ) : (
+                        <span className="text-red-600">❌ {(devSyncResult as any).error}</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {debugInfo && (
@@ -361,6 +430,39 @@ export default function DashboardPage() {
               Here&apos;s what&apos;s happening with your TCG business today.
             </p>
           </div>
+          {/* Development Sync Button - Only show in development */}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="flex flex-col items-end space-y-2">
+              <Button 
+                onClick={syncUsersWithClerk}
+                disabled={isDevSyncing}
+                variant="outline"
+                size="sm"
+                className="text-xs"
+              >
+                {isDevSyncing ? (
+                  <>
+                    <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
+                    Syncing...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-3 w-3 mr-1" />
+                    Sync with Clerk
+                  </>
+                )}
+              </Button>
+              {devSyncResult && (
+                <div className="text-xs text-muted-foreground max-w-xs">
+                  {(devSyncResult as any).success ? (
+                    <span className="text-green-600">✅ Sync completed</span>
+                  ) : (
+                    <span className="text-red-600">❌ {(devSyncResult as any).error}</span>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Stats Cards */}

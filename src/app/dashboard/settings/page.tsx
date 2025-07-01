@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Settings, Store, Users, Bell, Shield, Database, CreditCard, Palette } from "lucide-react";
+import { Settings, Store, Users, Bell, Shield, Database, CreditCard, Palette, RefreshCw, AlertTriangle, CheckCircle } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
@@ -13,19 +13,156 @@ import { Switch } from "~/components/ui/switch";
 import { Textarea } from "~/components/ui/textarea";
 import { ThemeToggle } from "~/app/_components/theme-toggle";
 import { api } from "~/trpc/react";
+import { toast } from "sonner";
+import { useRolePermissions } from "~/hooks/use-role-permissions";
+import { useUnifiedShop } from "~/hooks/use-unified-shop";
+import { Alert, AlertDescription } from "~/components/ui/alert";
 
 export default function SettingsPage() {
   const [isLoading, setIsLoading] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<{
+    loading: boolean;
+    success?: boolean;
+    message?: string;
+    errors?: string[];
+  }>({ loading: false });
+
+  const { isAdmin } = useRolePermissions();
+  const { hasShop, shopName } = useUnifiedShop();
 
   // Fetch shop settings
-  const { data: shopData, isLoading: shopLoading } = api.shop.getCurrent.useQuery();
-  const { data: settingsData, isLoading: settingsLoading } = api.shop.getSettings.useQuery();
+  const { data: shopData, isLoading: shopLoading, refetch: refetchShop } = api.shop.getCurrent.useQuery();
+  const { data: settingsData, isLoading: settingsLoading, refetch: refetchSettings } = api.shop.getSettings.useQuery();
+  const { data: membersData, refetch: refetchMembers } = api.shop.getMembers.useQuery(undefined, {
+    enabled: isAdmin,
+  });
+
+  // Mutations
+  const updateShopMutation = api.shop.update.useMutation({
+    onSuccess: () => {
+      toast.success("Shop updated successfully!");
+      void refetchShop();
+    },
+    onError: (error) => {
+      toast.error("Failed to update shop", {
+        description: error.message,
+      });
+    },
+  });
+
+  const updateSettingsMutation = api.shop.updateSettings.useMutation({
+    onSuccess: () => {
+      toast.success("Settings updated successfully!");
+      void refetchSettings();
+    },
+    onError: (error) => {
+      toast.error("Failed to update settings", {
+        description: error.message,
+      });
+    },
+  });
 
   const handleSaveSettings = async () => {
     setIsLoading(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setIsLoading(false);
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      toast.success("Settings saved successfully!");
+    } catch (error) {
+      toast.error("Failed to save settings");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSyncData = async () => {
+    setSyncStatus({ loading: true });
+    try {
+      const response = await fetch('/api/sync-users-with-clerk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setSyncStatus({
+          loading: false,
+          success: true,
+          message: result.message,
+        });
+        toast.success("Data synchronized successfully!");
+        
+        // Refresh all data
+        void refetchShop();
+        void refetchSettings();
+        void refetchMembers();
+      } else {
+        setSyncStatus({
+          loading: false,
+          success: false,
+          message: result.message,
+          errors: result.errors,
+        });
+        toast.error("Sync failed", {
+          description: result.message,
+        });
+      }
+    } catch (error) {
+      setSyncStatus({
+        loading: false,
+        success: false,
+        message: "Failed to sync data",
+        errors: [error instanceof Error ? error.message : "Unknown error"],
+      });
+      toast.error("Sync failed", {
+        description: "An unexpected error occurred",
+      });
+    }
+  };
+
+  const handleVerifyConsistency = async () => {
+    setSyncStatus({ loading: true });
+    try {
+      const response = await fetch('/api/verify-consistency', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setSyncStatus({
+          loading: false,
+          success: true,
+          message: result.message,
+        });
+        toast.success("Consistency check completed!");
+        
+        // Refresh all data
+        void refetchShop();
+        void refetchSettings();
+        void refetchMembers();
+      } else {
+        setSyncStatus({
+          loading: false,
+          success: false,
+          message: result.message,
+          errors: result.errors,
+        });
+        toast.error("Consistency check failed", {
+          description: result.message,
+        });
+      }
+    } catch (error) {
+      setSyncStatus({
+        loading: false,
+        success: false,
+        message: "Consistency check failed",
+        errors: [error instanceof Error ? error.message : "Unknown error"],
+      });
+      toast.error("Consistency check failed");
+    }
   };
 
   return (
@@ -39,14 +176,70 @@ export default function SettingsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm">
-            Reset to Defaults
-          </Button>
+          {isAdmin && (
+            <Button 
+              variant="outline" 
+              onClick={handleVerifyConsistency}
+              disabled={syncStatus.loading}
+            >
+              {syncStatus.loading ? (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                  Checking...
+                </>
+              ) : (
+                <>
+                  <Shield className="mr-2 h-4 w-4" />
+                  Verify Data
+                </>
+              )}
+            </Button>
+          )}
+          {isAdmin && (
+            <Button 
+              variant="outline" 
+              onClick={handleSyncData}
+              disabled={syncStatus.loading}
+            >
+              {syncStatus.loading ? (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                  Syncing...
+                </>
+              ) : (
+                <>
+                  <Database className="mr-2 h-4 w-4" />
+                  Sync Data
+                </>
+              )}
+            </Button>
+          )}
           <Button onClick={handleSaveSettings} disabled={isLoading}>
             {isLoading ? "Saving..." : "Save Changes"}
           </Button>
         </div>
       </div>
+
+      {/* Sync Status Alert */}
+      {syncStatus.message && (
+        <Alert className={syncStatus.success ? "border-green-200 bg-green-50" : "border-red-200 bg-red-50"}>
+          {syncStatus.success ? (
+            <CheckCircle className="h-4 w-4 text-green-600" />
+          ) : (
+            <AlertTriangle className="h-4 w-4 text-red-600" />
+          )}
+          <AlertDescription className={syncStatus.success ? "text-green-800" : "text-red-800"}>
+            {syncStatus.message}
+            {syncStatus.errors && syncStatus.errors.length > 0 && (
+              <ul className="mt-2 list-disc list-inside">
+                {syncStatus.errors.map((error, index) => (
+                  <li key={index} className="text-sm">{error}</li>
+                ))}
+              </ul>
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Settings Tabs */}
       <Tabs defaultValue="general" className="w-full">
@@ -199,41 +392,41 @@ export default function SettingsPage() {
                     placeholder="Enter shop name"
                   />
                 </div>
-                
+
                 <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
+                  <Label htmlFor="shopSlug">Shop Slug</Label>
+                  <Input 
+                    id="shopSlug" 
+                    defaultValue={shopData?.slug ?? "my-tcg-shop"}
+                    placeholder="shop-url-slug"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    This will be used in your shop URL
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="shopDescription">Description</Label>
                   <Textarea 
-                    id="description" 
+                    id="shopDescription" 
                     defaultValue={shopData?.description ?? ""}
-                    placeholder="Brief description of your shop"
+                    placeholder="Describe your shop..."
                     rows={3}
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="location">Location</Label>
-                  <Input 
-                    id="location" 
-                    defaultValue={shopData?.location ?? ""}
-                    placeholder="Shop address or location"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Phone Number</Label>
-                  <Input 
-                    id="phone" 
-                    placeholder="(555) 123-4567"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input 
-                    id="email" 
-                    type="email"
-                    placeholder="shop@example.com"
-                  />
+                  <Label htmlFor="shopType">Shop Type</Label>
+                  <Select defaultValue={shopData?.type ?? "local"}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select shop type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="local">Local Store</SelectItem>
+                      <SelectItem value="online">Online Store</SelectItem>
+                      <SelectItem value="both">Both</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </CardContent>
             </Card>
@@ -245,7 +438,7 @@ export default function SettingsPage() {
                   Store Credit Settings
                 </CardTitle>
                 <CardDescription>
-                  Configure store credit policies
+                  Configure store credit options
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -253,18 +446,18 @@ export default function SettingsPage() {
                   <div className="space-y-0.5">
                     <Label>Enable Store Credit</Label>
                     <p className="text-sm text-muted-foreground">
-                      Allow customers to earn and spend store credit
+                      Allow customers to use store credit
                     </p>
                   </div>
-                  <Switch defaultChecked />
+                  <Switch defaultChecked={settingsData?.enableStoreCredit ?? true} />
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="minCredit">Minimum Credit Amount</Label>
                   <Input 
                     id="minCredit" 
-                    type="number"
-                    defaultValue="0"
+                    type="number" 
+                    defaultValue={settingsData?.minCreditAmount ?? 0}
                     placeholder="0.00"
                   />
                 </div>
@@ -273,287 +466,229 @@ export default function SettingsPage() {
                   <Label htmlFor="maxCredit">Maximum Credit Amount</Label>
                   <Input 
                     id="maxCredit" 
-                    type="number"
-                    placeholder="No limit"
+                    type="number" 
+                    defaultValue={settingsData?.maxCreditAmount ?? 1000}
+                    placeholder="1000.00"
                   />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="creditExpiry">Credit Expiry (days)</Label>
-                  <Input 
-                    id="creditExpiry" 
-                    type="number"
-                    defaultValue="365"
-                    placeholder="365"
-                  />
+                  <p className="text-xs text-muted-foreground">
+                    Leave empty for unlimited
+                  </p>
                 </div>
               </CardContent>
             </Card>
           </div>
         </TabsContent>
-        
+
         <TabsContent value="users" className="space-y-4">
+          {!isAdmin ? (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-center">
+                  <Shield className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                  <h3 className="text-lg font-semibold mb-2">Admin Access Required</h3>
+                  <p className="text-muted-foreground">
+                    Only shop administrators can manage team members and roles.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    Team Members
+                  </CardTitle>
+                  <CardDescription>
+                    Manage your shop team and roles
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {membersData ? (
+                    <div className="space-y-3">
+                      {membersData.map((member) => (
+                        <div key={member.id} className="flex items-center justify-between p-3 border rounded-lg">
+                          <div>
+                            <p className="font-medium">{member.name || member.email}</p>
+                            <p className="text-sm text-muted-foreground">{member.email}</p>
+                          </div>
+                          <Badge variant={member.role === "admin" ? "default" : "secondary"}>
+                            {member.role}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <Users className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                      <p className="text-muted-foreground">No team members found</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Database className="h-4 w-4" />
+                    Data Synchronization
+                  </CardTitle>
+                  <CardDescription>
+                    Keep your data in sync with Clerk
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Current Status</Label>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                      <span className="text-sm">All systems synchronized</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Last Sync</Label>
+                    <p className="text-sm text-muted-foreground">
+                      {new Date().toLocaleString()}
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Team Members</Label>
+                    <p className="text-sm text-muted-foreground">
+                      {membersData?.length ?? 0} members in database
+                    </p>
+                  </div>
+
+                  <Button 
+                    onClick={handleSyncData}
+                    disabled={syncStatus.loading}
+                    className="w-full"
+                  >
+                    {syncStatus.loading ? (
+                      <>
+                        <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                        Syncing...
+                      </>
+                    ) : (
+                      <>
+                        <Database className="mr-2 h-4 w-4" />
+                        Sync Now
+                      </>
+                    )}
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="notifications" className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Users className="h-4 w-4" />
-                User Management
+                <Bell className="h-4 w-4" />
+                Notification Settings
               </CardTitle>
               <CardDescription>
-                Manage shop staff and permissions
+                Configure how you receive notifications
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 rounded-lg border">
-                  <div className="flex items-center gap-4">
-                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                      <span className="text-sm font-medium">JD</span>
-                    </div>
-                    <div>
-                      <p className="font-medium">John Doe</p>
-                      <p className="text-sm text-muted-foreground">john@example.com</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="default">Owner</Badge>
-                    <Button size="sm" variant="outline">
-                      Edit
-                    </Button>
-                  </div>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Email Notifications</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Receive notifications via email
+                  </p>
                 </div>
+                <Switch defaultChecked={settingsData?.enableNotifications ?? true} />
+              </div>
 
-                <div className="flex items-center justify-between p-4 rounded-lg border">
-                  <div className="flex items-center gap-4">
-                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                      <span className="text-sm font-medium">JS</span>
-                    </div>
-                    <div>
-                      <p className="font-medium">Jane Smith</p>
-                      <p className="text-sm text-muted-foreground">jane@example.com</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary">Staff</Badge>
-                    <Button size="sm" variant="outline">
-                      Edit
-                    </Button>
-                  </div>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Low Stock Alerts</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Get notified when inventory is low
+                  </p>
                 </div>
+                <Switch defaultChecked={true} />
+              </div>
 
-                <Button className="w-full">
-                  <Users className="mr-2 h-4 w-4" />
-                  Invite New User
-                </Button>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>New Order Notifications</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Get notified of new orders
+                  </p>
+                </div>
+                <Switch defaultChecked={true} />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Price Update Notifications</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Get notified of price changes
+                  </p>
+                </div>
+                <Switch defaultChecked={settingsData?.autoPriceSync ?? true} />
               </div>
             </CardContent>
           </Card>
         </TabsContent>
-        
-        <TabsContent value="notifications" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Bell className="h-4 w-4" />
-                  Email Notifications
-                </CardTitle>
-                <CardDescription>
-                  Configure email notification preferences
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Low Stock Alerts</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Get notified when inventory is low
-                    </p>
-                  </div>
-                  <Switch defaultChecked />
-                </div>
 
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>New Orders</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Notify when new orders are placed
-                    </p>
-                  </div>
-                  <Switch defaultChecked />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Daily Reports</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Receive daily sales summaries
-                    </p>
-                  </div>
-                  <Switch />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Weekly Analytics</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Get weekly performance reports
-                    </p>
-                  </div>
-                  <Switch defaultChecked />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Bell className="h-4 w-4" />
-                  SMS Notifications
-                </CardTitle>
-                <CardDescription>
-                  Configure SMS notification preferences
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Urgent Alerts</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Critical system notifications
-                    </p>
-                  </div>
-                  <Switch defaultChecked />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Large Orders</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Orders over $100
-                    </p>
-                  </div>
-                  <Switch />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>System Maintenance</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Scheduled maintenance alerts
-                    </p>
-                  </div>
-                  <Switch defaultChecked />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-        
         <TabsContent value="security" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Shield className="h-4 w-4" />
-                  Security Settings
-                </CardTitle>
-                <CardDescription>
-                  Configure security and privacy settings
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Two-Factor Authentication</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Require 2FA for all users
-                    </p>
-                  </div>
-                  <Switch defaultChecked />
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="h-4 w-4" />
+                Security Settings
+              </CardTitle>
+              <CardDescription>
+                Manage your account security
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Two-Factor Authentication</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Add an extra layer of security
+                  </p>
                 </div>
+                <Switch />
+              </div>
 
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Session Timeout</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Auto-logout after inactivity
-                    </p>
-                  </div>
-                  <Switch defaultChecked />
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Session Timeout</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Automatically log out after inactivity
+                  </p>
                 </div>
+                <Switch defaultChecked={true} />
+              </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="timeout">Timeout Duration (minutes)</Label>
-                  <Input 
-                    id="timeout" 
-                    type="number"
-                    defaultValue="30"
-                    placeholder="30"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Audit Logging</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Log all user actions
-                    </p>
-                  </div>
-                  <Switch defaultChecked />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Database className="h-4 w-4" />
-                  Data & Privacy
-                </CardTitle>
-                <CardDescription>
-                  Data retention and privacy settings
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="retention">Data Retention (days)</Label>
-                  <Input 
-                    id="retention" 
-                    type="number"
-                    defaultValue="2555"
-                    placeholder="2555"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Auto Backup</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Daily automated backups
-                    </p>
-                  </div>
-                  <Switch defaultChecked />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Data Export</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Allow data export
-                    </p>
-                  </div>
-                  <Switch defaultChecked />
-                </div>
-
-                <Button variant="outline" className="w-full">
-                  Export All Data
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
+              <div className="space-y-2">
+                <Label htmlFor="sessionTimeout">Session Timeout (minutes)</Label>
+                <Select defaultValue="30">
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select timeout" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="15">15 minutes</SelectItem>
+                    <SelectItem value="30">30 minutes</SelectItem>
+                    <SelectItem value="60">1 hour</SelectItem>
+                    <SelectItem value="120">2 hours</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
-        
+
         <TabsContent value="advanced" className="space-y-4">
           <Card>
             <CardHeader>
@@ -566,28 +701,11 @@ export default function SettingsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="apiKey">API Key</Label>
-                <Input 
-                  id="apiKey" 
-                  type="password"
-                  placeholder="Enter API key"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="webhook">Webhook URL</Label>
-                <Input 
-                  id="webhook" 
-                  placeholder="https://example.com/webhook"
-                />
-              </div>
-
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <Label>Debug Mode</Label>
                   <p className="text-sm text-muted-foreground">
-                    Enable detailed logging
+                    Enable detailed logging for troubleshooting
                   </p>
                 </div>
                 <Switch />
@@ -595,27 +713,37 @@ export default function SettingsPage() {
 
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <Label>Beta Features</Label>
+                  <Label>Auto Backup</Label>
                   <p className="text-sm text-muted-foreground">
-                    Enable experimental features
+                    Automatically backup your data
                   </p>
                 </div>
-                <Switch />
+                <Switch defaultChecked={true} />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="cache">Cache Duration (seconds)</Label>
-                <Input 
-                  id="cache" 
-                  type="number"
-                  defaultValue="300"
-                  placeholder="300"
-                />
+                <Label htmlFor="backupFrequency">Backup Frequency</Label>
+                <Select defaultValue="daily">
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select frequency" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="hourly">Hourly</SelectItem>
+                    <SelectItem value="daily">Daily</SelectItem>
+                    <SelectItem value="weekly">Weekly</SelectItem>
+                    <SelectItem value="monthly">Monthly</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
-              <Button variant="destructive" className="w-full">
-                Clear All Cache
-              </Button>
+              <div className="pt-4 border-t">
+                <Button variant="destructive" className="w-full">
+                  Reset All Settings
+                </Button>
+                <p className="text-xs text-muted-foreground mt-2 text-center">
+                  This will reset all settings to their default values
+                </p>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

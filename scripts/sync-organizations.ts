@@ -31,7 +31,6 @@ async function syncOrganizations() {
         name: true,
         slug: true,
         description: true,
-        location: true,
         type: true,
         createdAt: true,
         updatedAt: true,

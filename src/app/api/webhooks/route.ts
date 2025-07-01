@@ -6,6 +6,7 @@ import { db } from '~/server/db'
 import { syncRoleToDatabase, normalizeRole } from '~/lib/roles'
 import { env } from '~/env'
 import type { PrismaClient } from '@prisma/client'
+import { authSync } from '~/lib/auth-sync'
 
 export async function POST(req: Request) {
   console.log('🔍 Webhook received - checking configuration...')
@@ -202,44 +203,27 @@ type MembershipDeletedData = {
 async function handleUserCreated(userData: UserCreatedData) {
   const { id, email_addresses, first_name, last_name } = userData
   const email = email_addresses[0]?.email_address ?? ''
-  const name = `${first_name ?? ''} ${last_name ?? ''}`.trim() || null
+  const name = `${first_name ?? ''} ${last_name ?? ''}`.trim() ?? null
 
   console.log('🔄 Creating user:', { id, email, name })
-  console.log('📧 Email addresses:', email_addresses)
-  console.log('👤 First name:', first_name)
-  console.log('👤 Last name:', last_name)
-  console.log('🔍 User signup method:', first_name && last_name ? 'Regular signup' : 'Minimal signup')
+
+  if (!email) {
+    console.error('❌ No email address found for user:', userData)
+    return
+  }
 
   try {
-  // Check if user already exists (from invitation flow)
-  const existingUser = await db.user.findUnique({
-    where: { email },
-  })
+    const result = await authSync.syncUser({
+      clerkId: id,
+      email,
+      name: name || undefined,
+    })
 
-  if (existingUser) {
-      console.log('📝 User already exists, updating with Clerk ID:', existingUser.id)
-    // Update existing user with Clerk ID
-    const updatedUser = await db.user.update({
-      where: { email },
-      data: {
-        clerkId: id,
-        name: name ?? existingUser.name,
-      },
-    })
-      console.log('✅ Linked existing user to Clerk account:', updatedUser.id)
-    return updatedUser
-  } else {
-      console.log('🆕 Creating new user in database...')
-    // Create new user
-    const newUser = await db.user.create({
-      data: {
-        clerkId: id,
-        email,
-        name,
-      },
-    })
-      console.log('✅ Created new user:', newUser.id)
-    return newUser
+    if (result.success) {
+      console.log(`✅ User sync completed: ${email}`)
+    } else {
+      console.error(`❌ User sync failed: ${email}`, result.errors)
+      throw new Error(result.message)
     }
   } catch (error) {
     console.error('❌ Error in handleUserCreated:', error)
@@ -251,102 +235,60 @@ async function handleUserCreated(userData: UserCreatedData) {
         emailAddresses: email_addresses,
       })
     }
-    throw error // Re-throw to be handled by the main webhook handler
+    throw error
   }
 }
 
 async function handleUserUpdated(userData: UserUpdatedData) {
   const { id, email_addresses, first_name, last_name } = userData
   const email = email_addresses[0]?.email_address ?? ''
-  const name = `${first_name ?? ''} ${last_name ?? ''}`.trim() || null
+  const name = `${first_name ?? ''} ${last_name ?? ''}`.trim() ?? null
 
-  console.log('Updating user:', { id, email, name })
+  console.log('🔄 Updating user:', { id, email, name })
 
-  // Always try to update by clerkId first
-  const existingUser = await db.user.findUnique({
-    where: { clerkId: id },
-  })
+  if (!email) {
+    console.error('❌ No email address found for user:', userData)
+    return
+  }
 
-  if (existingUser) {
-    const updatedUser = await db.user.update({
-      where: { clerkId: id },
-      data: { email, name },
-    })
-    console.log('Updated user:', updatedUser)
-    return updatedUser
-  } else {
-    // Fallback: try to find by email and link
-    const userByEmail = await db.user.findUnique({
-      where: { email },
+  try {
+    const result = await authSync.syncUser({
+      clerkId: id,
+      email,
+      name: name || undefined,
     })
 
-    if (userByEmail && !userByEmail.clerkId) {
-      const updatedUser = await db.user.update({
-        where: { email },
-        data: {
-          clerkId: id,
-          name: name ?? userByEmail.name,
-        },
-      })
-      console.log('Linked user by email:', updatedUser)
-      return updatedUser
+    if (result.success) {
+      console.log(`✅ User update completed: ${email}`)
     } else {
-      // Create new user if not found
-      const newUser = await db.user.create({
-        data: { clerkId: id, email, name },
-      })
-      console.log('Created user from update event:', newUser)
-      return newUser
+      console.error(`❌ User update failed: ${email}`, result.errors)
+      throw new Error(result.message)
     }
+  } catch (error) {
+    console.error(`❌ Error updating user ${email}:`, error)
+    throw error
   }
 }
 
 async function handleOrganizationCreated(orgData: OrganizationCreatedData) {
   const { id, name, slug } = orgData
 
-  console.log('Creating organization:', { id, name, slug })
+  console.log('🔄 Creating organization:', { id, name, slug })
 
   try {
-    // Use transaction to ensure data consistency
-    const newShop = await db.$transaction(async (tx) => {
-      // Create or update the shop
-      const shop = await tx.shop.upsert({
-        where: { id },
-        update: { 
-          name, 
-          slug,
-          updatedAt: new Date(),
-        },
-        create: {
-          id,
-          name,
-          slug,
-          type: 'local',
-          description: null,
-        },
-      })
-
-      // Create default shop settings if they don't exist
-      await tx.shopSettings.upsert({
-        where: { shopId: id },
-        update: {},
-        create: {
-          shopId: id,
-          defaultCurrency: 'USD',
-          enableNotifications: true,
-          autoPriceSync: true,
-          lowStockThreshold: 5,
-          enableStoreCredit: true,
-          minCreditAmount: 0,
-          maxCreditAmount: 1000,
-        },
-      })
-
-      console.log('✅ Shop and settings created/updated:', shop)
-      return shop
+    const result = await authSync.syncShop({
+      id,
+      name,
+      slug,
+      type: 'local',
     })
 
-    return newShop
+    if (result.success) {
+      console.log(`✅ Organization sync completed: ${name}`)
+    } else {
+      console.error(`❌ Organization sync failed: ${name}`, result.errors)
+      throw new Error(result.message)
+    }
   } catch (error) {
     console.error('❌ Error creating organization:', error)
     throw error
@@ -355,11 +297,11 @@ async function handleOrganizationCreated(orgData: OrganizationCreatedData) {
 
 async function handleMembershipCreated(membershipData: MembershipCreatedData) {
   const email = membershipData.public_user_data?.identifier
-  const name = `${membershipData.public_user_data?.first_name ?? ''} ${membershipData.public_user_data?.last_name ?? ''}`.trim() || null
+  const name = `${membershipData.public_user_data?.first_name ?? ''} ${membershipData.public_user_data?.last_name ?? ''}`.trim() ?? null
   const organizationId = membershipData.organization?.id
   const role = membershipData.role
 
-  console.log('Processing membership creation:', {
+  console.log('🔄 Processing membership creation:', {
     email,
     organizationId,
     role,
@@ -372,68 +314,41 @@ async function handleMembershipCreated(membershipData: MembershipCreatedData) {
   })
 
   if (!existingShop) {
-    console.log(`⚠️ Shop ${organizationId} not found in database, skipping membership creation (shop may have been deleted or never created)`)
+    console.log(`⚠️ Shop ${organizationId} not found in database, skipping membership creation`)
     return
   }
 
   console.log(`🔄 Found shop for membership: ${existingShop.name} (${existingShop.slug})`)
 
-  // Use transaction for data consistency
-  await db.$transaction(async (tx) => {
-    // Find or create user
-    let user = await tx.user.findUnique({
+  try {
+    // Get user's Clerk ID from email
+    const user = await db.user.findUnique({
       where: { email },
     })
 
-    if (user) {
-      // Handle shop ownership conflicts
-      if (user.shopId && user.shopId !== organizationId) {
-        await handleShopOwnershipConflict(tx, user.id, user.shopId, organizationId)
-      }
+    if (!user?.clerkId) {
+      console.log(`⚠️ User ${email} not found or missing Clerk ID, skipping membership sync`)
+      return
+    }
 
-      // Update user's shop and role
-      user = await tx.user.update({
-        where: { email },
-        data: {
-          shopId: organizationId,
-          name: name ?? user.name,
-          role: role, // Always update role when membership is created
-        },
-      })
-      console.log(`✅ Updated existing user ${email} with shop ${organizationId} and role ${role}`)
+    const result = await authSync.syncMembership({
+      userId: user.clerkId,
+      shopId: organizationId,
+      role,
+      email,
+      name: name || undefined,
+    })
+
+    if (result.success) {
+      console.log(`✅ Membership sync completed: ${email} -> ${organizationId} (${role})`)
     } else {
-      // Create new user (invitation accepted before account creation)
-      user = await tx.user.create({
-        data: {
-          email,
-          name,
-          clerkId: '', // Will be set when user completes signup
-          shopId: organizationId,
-          role: role, // Set role immediately
-        },
-      })
-      console.log(`✅ Created new user ${email} with shop ${organizationId} and role ${role}`)
+      console.error(`❌ Membership sync failed: ${email}`, result.errors)
+      throw new Error(result.message)
     }
-
-    // Verify the update/creation worked
-    const verifyUser = await tx.user.findUnique({
-      where: { email },
-      select: { id: true, email: true, shopId: true, role: true },
-    })
-
-    console.log(`🔍 Verification - User ${email}:`, {
-      id: verifyUser?.id,
-      shopId: verifyUser?.shopId,
-      role: verifyUser?.role,
-      expectedShopId: organizationId,
-      expectedRole: role,
-    })
-
-    if (verifyUser?.shopId !== organizationId || verifyUser?.role !== role) {
-      console.error(`❌ User ${email} not properly linked or role not set correctly`)
-      throw new Error(`Failed to properly link user ${email} to shop ${organizationId} with role ${role}`)
-    }
-  })
+  } catch (error) {
+    console.error(`❌ Error processing membership creation for ${email}:`, error)
+    throw error
+  }
 }
 
 async function handleMembershipUpdated(membershipData: MembershipUpdatedData) {
@@ -441,7 +356,7 @@ async function handleMembershipUpdated(membershipData: MembershipUpdatedData) {
   const organizationId = membershipData.organization?.id
   const role = membershipData.role
 
-  console.log('Updating membership role:', { email, organizationId, role })
+  console.log('🔄 Updating membership role:', { email, organizationId, role })
 
   // First check if the shop exists in our database
   const existingShop = await db.shop.findUnique({
@@ -450,20 +365,40 @@ async function handleMembershipUpdated(membershipData: MembershipUpdatedData) {
   })
 
   if (!existingShop) {
-    console.log(`⚠️ Shop ${organizationId} not found in database, skipping membership update (shop may have been deleted or never created)`)
+    console.log(`⚠️ Shop ${organizationId} not found in database, skipping membership update`)
     return
   }
 
   console.log(`🔄 Found shop for membership update: ${existingShop.name} (${existingShop.slug})`)
 
-  if (role === "org:admin" || role === "org:member") {
-    await db.user.update({
+  try {
+    // Get user's Clerk ID from email
+    const user = await db.user.findUnique({
       where: { email },
-      data: { role: role },
-    });
-    console.log(`Updated role for ${email}: ${role}`);
-  } else {
-    console.warn(`Invalid role received from Clerk: ${role}`);
+    })
+
+    if (!user?.clerkId) {
+      console.log(`⚠️ User ${email} not found or missing Clerk ID, skipping membership update`)
+      return
+    }
+
+    const result = await authSync.syncMembership({
+      userId: user.clerkId,
+      shopId: organizationId,
+      role,
+      email,
+      name: user.name || undefined,
+    })
+
+    if (result.success) {
+      console.log(`✅ Membership update completed: ${email} -> ${organizationId} (${role})`)
+    } else {
+      console.error(`❌ Membership update failed: ${email}`, result.errors)
+      throw new Error(result.message)
+    }
+  } catch (error) {
+    console.error(`❌ Error processing membership update for ${email}:`, error)
+    throw error
   }
 }
 
@@ -471,7 +406,7 @@ async function handleMembershipDeleted(membershipData: MembershipDeletedData) {
   const email = membershipData.public_user_data?.identifier
   const organizationId = membershipData.organization?.id
 
-  console.log('👤 Removing user from organization:', { email, organizationId })
+  console.log('🔄 Removing user from organization:', { email, organizationId })
 
   // First check if the shop exists in our database
   const existingShop = await db.shop.findUnique({
@@ -480,44 +415,33 @@ async function handleMembershipDeleted(membershipData: MembershipDeletedData) {
   })
 
   if (!existingShop) {
-    console.log(`⚠️ Shop ${organizationId} not found in database, skipping membership deletion (shop may have been deleted or never created)`)
+    console.log(`⚠️ Shop ${organizationId} not found in database, skipping membership deletion`)
     return
   }
 
   console.log(`🔄 Found shop for membership deletion: ${existingShop.name} (${existingShop.slug})`)
 
   try {
-    // Use transaction for data consistency
-    await db.$transaction(async (tx) => {
-      // Find the user
-      const user = await tx.user.findUnique({
-        where: { email },
-      })
-
-      if (!user) {
-        console.log(`⚠️ User not found in database: ${email}`)
-        return
-      }
-
-      // Check if user is being removed from their current shop
-      if (user.shopId === organizationId) {
-        // Remove user from shop and clear their role
-        const updatedUser = await tx.user.update({
-          where: { email },
-          data: {
-            shopId: null,
-            role: null, // Clear role when removed from organization
-          },
-        })
-
-        console.log(`✅ Removed ${email} from shop ${organizationId} and cleared role`)
-        console.log(`📊 User status: shopId=${updatedUser.shopId}, role=${updatedUser.role}`)
-      } else {
-        console.log(`⚠️ User ${email} is not a member of shop ${organizationId} (current shop: ${user.shopId})`)
-      }
+    // Get user's Clerk ID from email
+    const user = await db.user.findUnique({
+      where: { email },
     })
+
+    if (!user?.clerkId) {
+      console.log(`⚠️ User ${email} not found or missing Clerk ID, skipping membership deletion`)
+      return
+    }
+
+    const result = await authSync.removeMembership(user.clerkId, organizationId)
+
+    if (result.success) {
+      console.log(`✅ Membership removal completed: ${email} from ${organizationId}`)
+    } else {
+      console.error(`❌ Membership removal failed: ${email}`, result.errors)
+      throw new Error(result.message)
+    }
   } catch (error) {
-    console.error(`❌ Error removing user ${email} from organization ${organizationId}:`, error)
+    console.error(`❌ Error processing membership deletion for ${email}:`, error)
     throw error
   }
 }
