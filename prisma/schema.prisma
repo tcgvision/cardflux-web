@@ -221,6 +221,14 @@ model Product {
   marketPrice   Float?    // Add for price tracking
   lastPriceUpdate DateTime? // Add for price freshness
   
+  // Flexible fields for future expansion
+  productType   String?   // "card", "booster_box", "etb", "accessory", etc.
+  sku           String?   // Stock Keeping Unit for non-card products
+  barcode       String?   // Universal Product Code
+  description   String?   // Product description
+  brand         String?   // Brand/manufacturer
+  model         String?   // Model/variant
+  
   // Franchise-specific attributes
   franchiseAttributes ProductFranchiseAttributes?
   
@@ -237,6 +245,9 @@ model Product {
   @@unique([shopId, tcgLine, setCode, cardNumber]) // Prevent duplicates
   @@index([tcgplayerId]) // For price sync performance
   @@index([shopId, tcgLine]) // For franchise filtering
+  @@index([productType]) // For product type filtering
+  @@index([barcode]) // For barcode scanning
+  @@index([sku]) // For SKU lookups
 }
 
 // Franchise-specific product attributes
@@ -418,6 +429,8 @@ enum BuylistStatus {
   REJECTED
   CREDITED
 }
+
+
 
 // --- SHOP SETTINGS --- //
 model ShopSettings {
