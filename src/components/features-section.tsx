@@ -14,48 +14,52 @@ import {
   Smartphone,
   Database,
   Globe,
-  Users
+  Users,
+  Store,
+  Package,
+  Search,
+  CreditCard
 } from "lucide-react";
 
 const features = [
   {
-    title: "AI-Powered Scanning",
-    description: "Instantly scan and identify cards with our advanced computer vision technology.",
+    title: "Unified Inventory Management",
+    description: "Manage all your products - cards, figures, comics, games, and more - in one centralized system.",
+    icon: <Store className="w-6 h-6" />,
+  },
+  {
+    title: "AI-Powered Card Scanning",
+    description: "Instantly scan and identify TCG cards with our advanced computer vision technology.",
     icon: <Camera className="w-6 h-6" />,
   },
   {
-    title: "Real-time Pricing",
-    description: "Get live market prices and trends from multiple sources to maximize your profits.",
-    icon: <TrendingUp className="w-6 h-6" />,
+    title: "Multi-Category POS",
+    description: "Fast, seamless checkout for any product type with integrated payment processing.",
+    icon: <CreditCard className="w-6 h-6" />,
   },
   {
-    title: "Collection Analytics",
-    description: "Track your portfolio performance with detailed insights and growth metrics.",
+    title: "Smart Analytics",
+    description: "Cross-category insights and performance metrics to optimize your entire business.",
     icon: <BarChart3 className="w-6 h-6" />,
   },
   {
-    title: "Multi-TCG Support",
-    description: "Manage collections across OPTCG, Pokemon, Magic, Yu-Gi-Oh, and more.",
-    icon: <Layers className="w-6 h-6" />,
+    title: "Local Product Finder",
+    description: "Let customers search your inventory in real-time across all product categories.",
+    icon: <Search className="w-6 h-6" />,
   },
   {
-    title: "Instant Sync",
-    description: "Automatically sync your inventory across all devices in real-time.",
-    icon: <Zap className="w-6 h-6" />,
+    title: "Condition Tracking",
+    description: "Track condition and value for collectible items with specialized grading systems.",
+    icon: <Package className="w-6 h-6" />,
   },
   {
-    title: "Smart Recommendations",
-    description: "AI-driven suggestions for buying, selling, and collection optimization.",
-    icon: <Target className="w-6 h-6" />,
+    title: "Community Tools",
+    description: "Build customer loyalty with wishlists, tournaments, and engagement features.",
+    icon: <Users className="w-6 h-6" />,
   },
   {
-    title: "Market Predictions",
-    description: "Advanced algorithms predict price movements and market trends.",
-    icon: <Sparkles className="w-6 h-6" />,
-  },
-  {
-    title: "Secure & Private",
-    description: "Bank-level security with encrypted storage and privacy protection.",
+    title: "Secure & Scalable",
+    description: "Bank-level security with cloud-based infrastructure that grows with your business.",
     icon: <Shield className="w-6 h-6" />,
   },
 ];
@@ -72,11 +76,11 @@ export function FeaturesSection() {
           className="text-center mb-12 sm:mb-16"
         >
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight md:text-4xl mb-4">
-            Everything you need to manage your TCG collection
+            Universal platform with collectible superpowers
           </h2>
-          <p className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto px-4 sm:px-0">
-            From scanning cards to tracking performance, CardFlux provides all the tools you need 
-            to take your trading card game collection to the next level.
+          <p className="text-base sm:text-lg text-muted-foreground max-w-3xl mx-auto px-4 sm:px-0">
+            CardFlux combines the power of unified inventory management with specialized features for collectible stores. 
+            TCG stores get AI scanning and tournament tools, while other stores get TCG capabilities as a bonus.
           </p>
         </motion.div>
 

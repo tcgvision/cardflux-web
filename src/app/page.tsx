@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import { Button } from "~/components/ui/button";
@@ -9,10 +10,12 @@ import { FeaturesSection } from "~/components/features-section";
 import { HowItWorksSection } from "~/components/how-it-works-section";
 import { PricingSection } from "~/components/pricing-section";
 import { Footer } from "~/components/footer";
-import { ArrowRight, Play, Sparkles, Zap, Target } from "lucide-react";
+import { WaitlistModal } from "~/components/waitlist-modal";
+import { ArrowRight, Play, Sparkles, Zap, Target, Store, Users, Gift } from "lucide-react";
 
 export default function Home() {
   const router = useRouter();
+  const [isWaitlistOpen, setIsWaitlistOpen] = useState(false);
 
   const handleGetStarted = () => {
     router.push("/get-started");
@@ -20,6 +23,10 @@ export default function Home() {
 
   const handleWatchDemo = () => {
     router.push("/learn-more");
+  };
+
+  const handleJoinWaitlist = () => {
+    setIsWaitlistOpen(true);
   };
 
   return (
@@ -39,7 +46,7 @@ export default function Home() {
           >
             <div className="inline-flex items-center rounded-full border bg-background/50 px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm backdrop-blur-sm mb-4 sm:mb-6">
               <Sparkles className="mr-2 h-3 w-3 sm:h-4 sm:w-4 text-primary" />
-              <span>AI-Powered TCG Management Platform</span>
+              <span>Complete Collectible Store Management Platform</span>
             </div>
           </motion.div>
 
@@ -51,7 +58,7 @@ export default function Home() {
             className="mb-4 sm:mb-6"
           >
             <h2 className="text-xl sm:text-2xl font-bold tracking-tight md:text-3xl text-muted-foreground">
-              Scan - Sync - Sell
+              Unified Commerce • Intelligent Automation • Community Focus
             </h2>
           </motion.div>
 
@@ -60,13 +67,12 @@ export default function Home() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.4 }}
-            className="mx-auto max-w-4xl text-3xl sm:text-4xl font-bold tracking-tight text-foreground md:text-6xl lg:text-7xl mb-4 sm:mb-6 leading-tight"
+            className="mx-auto max-w-5xl text-3xl sm:text-4xl font-bold tracking-tight text-foreground md:text-6xl lg:text-7xl mb-4 sm:mb-6 leading-tight"
           >
-            Advanced analytics for your{" "}
+            The ultimate POS and inventory platform for{" "}
             <span className="bg-gradient-to-r from-primary to-slate-600 dark:to-slate-400 bg-clip-text text-transparent">
-              Trading Card Game
-            </span>{" "}
-            collection
+              collectible stores
+            </span>
           </motion.h1>
 
           {/* Subtitle */}
@@ -74,10 +80,11 @@ export default function Home() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.6 }}
-            className="mx-auto max-w-2xl text-base sm:text-lg text-muted-foreground mb-6 sm:mb-8 px-4 sm:px-0"
+            className="mx-auto max-w-3xl text-base sm:text-lg text-muted-foreground mb-6 sm:mb-8 px-4 sm:px-0"
           >
-            From scanning cards to syncing inventory and maximizing sales - CardFlux handles everything. 
-            Built for modern TCG shops and collectors who want to scale efficiently.
+            From trading cards to figures, comics to games - manage everything in one powerful platform. 
+            TCG stores get specialized AI scanning and tournament features, while other collectible stores 
+            get TCG capabilities as a bonus. Built for modern collectible retailers who want to scale efficiently.
           </motion.p>
 
           {/* CTA Buttons */}
@@ -92,7 +99,7 @@ export default function Home() {
               className="group px-6 sm:px-8 py-2.5 sm:py-3 text-base sm:text-lg w-full sm:w-auto"
               onClick={handleGetStarted}
             >
-              Get Started
+              Start Free Trial
               <ArrowRight className="ml-2 h-4 w-4 sm:h-5 sm:w-5 transition-transform group-hover:translate-x-1" />
             </Button>
             <Button 
@@ -104,6 +111,15 @@ export default function Home() {
               <Play className="mr-2 h-4 w-4 sm:h-5 sm:w-5 transition-transform group-hover:scale-110" />
               Watch Demo
             </Button>
+            <Button 
+              variant="secondary" 
+              size="lg"
+              className="px-6 sm:px-8 py-2.5 sm:py-3 text-base sm:text-lg group w-full sm:w-auto"
+              onClick={handleJoinWaitlist}
+            >
+              <Gift className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
+              Join Waitlist
+            </Button>
           </motion.div>
 
           {/* Feature Highlights */}
@@ -114,16 +130,20 @@ export default function Home() {
             className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-xs sm:text-sm text-muted-foreground px-4 sm:px-0"
           >
             <div className="flex items-center gap-1.5 sm:gap-2">
+              <Store className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
+              <span>Unified Inventory</span>
+            </div>
+            <div className="flex items-center gap-1.5 sm:gap-2">
               <Zap className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
-              <span>Instant AI Scanning</span>
+              <span>AI-Powered Scanning</span>
             </div>
             <div className="flex items-center gap-1.5 sm:gap-2">
               <Target className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
-              <span>Real-time Pricing</span>
+              <span>Smart Analytics</span>
             </div>
             <div className="flex items-center gap-1.5 sm:gap-2">
-              <Sparkles className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
-              <span>Smart Analytics</span>
+              <Users className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
+              <span>Community Tools</span>
             </div>
           </motion.div>
         </div>
@@ -140,10 +160,11 @@ export default function Home() {
             className="text-center mb-8 sm:mb-12"
           >
             <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-4">
-              Trusted by TCG Enthusiasts Worldwide
+              Trusted by Collectible Stores Worldwide
             </h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              Join thousands of collectors and shop owners who trust CardFlux for their trading card game management needs.
+              Join thousands of collectible store owners who trust CardFlux to manage their inventory, 
+              streamline operations, and grow their business.
             </p>
           </motion.div>
           
@@ -173,6 +194,13 @@ export default function Home() {
 
       {/* Footer */}
       <Footer />
+
+      {/* Waitlist Modal */}
+      <WaitlistModal 
+        isOpen={isWaitlistOpen}
+        onClose={() => setIsWaitlistOpen(false)}
+        source="landing_page"
+      />
     </div>
   );
 }

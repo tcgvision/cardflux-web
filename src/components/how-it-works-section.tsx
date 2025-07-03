@@ -6,20 +6,20 @@ import { ThreeDCard } from "~/components/3d-card-demo";
 const steps = [
   {
     number: "01",
-    title: "Scan Instantly",
-    description: "Point your camera at any TCG card. Our AI recognizes it in seconds—no typing, no searching, just instant identification.",
+    title: "Add Everything",
+    description: "Add any collectible item - cards, figures, comics, games, or accessories. Use AI scanning for TCG cards or manual entry for other items.",
     imageSrc: "/cards/Scan_Instantly-Card_Flux-event.avif",
   },
   {
     number: "02",
-    title: "Sync Everything",
-    description: "Your inventory updates in real-time across POS, Discord bot, and mobile app. One scan, infinite connections.",
+    title: "Manage Unified",
+    description: "Track inventory, pricing, and condition across all product categories in one centralized system. Real-time updates across all channels.",
     imageSrc: "/cards/Sync_Everything-Card_Flux-event.avif",
   },
   {
     number: "03",
-    title: "Sell Smarter",
-    description: "Live pricing, automated Discord storefront, and analytics help you move inventory faster and maximize profits.",
+    title: "Sell & Grow",
+    description: "Process sales for any product type with our POS system. Build customer loyalty with community features and grow your business with analytics.",
     imageSrc: "/cards/Sell_Smarter-Card_Flux-event (1).avif",
   }
 ];
@@ -44,13 +44,13 @@ export function HowItWorksSection() {
             ⚡ How CardFlux Works
           </div>
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight md:text-4xl mb-4">
-            From Scan to Sale in{" "}
+            From inventory to sales in{" "}
             <span className="bg-gradient-to-r from-primary to-slate-600 dark:to-slate-400 bg-clip-text text-transparent">
               Three Steps
             </span>
           </h2>
-          <p className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto px-4 sm:px-0">
-            Transform your TCG business with AI-powered scanning, real-time sync, and automated selling tools.
+          <p className="text-base sm:text-lg text-muted-foreground max-w-3xl mx-auto px-4 sm:px-0">
+            Transform your collectible store with unified inventory management, AI-powered tools, and community-focused features.
           </p>
         </motion.div>
 
@@ -104,13 +104,13 @@ export function HowItWorksSection() {
             <div className="absolute inset-0 bg-grid-white/[0.02] bg-[size:20px_20px]" />
             <div className="relative">
               <div className="inline-flex items-center px-4 py-2 rounded-full bg-primary/20 border border-primary/30 text-primary text-sm font-medium mb-4">
-                🚀 Ready to Transform Your TCG Business?
+                🚀 Ready to Transform Your Collectible Store?
               </div>
               <h3 className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6">
                 Join the CardFlux Revolution
               </h3>
               <p className="text-muted-foreground mb-6 sm:mb-8 text-base sm:text-lg max-w-2xl mx-auto">
-                Start scanning, syncing, and selling smarter today. No setup fees, no long-term contracts.
+                Start managing your entire collectible inventory today. No setup fees, no long-term contracts.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center">
                 <motion.button 

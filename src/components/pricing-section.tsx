@@ -5,35 +5,37 @@ import { motion } from "motion/react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
-import { Check, Star } from "lucide-react";
+import { WaitlistModal } from "~/components/waitlist-modal";
+import { Check, Star, Gift } from "lucide-react";
 
 const plans = [
   {
-    name: "Free",
-    description: "Perfect for getting started",
+    name: "Starter",
+    description: "Perfect for small collectible stores",
     price: { monthly: 0, annual: 0 },
     features: [
-      "Up to 100 cards",
-      "Basic scanning",
-      "Price lookups",
-      "Email support"
+      "Up to 500 products",
+      "Basic inventory management",
+      "Simple POS system",
+      "Email support",
+      "Basic analytics"
     ],
     popular: false,
     cta: "Get Started",
     color: "border-gray-200"
   },
   {
-    name: "Pro",
-    description: "For serious collectors",
-    price: { monthly: 9, annual: 7 },
+    name: "Professional",
+    description: "For growing collectible businesses",
+    price: { monthly: 29, annual: 24 },
     features: [
-      "Unlimited cards",
-      "Advanced AI scanning",
-      "Real-time pricing",
-      "Portfolio analytics",
+      "Unlimited products",
+      "AI-powered card scanning",
+      "Multi-category POS",
+      "Advanced analytics",
+      "Customer management",
       "Priority support",
-      "Export data",
-      "API access"
+      "Local product finder"
     ],
     popular: true,
     cta: "Start Free Trial",
@@ -41,13 +43,13 @@ const plans = [
   },
   {
     name: "Enterprise",
-    description: "For shops and businesses",
-    price: { monthly: 29, annual: 24 },
+    description: "For established collectible chains",
+    price: { monthly: 79, annual: 64 },
     features: [
-      "Everything in Pro",
-      "Team management",
-      "Advanced analytics",
-      "Custom integrations",
+      "Everything in Professional",
+      "Multi-location support",
+      "Advanced integrations",
+      "Custom reporting",
       "Dedicated support",
       "White-label options",
       "SLA guarantee"
@@ -60,6 +62,11 @@ const plans = [
 
 export function PricingSection() {
   const [isAnnual, setIsAnnual] = useState(false);
+  const [isWaitlistOpen, setIsWaitlistOpen] = useState(false);
+
+  const handleJoinWaitlist = () => {
+    setIsWaitlistOpen(true);
+  };
 
   return (
     <section className="py-16 sm:py-20 bg-gradient-to-b from-background to-slate-100/20 dark:to-slate-800/20">
@@ -72,10 +79,10 @@ export function PricingSection() {
           className="text-center mb-12 sm:mb-16"
         >
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight md:text-4xl mb-4">
-            Simple, transparent pricing
+            Simple, transparent pricing for collectible stores
           </h2>
           <p className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto mb-6 sm:mb-8 px-4 sm:px-0">
-            Choose the plan that best fits your needs. All plans include a 14-day free trial.
+            Choose the plan that best fits your collectible store. All plans include a 14-day free trial.
           </p>
           
           {/* Billing Toggle */}
@@ -171,11 +178,41 @@ export function PricingSection() {
           ))}
         </div>
 
-        {/* FAQ Section */}
+        {/* Waitlist CTA */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.4 }}
+          viewport={{ once: true }}
+          className="text-center mt-12 sm:mt-16"
+        >
+          <div className="bg-gradient-to-r from-primary/10 to-slate-600/10 dark:to-slate-400/10 rounded-lg p-6 sm:p-8 max-w-2xl mx-auto">
+            <Badge className="mb-3 bg-primary/20 text-primary border-primary/30">
+              <Gift className="mr-1 h-3 w-3" />
+              Early Access
+            </Badge>
+            <h3 className="text-lg sm:text-xl font-semibold mb-2">
+              Want to be first in line?
+            </h3>
+            <p className="text-muted-foreground text-sm sm:text-base mb-4">
+              Join our waitlist and get exclusive early access with a 10% launch discount when CardFlux goes live.
+            </p>
+            <Button 
+              onClick={handleJoinWaitlist}
+              variant="outline"
+              className="group"
+            >
+              <Gift className="mr-2 h-4 w-4" />
+              Join the Waitlist
+            </Button>
+          </div>
+        </motion.div>
+
+        {/* FAQ Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.6 }}
           viewport={{ once: true }}
           className="text-center mt-12 sm:mt-16"
         >
@@ -184,6 +221,13 @@ export function PricingSection() {
           </p>
         </motion.div>
       </div>
+
+      {/* Waitlist Modal */}
+      <WaitlistModal 
+        isOpen={isWaitlistOpen}
+        onClose={() => setIsWaitlistOpen(false)}
+        source="pricing_page"
+      />
     </section>
   );
 } 

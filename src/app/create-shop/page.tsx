@@ -19,28 +19,36 @@ import {
 import { Input } from "~/components/ui/input";
 import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import { Badge } from "~/components/ui/badge";
+import { Alert, AlertDescription } from "~/components/ui/alert";
+import { 
+  Loader2, 
+  Store, 
+  CheckCircle, 
+  Crown,
+  ArrowRight,
+  CreditCard,
+  Shield,
+  Users,
+  Database,
+  BarChart3,
+  Zap
+} from "lucide-react";
 
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
-import { Loader2, Store } from "lucide-react";
-
-// Form validation schema
-const formSchema = z.object({
+// Form validation schema for shop name
+const shopNameSchema = z.object({
   name: z.string().min(2, "Shop name must be at least 2 characters"),
-  description: z.string().min(10, "Description must be at least 10 characters"),
-  type: z.enum(["local", "online", "both"]),
 });
 
-type FormData = z.infer<typeof formSchema>;
-
-
+type ShopNameData = z.infer<typeof shopNameSchema>;
 
 export default function CreateShopPage() {
   const router = useRouter();
   const { user } = useUser();
   const { createOrganization, setActive } = useClerk();
   const { organization, isLoaded: orgLoaded } = useOrganization();
-  const [activeTab, setActiveTab] = useState<"create" | "join">("create");
   const [isRedirecting, setIsRedirecting] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Handle organization changes - redirect to dashboard when organization is available
   useEffect(() => {
@@ -53,13 +61,11 @@ export default function CreateShopPage() {
     }
   }, [orgLoaded, organization, router, isRedirecting]);
 
-  // Form setup
-  const form = useForm<FormData>({
-    resolver: zodResolver(formSchema),
+  // Shop name form setup
+  const shopNameForm = useForm<ShopNameData>({
+    resolver: zodResolver(shopNameSchema),
     defaultValues: {
       name: "",
-      description: "",
-      type: "local",
     },
   });
 
@@ -77,77 +83,47 @@ export default function CreateShopPage() {
     },
   });
 
-  // Form submission handler
-  const onSubmit = async (data: FormData) => {
+  // Handle shop creation
+  const onShopNameSubmit = async (data: ShopNameData) => {
+    if (!user) {
+      toast.error("Error", {
+        description: "You must be signed in to create a shop.",
+      });
+      return;
+    }
+
+    setIsProcessing(true);
     try {
-      // Create organization in Clerk
+      // Create the Clerk organization first
       const org = await createOrganization({
         name: data.name,
-        slug: data.name.toLowerCase().replace(/\s+/g, "-"),
       });
 
-      if (!org) {
-        throw new Error("Failed to create organization");
-      }
-
-      console.log("✅ Organization created in Clerk:", org.id);
-
-      // Set the newly created organization as active
-      await setActive({ organization: org.id });
-      console.log("✅ Organization set as active");
-
-      // Create shop in database
-      await createShopMutation.mutateAsync({
-        name: data.name,
-        slug: data.name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, ""),
-        description: data.description,
-        type: data.type,
-      });
-
-      console.log("✅ Shop created in database");
-
-      // Manual sync to ensure user is properly linked and role is set
-      try {
-        console.log("🔄 Starting manual sync...");
+      if (org) {
+        // Set the organization as active
+        await setActive({ organization: org });
         
-        // Sync user to database
-        const userSyncResponse = await fetch('/api/sync-user', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+        // Create the shop in our database
+        await createShopMutation.mutateAsync({
+          name: data.name,
+          type: "local",
+          slug: data.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''),
         });
-        
-        if (userSyncResponse.ok) {
-          console.log("✅ User sync completed");
-        } else {
-          console.warn("⚠️ User sync failed:", await userSyncResponse.text());
-        }
 
-        // Wait a bit for webhooks to process
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        toast.success("Shop created successfully!", {
+          description: "You can now select a plan to unlock all features.",
+        });
 
-        // Check if user is properly linked to shop
-        const membershipCheck = await fetch('/api/check-shop-membership');
-        if (membershipCheck.ok) {
-          const membershipData = await membershipCheck.json();
-          console.log("✅ Shop membership check:", membershipData);
-        }
-
-      } catch (syncError) {
-        console.warn("⚠️ Manual sync failed, but continuing:", syncError);
+        // Redirect to dashboard where they can access billing
+        router.push("/dashboard");
       }
-
-      // Small delay to ensure Clerk processes the organization change
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Navigate to onboarding - guide users through the setup process
-      router.push("/dashboard/onboarding");
-      
     } catch (error) {
       console.error("Error creating shop:", error);
-      const errorMessage = error instanceof Error ? error.message : "Failed to create shop. Please try again.";
       toast.error("Error", {
-        description: errorMessage,
+        description: "Failed to create shop. Please try again.",
       });
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -177,127 +153,76 @@ export default function CreateShopPage() {
 
   return (
     <div className="container mx-auto flex min-h-[calc(100vh-7rem)] items-center justify-center px-4">
-      <Card className="w-full max-w-2xl">
-        <CardHeader>
-          <CardTitle>Set Up Your Shop</CardTitle>
-          <CardDescription>
-            Create a new shop or join an existing one
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "create" | "join")} className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="create">Create Shop</TabsTrigger>
-              <TabsTrigger value="join">Join Shop</TabsTrigger>
-            </TabsList>
-            <TabsContent value="create">
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className={`space-y-6 ${createShopMutation.isPending ? 'opacity-60 pointer-events-none' : ''}`}>
-                  <FormField
-                    control={form.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-foreground">Shop Name</FormLabel>
-                        <FormControl>
-                          <Input 
-                            placeholder="Enter your shop name" 
-                            {...field} 
-                            disabled={createShopMutation.isPending}
-                            className="bg-background border-border text-foreground placeholder:text-muted-foreground"
-                          />
-                        </FormControl>
-                        <FormMessage className="text-destructive" />
-                      </FormItem>
-                    )}
-                  />
+      <div className="w-full max-w-md space-y-8">
+        <div className="text-center">
+          <Store className="h-12 w-12 mx-auto mb-4 text-primary" />
+          <h1 className="text-3xl font-bold">Create Your Shop</h1>
+          <p className="text-muted-foreground mt-2">
+            Get started with CardFlux in just a few steps
+          </p>
+        </div>
 
-                  <FormField
-                    control={form.control}
-                    name="description"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-foreground">Description</FormLabel>
-                        <FormControl>
-                          <Input 
-                            placeholder="Describe your shop" 
-                            {...field} 
-                            disabled={createShopMutation.isPending}
-                            className="bg-background border-border text-foreground placeholder:text-muted-foreground"
-                          />
-                        </FormControl>
-                        <FormMessage className="text-destructive" />
-                      </FormItem>
-                    )}
-                  />
-
-
-
-                  <FormField
-                    control={form.control}
-                    name="type"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-foreground">Shop Type</FormLabel>
-                        <FormControl>
-                          <select
-                            className="w-full rounded-md border border-input bg-background px-3 py-2 text-foreground cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-                            {...field}
-                            disabled={createShopMutation.isPending}
-                          >
-                            <option value="local">Local Store</option>
-                            <option value="online">Online Store</option>
-                            <option value="both">Both Local & Online</option>
-                          </select>
-                        </FormControl>
-                        <FormMessage className="text-destructive" />
-                      </FormItem>
-                    )}
-                  />
-
-                  <Button 
-                    type="submit" 
-                    className="w-full bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer disabled:cursor-not-allowed"
-                    disabled={createShopMutation.isPending}
-                  >
-                    {createShopMutation.isPending ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Creating Shop...
-                      </>
-                    ) : (
-                      <>
-                        <Store className="mr-2 h-4 w-4" />
-                        Create Shop
-                      </>
-                    )}
-                  </Button>
-                </form>
-              </Form>
-            </TabsContent>
-            <TabsContent value="join">
-              <div className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  To join an existing shop, you need an invitation from the shop owner.
-                  Please check your email for an invitation link or contact the shop owner.
-                </p>
+        <Card>
+          <CardHeader>
+            <CardTitle>Step 1: Name Your Shop</CardTitle>
+            <CardDescription>
+              Let's start by giving your shop a name. You can always change this later.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Form {...shopNameForm}>
+              <form onSubmit={shopNameForm.handleSubmit(onShopNameSubmit)} className="space-y-4">
+                <FormField
+                  control={shopNameForm.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Shop Name</FormLabel>
+                      <FormControl>
+                        <Input 
+                          placeholder="Enter your shop name..."
+                          {...field}
+                          disabled={isProcessing}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
                 <Button 
-                  variant="outline" 
-                  className="w-full cursor-pointer hover:bg-accent hover:text-accent-foreground"
-                  onClick={() => {
-                    // TODO: Implement invitation flow
-                    toast.info("Coming soon!", {
-                      description: "Shop invitation system will be available soon.",
-                    });
-                  }}
+                  type="submit" 
+                  className="w-full" 
+                  disabled={isProcessing}
                 >
-                  Enter Invitation Code
+                  {isProcessing ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Creating Shop...
+                    </>
+                  ) : (
+                    <>
+                      Create Shop
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </>
+                  )}
                 </Button>
-              </div>
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
+              </form>
+            </Form>
+          </CardContent>
+        </Card>
+
+        <Alert>
+          <Shield className="h-4 w-4" />
+          <AlertDescription>
+            Your shop will be created with a free starter plan. You can upgrade to unlock additional features later.
+          </AlertDescription>
+        </Alert>
+
+        <div className="text-center text-sm text-muted-foreground">
+          <p>By creating a shop, you agree to our Terms of Service and Privacy Policy.</p>
+        </div>
+      </div>
     </div>
   );
 } 

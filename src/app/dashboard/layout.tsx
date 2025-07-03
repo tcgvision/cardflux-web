@@ -1,14 +1,12 @@
 import { type Metadata } from "next";
 import { Geist } from "next/font/google";
 import { TRPCReactProvider } from "~/trpc/react";
-import { auth } from "@clerk/nextjs/server";
-import { db } from "~/server/db";
-import type { PrismaClient } from "@prisma/client";
 import { SidebarInset, SidebarProvider } from "~/components/ui/sidebar";
 import { AppSidebar } from "~/components/app-sidebar";
 import { SiteHeader } from "~/components/site-header";
 import { LoadingProvider } from "~/components/loading-provider";
 import { DashboardContent } from "~/components/dashboard-content";
+import { BillingGuard } from "~/components/billing-guard";
 
 // const geist = Geist;
 
@@ -38,7 +36,9 @@ export default function DashboardLayout({
           <SidebarInset>
             <SiteHeader />
             <DashboardContent>
-              {children}
+              <BillingGuard>
+                {children}
+              </BillingGuard>
             </DashboardContent>
           </SidebarInset>
         </SidebarProvider>

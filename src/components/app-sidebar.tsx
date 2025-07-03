@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { usePathname, useRouter } from "next/navigation"
+import { useUser } from "@clerk/nextjs"
 import {
   IconCamera,
   IconChartBar,
@@ -20,6 +21,7 @@ import {
   IconShoppingCart,
   IconReceipt,
   IconUsersGroup,
+  IconCreditCard as IconBilling,
 } from "@tabler/icons-react"
 
 import { NavDocuments } from "~/components/nav-documents"
@@ -46,6 +48,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { shopName, isLoaded, hasShop, source, needsSync } = useUnifiedShop()
   const { needsSync: syncNeeded, syncReason } = useSyncStatus()
   const { isAdmin } = useRolePermissions()
+  const { user } = useUser()
   const pathname = usePathname()
   const router = useRouter()
 
@@ -107,6 +110,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         title: "Team Management",
         url: "/dashboard/team",
         icon: IconUsersGroup,
+      }] : []),
+      // Only show billing for main admin
+      ...(isAdmin && user?.emailAddresses.some((email: any) => 
+        email.emailAddress === 'admin@cardflux.com'
+      ) ? [{
+        title: "Billing",
+        url: "/dashboard/billing",
+        icon: IconBilling,
       }] : []),
       {
         title: "Settings",

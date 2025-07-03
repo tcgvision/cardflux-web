@@ -187,6 +187,7 @@ export const shopRouter = createTRPCRouter({
           throw ErrorHandler.handleForbiddenError(ErrorMessages.SHOP.ADMIN_REQUIRED);
         }
 
+        // Update database first
         const shop = await ctx.db.shop.update({
           where: { id: ctx.shop.id },
           data: input,
@@ -198,6 +199,24 @@ export const shopRouter = createTRPCRouter({
             },
           },
         });
+
+        // Update Clerk organization to trigger webhook
+        if (input.name || input.description) {
+          try {
+            const { clerkClient } = await import('@clerk/nextjs/server');
+            const client = await clerkClient();
+            
+            await client.organizations.updateOrganization(ctx.shop.id, {
+              name: input.name ?? shop.name,
+              slug: input.name ? input.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') : shop.slug,
+            });
+            
+            console.log(`✅ Updated Clerk organization: ${ctx.shop.id}`);
+          } catch (clerkError) {
+            console.error('❌ Failed to update Clerk organization:', clerkError);
+            // Don't throw error - database update was successful
+          }
+        }
 
         return shop;
       } catch (error) {
@@ -462,4 +481,87 @@ export const shopRouter = createTRPCRouter({
       throw ErrorHandler.handleDatabaseError(error, "shop.getMembers");
     }
   }),
+
+  // Get billing status (Admin only)
+  getBillingStatus: shopProcedure.query(async ({ ctx }) => {
+    try {
+      // Check if user has admin permissions
+      const userRole = ctx.userRole;
+      
+      if (!hasRolePermission(userRole, ROLES.ADMIN)) {
+        throw ErrorHandler.handleForbiddenError(ErrorMessages.SHOP.ADMIN_REQUIRED);
+      }
+
+      // Import billing service
+      const { BillingService } = await import('~/lib/billing');
+      
+      // Get real billing status
+      const billingStatus = await BillingService.getBillingStatus(ctx.shop.id) as any;
+      
+      return billingStatus;
+    } catch (error) {
+      if (error instanceof TRPCError) {
+        throw error;
+      }
+      throw ErrorHandler.handleDatabaseError(error, "shop.getBillingStatus");
+    }
+  }),
+
+  // Change plan (Admin only)
+  changePlan: shopProcedure
+    .input(z.object({
+      planId: z.enum(['starter', 'professional', 'enterprise']),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        // Check if user has admin permissions
+        const userRole = ctx.userRole;
+        
+        if (!hasRolePermission(userRole, ROLES.ADMIN)) {
+          throw ErrorHandler.handleForbiddenError(ErrorMessages.SHOP.ADMIN_REQUIRED);
+        }
+
+        // Import billing service
+        const { BillingService } = await import('~/lib/billing');
+        
+        // Update subscription
+        const subscription = await BillingService.updateSubscription(
+          ctx.shop.id,
+          input.planId
+        ) as any;
+
+        return { success: true, subscription };
+      } catch (error) {
+        if (error instanceof TRPCError) {
+          throw error;
+        }
+        throw ErrorHandler.handleDatabaseError(error, "shop.changePlan");
+      }
+    }),
+
+  // Cancel subscription (Admin only)
+  cancelSubscription: shopProcedure
+    .mutation(async ({ ctx }) => {
+      try {
+        // Check if user has admin permissions
+        const userRole = ctx.userRole;
+        
+        if (!hasRolePermission(userRole, ROLES.ADMIN)) {
+          throw ErrorHandler.handleForbiddenError(ErrorMessages.SHOP.ADMIN_REQUIRED);
+        }
+
+        // Import billing service
+        const { BillingService } = await import('~/lib/billing');
+        
+        // Cancel subscription
+        await BillingService.cancelSubscription(ctx.shop.id);
+
+        return { success: true };
+      } catch (error) {
+        if (error instanceof TRPCError) {
+          throw error;
+        }
+        throw ErrorHandler.handleDatabaseError(error, "shop.cancelSubscription");
+      }
+    }),
 }); 

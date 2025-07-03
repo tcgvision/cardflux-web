@@ -13,13 +13,25 @@ datasource db {
 
 // --- CORE MODELS --- //
 model Shop {
-  id          String   @id             // Clerk Org ID
+  id          String   @id @default(cuid())
   name        String
   slug        String   @unique
   description String?
   type        String   // "local", "online", or "both"
+  clerkOrgId  String   @unique // Clerk Organization ID
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  
+  // Billing fields - simplified for Clerk billing
+  planId              String?   @default("starter")
+  planStatus          String?   @default("active") // active, past_due, canceled, trialing
+  clerkSubscriptionId String?
+  trialEndsAt         DateTime?
+  
+  // Usage tracking
+  currentUsers        Int @default(0)
+  currentProducts     Int @default(0)
+  monthlyTransactions Int @default(0)
   
   // Enhanced address structure
   address     ShopAddress?
@@ -42,6 +54,7 @@ model Shop {
   buylists    Buylist[]
   storeCreditTransactions StoreCreditTransaction[]
   settings    ShopSettings?
+  billingEvents BillingEvent[]
 }
 
 // Enhanced address model
@@ -448,4 +461,52 @@ model ShopSettings {
   
   // Relations
   shop                  Shop @relation(fields: [shopId], references: [id])
+}
+
+// --- BILLING --- //
+model BillingEvent {
+  id        String   @id @default(cuid())
+  shopId    String
+  eventType String   // subscription.created, subscription.updated, payment.failed, etc.
+  eventData Json
+  createdAt DateTime @default(now())
+  
+  // Relations
+  shop      Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  
+  @@index([shopId, createdAt])
+  @@index([eventType, createdAt])
+}
+
+// --- WAITLIST SYSTEM --- //
+model WaitlistEntry {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  firstName   String?
+  lastName    String?
+  storeName   String?
+  storeType   String?  // "TCG", "Comic", "Figure", "General", etc.
+  expectedLaunch String? // "Q1 2024", "Q2 2024", etc.
+  
+  // Communication preferences
+  emailUpdates Boolean @default(true)
+  progressUpdates Boolean @default(true)
+  launchNotifications Boolean @default(true)
+  
+  // Discount and tracking
+  discountCode String? @unique // Generated 10% discount code
+  discountUsed Boolean @default(false)
+  
+  // Metadata
+  source      String?  // "landing_page", "pricing_page", etc.
+  referrer    String?  // Where they came from
+  ipAddress   String?
+  userAgent   String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([email])
+  @@index([storeType])
+  @@index([createdAt])
 }

@@ -182,12 +182,14 @@ async function handleOrganizationCreated(orgData: any) {
       update: {
         name,
         slug,
+        clerkOrgId: id, // Link to Clerk organization ID
       },
       create: {
         id,
         name,
         slug,
         type: 'local',
+        clerkOrgId: id, // Link to Clerk organization ID
       },
     });
     
@@ -199,7 +201,7 @@ async function handleOrganizationCreated(orgData: any) {
 }
 
 async function handleOrganizationUpdated(orgData: any) {
-  const { id, name, slug } = orgData;
+  const { id, name, slug, private_metadata } = orgData;
 
   try {
     await db.shop.update({
@@ -207,6 +209,11 @@ async function handleOrganizationUpdated(orgData: any) {
       data: {
         name,
         slug,
+        // Update billing information from Clerk's private metadata
+        planId: private_metadata?.planId || 'starter',
+        planStatus: private_metadata?.planStatus || 'active',
+        clerkSubscriptionId: private_metadata?.subscriptionId,
+        trialEndsAt: private_metadata?.trialEndsAt ? new Date(private_metadata.trialEndsAt) : null,
       },
     });
     
