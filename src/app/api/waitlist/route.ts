@@ -71,9 +71,9 @@ export async function POST(request: NextRequest) {
         expectedLaunch: validatedData.expectedLaunch,
         source: validatedData.source,
         referrer: validatedData.referrer,
-        ipAddress: request.ip || headersList.get("x-forwarded-for") || "unknown",
+        ipAddress: (request as any).ip || headersList.get("x-forwarded-for") || "unknown",
         userAgent: headersList.get("user-agent") || "unknown",
-        discountCode,
+        discountCode: discountCode!,
       },
     });
     

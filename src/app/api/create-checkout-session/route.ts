@@ -1,13 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import Stripe from "stripe";
+// import { auth } from "@clerk/nextjs/server";
+// import Stripe from "stripe";
 
+// TODO: Re-enable Stripe after landing page deployment
 // Initialize Stripe
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2024-12-18.acacia",
-});
+// const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+//   apiVersion: "2024-12-18.acacia",
+// });
 
 export async function POST(request: NextRequest) {
+  // Temporarily disabled for landing page deployment
+  return NextResponse.json(
+    { error: "Checkout temporarily disabled" },
+    { status: 503 }
+  );
+
+  /* ORIGINAL CODE - Re-enable after deployment:
   try {
     const { userId } = await auth();
     
@@ -87,4 +95,5 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
+  */
 } 
