@@ -41,6 +41,14 @@
   "exclude": [
     "node_modules",
     "scripts/**/*",
-    "prisma/seed.ts"
+    "prisma/**/*",
+    "src/app/dashboard/**/*",
+    "src/app/api/**/*",
+    "src/app/posts/**/*",
+    "src/app/debug/**/*",
+    "src/app/create-shop/**/*",
+    "src/server/**/*",
+    "src/lib/auth-sync.ts",
+    "src/lib/billing.ts"
   ]
 }
