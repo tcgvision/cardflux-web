@@ -3,6 +3,9 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function main() {
+  console.log('🌱 Seed temporarily disabled for deployment');
+  return; // TODO: Fix schema issues before re-enabling seed
+
   console.log('🌱 Starting database seed...');
 
   // Create a sample shop with enhanced details

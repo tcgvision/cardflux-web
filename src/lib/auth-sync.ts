@@ -134,7 +134,7 @@ export class AuthSyncService {
         where: { id: user.id },
         data: {
           shopId: shop.id,
-          role: orgRole || 'org:member',
+          role: orgRole ?? undefined,
         },
         include: { shop: true }
       });
@@ -145,7 +145,7 @@ export class AuthSyncService {
         data: {
           userId: updatedUser.id.toString(),
           shopId: shop.id,
-          role: updatedUser.role,
+          role: updatedUser.role ?? undefined,
           wasCreated: !user.shopId,
           wasUpdated: !!user.shopId && user.shopId !== shop.id
         }
@@ -167,7 +167,8 @@ export class AuthSyncService {
   static async syncOrganization(orgId: string): Promise<SyncResult[]> {
     try {
       // Get organization members from Clerk
-      const members = await clerkClient.organizations.getOrganizationMembershipList({
+      const clerk = await clerkClient();
+      const members = await clerk.organizations.getOrganizationMembershipList({
         organizationId: orgId
       });
 
@@ -206,7 +207,8 @@ export class AuthSyncService {
       // Check each user's consistency
       for (const dbUser of dbUsers) {
         try {
-          const clerkUser = await clerkClient.users.getUser(dbUser.clerkId);
+          const clerk = await clerkClient();
+          const clerkUser = await clerk.users.getUser(dbUser.clerkId);
           const orgMemberships = (clerkUser as any)?.organizationMemberships ?? [];
 
           // Check if user has shopId but no Clerk org membership

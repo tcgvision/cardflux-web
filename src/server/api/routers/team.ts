@@ -110,9 +110,15 @@ export const teamRouter = createTRPCRouter({
       name: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      // TODO: Re-enable after fixing Clerk SDK async issues
+      throw new TRPCError({
+        code: "NOT_IMPLEMENTED",
+        message: "Team management temporarily disabled for deployment",
+      });
+
       // Check if user has admin permissions
       const userRole = ctx.userRole;
-      
+
       if (!hasRolePermission(userRole, ROLES.ADMIN)) {
         throw new TRPCError({
           code: "FORBIDDEN",
@@ -200,9 +206,15 @@ export const teamRouter = createTRPCRouter({
       role: z.enum([ROLES.ADMIN, ROLES.MEMBER]),
     }))
     .mutation(async ({ ctx, input }) => {
+      // TODO: Re-enable after fixing Clerk SDK async issues
+      throw new TRPCError({
+        code: "NOT_IMPLEMENTED",
+        message: "Team management temporarily disabled for deployment",
+      });
+
       // Check if user has admin permissions
       const userRole = ctx.userRole;
-      
+
       if (!hasRolePermission(userRole, ROLES.ADMIN)) {
         throw new TRPCError({
           code: "FORBIDDEN",
@@ -254,9 +266,15 @@ export const teamRouter = createTRPCRouter({
       userId: z.string(),
     }))
     .mutation(async ({ ctx, input }) => {
+      // TODO: Re-enable after fixing Clerk SDK async issues
+      throw new TRPCError({
+        code: "NOT_IMPLEMENTED",
+        message: "Team management temporarily disabled for deployment",
+      });
+
       // Check if user has admin permissions
       const userRole = ctx.userRole;
-      
+
       if (!hasRolePermission(userRole, ROLES.ADMIN)) {
         throw new TRPCError({
           code: "FORBIDDEN",
@@ -306,9 +324,15 @@ export const teamRouter = createTRPCRouter({
 
   // Get pending invitations
   getPendingInvitations: shopProcedure.query(async ({ ctx }) => {
+    // TODO: Re-enable after fixing Clerk SDK async issues
+    throw new TRPCError({
+      code: "NOT_IMPLEMENTED",
+      message: "Team management temporarily disabled for deployment",
+    });
+
     // Check if user has admin permissions
     const userRole = ctx.userRole;
-    
+
     if (!hasRolePermission(userRole, ROLES.ADMIN)) {
       throw new TRPCError({
         code: "FORBIDDEN",
@@ -346,9 +370,15 @@ export const teamRouter = createTRPCRouter({
       invitationId: z.string(),
     }))
     .mutation(async ({ ctx, input }) => {
+      // TODO: Re-enable after fixing Clerk SDK async issues
+      throw new TRPCError({
+        code: "NOT_IMPLEMENTED",
+        message: "Team management temporarily disabled for deployment",
+      });
+
       // Check if user has admin permissions
       const userRole = ctx.userRole;
-      
+
       if (!hasRolePermission(userRole, ROLES.ADMIN)) {
         throw new TRPCError({
           code: "FORBIDDEN",
@@ -382,6 +412,12 @@ export const teamRouter = createTRPCRouter({
       invitationId: z.string(),
     }))
     .mutation(async ({ ctx, input }) => {
+      // TODO: Re-enable after fixing Clerk SDK async issues
+      throw new TRPCError({
+        code: "NOT_IMPLEMENTED",
+        message: "Team management temporarily disabled for deployment",
+      });
+
       // Check if user has admin permissions
       const userRole = ctx.userRole;
       

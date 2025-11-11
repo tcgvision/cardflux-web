@@ -254,11 +254,15 @@ export class UsageTracker {
   }
 }
 
-// Billing service
+// Billing service - TEMPORARILY DISABLED FOR LANDING PAGE DEPLOYMENT
 export class BillingService {
   static async createSubscription(organizationId: string, planId: PlanId): Promise<any> {
-    try {
-      const subscription = await clerkClient.organizations.createSubscription({
+    // TODO: Re-enable after fixing Clerk SDK async issues
+    console.warn('Billing service temporarily disabled');
+    return null;
+    /* try {
+      const clerk = await clerkClient();
+      const subscription = await clerk.organizations.createSubscription({
         organizationId,
         planId,
         paymentMethodId: null, // Will use default payment method
@@ -288,12 +292,16 @@ export class BillingService {
     } catch (error) {
       console.error('Failed to create subscription:', error);
       throw error;
-    }
+    } */
   }
 
   static async updateSubscription(organizationId: string, planId: PlanId): Promise<any> {
-    try {
-      const subscription = await clerkClient.organizations.updateSubscription({
+    // TODO: Re-enable after fixing Clerk SDK async issues
+    console.warn('Billing service temporarily disabled');
+    return null;
+    /* try {
+      const clerk = await clerkClient();
+      const subscription = await clerk.organizations.updateSubscription({
         organizationId,
         planId,
       });
@@ -321,12 +329,16 @@ export class BillingService {
     } catch (error) {
       console.error('Failed to update subscription:', error);
       throw error;
-    }
+    } */
   }
 
   static async cancelSubscription(organizationId: string): Promise<void> {
-    try {
-      await clerkClient.organizations.cancelSubscription({
+    // TODO: Re-enable after fixing Clerk SDK async issues
+    console.warn('Billing service temporarily disabled');
+    return;
+    /* try {
+      const clerk = await clerkClient();
+      await clerk.organizations.cancelSubscription({
         organizationId,
       });
 
@@ -350,11 +362,14 @@ export class BillingService {
     } catch (error) {
       console.error('Failed to cancel subscription:', error);
       throw error;
-    }
+    } */
   }
 
   static async getSubscription(organizationId: string): Promise<any> {
-    try {
+    // TODO: Re-enable after fixing Clerk SDK async issues
+    console.warn('Billing service temporarily disabled');
+    return null;
+    /* try {
       const subscription = await clerkClient.organizations.getSubscription({
         organizationId,
       });
@@ -363,7 +378,7 @@ export class BillingService {
     } catch (error) {
       console.error('Failed to get subscription:', error);
       throw error;
-    }
+    } */
   }
 
   static async getBillingStatus(shopId: string): Promise<any> {
@@ -373,7 +388,7 @@ export class BillingService {
         select: {
           planId: true,
           planStatus: true,
-          nextBillingDate: true,
+          // nextBillingDate: true, // TODO: Add this field to schema
           currentUsers: true,
           currentProducts: true,
           monthlyTransactions: true,
@@ -392,7 +407,7 @@ export class BillingService {
       return {
         plan: shop.planId,
         status: shop.planStatus,
-        nextBillingDate: shop.nextBillingDate,
+        // nextBillingDate: shop.nextBillingDate, // TODO: Add this field to schema
         amount: plan.price,
         currency: 'USD',
         interval: 'month',

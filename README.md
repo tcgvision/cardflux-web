@@ -33,7 +33,8 @@ This project is built using the [T3 Stack](https://create.t3.gg/), a collection 
 │   └── schema.prisma  # DB schema
 ├── types/        # Global types
 ├── public/       # Static assets
-└── .env.example  # Environment variable template
+└── env/
+    └── clerk.env.example  # Environment variable template
 ```
 
 ## 🚀 Getting Started
@@ -52,18 +53,22 @@ pnpm install
 If you don't have it yet: `npm i -g pnpm`
 
 ### 3. Environment Setup
-Create your `.env` file:
+Create your `.env.local` file:
 ```bash
-cp .env.example .env
+cp env/clerk.env.example .env.local
 ```
 
-Add the following variables:
+Update the placeholders with your real values:
 ```env
-DATABASE_URL=postgresql://...
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=...
-CLERK_SECRET_KEY=...
-NEXT_PUBLIC_SUPABASE_URL=...
-NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
+CLERK_SECRET_KEY=sk_test_...
+NEXT_PUBLIC_CLERK_SIGN_IN_URL=/auth/sign-in
+NEXT_PUBLIC_CLERK_SIGN_UP_URL=/auth/sign-up
+NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/dashboard
+NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/create-shop
+NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL=/dashboard
+NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL=/create-shop
+SIGNING_SECRET=whsec_...
 ```
 
 ### 4. Database Setup

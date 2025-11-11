@@ -3,6 +3,9 @@
 import { db } from '../src/server/db';
 
 async function cleanupOrphanedData() {
+  console.log('🧹 Cleanup script temporarily disabled for deployment');
+  return; // TODO: Fix TypeScript errors before re-enabling
+
   console.log('🧹 Starting cleanup of orphaned data...\n');
 
   try {

@@ -109,6 +109,7 @@ export const shopRouter = createTRPCRouter({
         const shop = await ctx.db.shop.create({
           data: {
             id: orgId, // Use Clerk org ID
+            clerkOrgId: orgId, // Required field
             name: input.name,
             slug: uniqueSlug,
             description: input.description,
