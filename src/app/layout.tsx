@@ -1,4 +1,3 @@
-import { ClerkProvider } from "@clerk/nextjs";
 import { Montserrat } from "next/font/google";
 import "~/styles/globals.css";
 import { type Metadata } from "next";
@@ -7,7 +6,7 @@ import { Toaster } from "sonner";
 import { NavbarWrapper } from "./_components/navbar-wrapper";
 import { ThemeProvider } from "~/components/themeprovider";
 
-const montserrat = Montserrat({ 
+const montserrat = Montserrat({
   subsets: ["latin"],
   variable: "--font-montserrat",
 });
@@ -36,21 +35,9 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <ClerkProvider
-            appearance={{
-              elements: {
-                formButtonPrimary: "bg-primary hover:bg-primary/90",
-                footerActionLink: "text-primary hover:text-primary/90",
-              },
-            }}
-            signInUrl="/auth/sign-in"
-            signUpUrl="/auth/sign-up"
-            publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
-          >
-            <NavbarWrapper />
-            <TRPCReactProvider>{children}</TRPCReactProvider>
-            <Toaster />
-          </ClerkProvider>
+          <NavbarWrapper />
+          <TRPCReactProvider>{children}</TRPCReactProvider>
+          <Toaster />
         </ThemeProvider>
       </body>
     </html>
