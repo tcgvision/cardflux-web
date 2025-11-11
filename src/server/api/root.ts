@@ -1,34 +1,11 @@
-import { createTRPCRouter } from "~/server/api/trpc";
-import { shopRouter } from "./routers/shop";
-import { customerRouter } from "./routers/customer";
-import { transactionRouter } from "./routers/transaction";
-import { teamRouter } from "./routers/team";
-import { debugRouter } from "./routers/debug";
-import { billingRouter } from "./routers/billing";
-import { createCallerFactory } from "~/server/api/trpc";
+// Root router disabled for landing page deployment
+// TODO: Restore from src/server.bak after deployment
 
-/**
- * This is the primary router for your server.
- *
- * All routers added in /api/routers should be manually added here.
- */
+import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
+
 export const appRouter = createTRPCRouter({
-  shop: shopRouter,
-  customer: customerRouter,
-  transaction: transactionRouter,
-  team: teamRouter,
-  debug: debugRouter,
-  billing: billingRouter,
+  // Empty router for landing page
 });
 
-// export type definition of API
 export type AppRouter = typeof appRouter;
-
-/**
- * Create a server-side caller for the tRPC API.
- * @example
- * const trpc = createCaller(createContext);
- * const res = await trpc.post.all();
- *       ^? Post[]
- */
 export const createCaller = createCallerFactory(appRouter);
