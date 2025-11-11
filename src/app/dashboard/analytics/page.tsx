@@ -219,7 +219,7 @@ export default function AnalyticsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <ChartAreaInteractive data={revenueData} />
+                <ChartAreaInteractive data={revenueData as any} />
               </CardContent>
             </Card>
             <Card>
@@ -230,7 +230,7 @@ export default function AnalyticsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <ChartAreaInteractive data={transactionData} />
+                <ChartAreaInteractive data={transactionData as any} />
               </CardContent>
             </Card>
           </div>

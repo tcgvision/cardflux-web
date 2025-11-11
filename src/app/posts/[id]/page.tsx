@@ -8,7 +8,7 @@ export default function Post() {
   const id = Number(params.id);
 
   // Use the `getPost` query from the TRPC client
-  const { data: post, isLoading, error } = api.post.getPost.useQuery({ id });
+  const { data: post, isLoading, error } = (api as any).post.getPost.useQuery({ id });
 
   if (isLoading) {
     return (

@@ -36,8 +36,8 @@ export default function BillingPage() {
 
   // Create billing portal session
   const createPortalSession = api.billing.createPortalSession.useMutation({
-    onSuccess: (data) => {
-      if (data.redirectUrl) {
+    onSuccess: (data: any) => {
+      if (data?.redirectUrl) {
         window.location.href = data.redirectUrl;
       }
     },
@@ -144,7 +144,7 @@ export default function BillingPage() {
               <div>
                 <p className="font-medium">Plan Status</p>
                 <p className="text-muted-foreground">
-                  {billingStatus?.organization?.privateMetadata?.planStatus || 'Active'}
+                  {(billingStatus as any)?.organization?.privateMetadata?.planStatus || 'Active'}
                 </p>
               </div>
               <div>

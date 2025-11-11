@@ -12,12 +12,12 @@ export default function NewPost() {
   const { userId, isLoaded } = useAuth()
   
   // Use the createPost mutation from the TRPC client
-  const createPostMutation = api.post.createPost.useMutation({
+  const createPostMutation = (api as any).post.createPost.useMutation({
     onSuccess: () => {
       router.push('/')
       router.refresh()
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error('Failed to create post:', error)
       // You might want to show an error message to the user here
     },
