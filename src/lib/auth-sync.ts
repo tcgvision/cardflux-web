@@ -170,6 +170,7 @@ export class AuthSyncService {
         error: error instanceof Error ? error.message : "Unknown error"
       };
     }
+    */
   }
 
   /**
