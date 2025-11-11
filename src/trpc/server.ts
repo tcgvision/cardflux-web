@@ -2,7 +2,6 @@
 // TODO: Restore from server.ts.bak after deployment
 
 import "server-only";
-import type { ReactNode } from "react";
 
 // Stub API that returns empty object
 export const api = new Proxy({} as any, {
@@ -16,7 +15,7 @@ export const api = new Proxy({} as any, {
   },
 });
 
-// Stub HydrateClient that just renders children
-export function HydrateClient({ children }: { children: ReactNode }) {
-  return <>{children}</>;
+// Stub HydrateClient that just returns children without JSX
+export function HydrateClient({ children }: { children: any }) {
+  return children;
 }
