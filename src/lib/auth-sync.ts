@@ -1,5 +1,8 @@
+// TEMPORARILY DISABLED FOR LANDING PAGE DEPLOYMENT
+// TODO: Re-enable after fixing Clerk SDK async issues
+
 import { db } from "~/server/db";
-import { clerkClient } from "@clerk/nextjs/server";
+// import { clerkClient } from "@clerk/nextjs/server";
 import { ROLES, getNormalizedRole, type Role } from "~/lib/roles";
 import type { PrismaClient } from "@prisma/client";
 
@@ -56,9 +59,17 @@ export class AuthSyncService {
    * Sync a single user with their Clerk data
    */
   static async syncUser(userId: string): Promise<SyncResult> {
+    // TODO: Re-enable after fixing Clerk SDK
+    return {
+      success: false,
+      message: "Auth sync temporarily disabled for deployment",
+      error: "DISABLED"
+    };
+
+    /* ORIGINAL CODE - Re-enable later:
     try {
       // Get user from Clerk
-      const clerkUser = await clerkClient.users.getUser(userId);
+      const clerkUser = await (await clerkClient()).users.getUser(userId);
       if (!clerkUser) {
         return {
           success: false,
@@ -296,6 +307,7 @@ export class AuthSyncService {
         error: error instanceof Error ? error.message : "Unknown error"
       };
     }
+    */
   }
 }
 
