@@ -216,10 +216,9 @@ export class AuthSyncService {
    */
   static async checkConsistency(): Promise<ConsistencyCheckResult> {
     return {
-      success: true,
+      isConsistent: true,
       issues: [],
-      fixes: [],
-      summary: "Consistency check temporarily disabled for deployment"
+      fixes: []
     };
 
     /* ORIGINAL CODE:
