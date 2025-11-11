@@ -131,7 +131,7 @@ export const teamRouter = createTRPCRouter({
         where: { email: input.email },
       });
 
-      if (existingUser && existingUser.shopId === ctx.shop.id) {
+      if (existingUser && existingUser?.shopId === ctx.shop.id) {
         throw new TRPCError({
           code: "CONFLICT",
           message: "User is already a member of this shop",
