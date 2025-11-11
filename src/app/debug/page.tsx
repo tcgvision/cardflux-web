@@ -64,8 +64,8 @@ export default function DebugPage() {
       const data = await response.json();
       setResult(data);
       console.log('Fix result:', data);
-    } catch (error) {
-      setResult({ error: error.message });
+    } catch (error: any) {
+      setResult({ error: error?.message || 'Unknown error' });
     } finally {
       setLoading(false);
     }
@@ -116,7 +116,7 @@ export default function DebugPage() {
                 <div><strong>ID:</strong> {organization?.id || "N/A"}</div>
                 <div><strong>Name:</strong> {organization?.name || "N/A"}</div>
                 <div><strong>Slug:</strong> {organization?.slug || "N/A"}</div>
-                <div><strong>Role:</strong> {organization?.membership?.role || "N/A"}</div>
+                <div><strong>Role:</strong> {(organization as any)?.membership?.role || "N/A"}</div>
               </div>
             </div>
           </div>

@@ -178,8 +178,8 @@ export default function TestRolesPage() {
                     id: organization?.id,
                     name: organization?.name,
                     membership: {
-                      role: organization?.membership?.role,
-                      permissions: organization?.membership?.permissions,
+                      role: (organization as any)?.membership?.role,
+                      permissions: (organization as any)?.membership?.permissions,
                     },
                   },
                   apiData: {

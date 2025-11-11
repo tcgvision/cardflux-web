@@ -25,7 +25,7 @@ export function RoleGate({ children, allowedRoles, fallback }: RoleGateProps) {
 // Convenience components for common role checks
 export function AdminOnly({ children, fallback }: Omit<RoleGateProps, "allowedRoles">) {
   return (
-    <RoleGate allowedRoles={["admin"]} fallback={fallback}>
+    <RoleGate allowedRoles={["admin" as Role]} fallback={fallback}>
       {children}
     </RoleGate>
   );
@@ -33,7 +33,7 @@ export function AdminOnly({ children, fallback }: Omit<RoleGateProps, "allowedRo
 
 export function MemberOrAdmin({ children, fallback }: Omit<RoleGateProps, "allowedRoles">) {
   return (
-    <RoleGate allowedRoles={["member", "admin"]} fallback={fallback}>
+    <RoleGate allowedRoles={["member" as Role, "admin" as Role]} fallback={fallback}>
       {children}
     </RoleGate>
   );
