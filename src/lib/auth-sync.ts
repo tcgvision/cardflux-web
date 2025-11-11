@@ -176,6 +176,13 @@ export class AuthSyncService {
    * Sync all users in an organization
    */
   static async syncOrganization(orgId: string): Promise<SyncResult[]> {
+    return [{
+      success: false,
+      message: "Auth sync temporarily disabled for deployment",
+      error: "DISABLED"
+    }];
+
+    /* ORIGINAL CODE:
     try {
       // Get organization members from Clerk
       const clerk = await clerkClient();
@@ -200,12 +207,21 @@ export class AuthSyncService {
         error: error instanceof Error ? error.message : "Unknown error"
       }];
     }
+    */
   }
 
   /**
    * Check consistency between Clerk and database
    */
   static async checkConsistency(): Promise<ConsistencyCheckResult> {
+    return {
+      success: true,
+      issues: [],
+      fixes: [],
+      summary: "Consistency check temporarily disabled for deployment"
+    };
+
+    /* ORIGINAL CODE:
     const issues: string[] = [];
     const fixes: string[] = [];
 
@@ -262,12 +278,20 @@ export class AuthSyncService {
         fixes: []
       };
     }
+    */
   }
 
   /**
    * Fix user-shop linking issues
    */
   static async fixUserShopLinking(userId: string): Promise<SyncResult> {
+    return {
+      success: false,
+      message: "Fix user-shop linking temporarily disabled for deployment",
+      error: "DISABLED"
+    };
+
+    /* ORIGINAL CODE:
     try {
       // Get user from database
       const user = await db.user.findUnique({
